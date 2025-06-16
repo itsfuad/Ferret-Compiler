@@ -45,3 +45,18 @@ func (e *ExpressionStmt) Loc() *source.Location {
 
 func (e *ExpressionStmt) INode() Node { return e }
 func (e *ExpressionStmt) Stmt()       {} // Stmt is a marker interface for all statements
+
+// MultiProgram represents a program that may span multiple files.
+// It holds a map of file paths to their corresponding Program ASTs.
+type MultiProgram struct {
+	Programs map[string]*Program
+}
+
+// Loc returns the source location of the MultiProgram.
+// For now, this returns nil as the concept of a single location for a multi-file program is ambiguous.
+// It might represent the entry file or a span of all files in the future.
+func (mp *MultiProgram) Loc() *source.Location {
+	return nil // Placeholder
+}
+
+func (mp *MultiProgram) INode() Node { return mp }

@@ -3,6 +3,7 @@ package lexer
 import (
 	//Standard packages
 	"ferret/compiler/internal/source"
+	"ferret/compiler/report" // Added import for report package
 	"os"
 	"regexp"
 )
@@ -23,43 +24,19 @@ type Lexer struct {
 	FilePath   string
 }
 
-func (lex *Lexer) advance(match string) {
-	lex.Position.Advance(match)
-}
-
-func (lex *Lexer) push(token Token) {
-	lex.Tokens = append(lex.Tokens, token)
-}
-
-func (lex *Lexer) at() byte {
-	return lex.sourceCode[lex.Position.Index]
-}
-
-func (lex *Lexer) remainder() string {
-	return string(lex.sourceCode)[lex.Position.Index:]
-}
-
-func (lex *Lexer) atEOF() bool {
-	return lex.Position.Index >= len(lex.sourceCode)
-}
-
-func createLexer(filePath *string) *Lexer {
-
-	fileText, err := os.ReadFile(*filePath)
-	if err != nil {
-		panic(err)
-	}
-
-	//create the lexer
+// newLexerInternal creates a new Lexer instance with the given source code and file path.
+// It initializes the lexer's position and regex patterns.
+// This function assumes fileText is the content of the file.
+func newLexerInternal(fileText []byte, filePath string) *Lexer {
 	lex := &Lexer{
 		sourceCode: fileText,
+		FilePath:   filePath, // Store filePath for reporting
 		Tokens:     make([]Token, 0),
 		Position: source.Position{
 			Line:   1,
 			Column: 1,
 			Index:  0,
 		},
-
 		patterns: []regexPattern{
 			//{regexp.MustCompile(`\n`), skipHandler}, // newlines
 			{regexp.MustCompile(`\s+`), skipHandler},              // whitespace
@@ -114,6 +91,26 @@ func createLexer(filePath *string) *Lexer {
 		},
 	}
 	return lex
+}
+
+func (lex *Lexer) advance(match string) {
+	lex.Position.Advance(match)
+}
+
+func (lex *Lexer) push(token Token) {
+	lex.Tokens = append(lex.Tokens, token)
+}
+
+func (lex *Lexer) at() byte {
+	return lex.sourceCode[lex.Position.Index]
+}
+
+func (lex *Lexer) remainder() string {
+	return string(lex.sourceCode)[lex.Position.Index:]
+}
+
+func (lex *Lexer) atEOF() bool {
+	return lex.Position.Index >= len(lex.sourceCode)
 }
 
 // defaultHandler returns a regexHandler function that processes a token of the specified kind and value.
@@ -221,8 +218,19 @@ func skipHandler(lex *Lexer, regex *regexp.Regexp) {
 
 // Tokenize reads the source code from the specified file and tokenizes it.
 func Tokenize(filename string, debug bool) []Token {
-	lex := createLexer(&filename)
-	lex.FilePath = filename
+	fileText, err := os.ReadFile(filename)
+	if err != nil {
+		// Report the error
+		startPos := source.Position{Line: 1, Column: 0, Index: 0}
+		endPos := source.Position{Line: 1, Column: 0, Index: 0}
+		fileLocation := source.NewLocation(&startPos, &endPos)
+		// Assuming report.NORMAL_ERROR is a valid error level that doesn't panic immediately.
+		// The parser will then use this information via an empty token list.
+		report.Add(filename, fileLocation, "File system error: "+err.Error()).SetLevel(report.NORMAL_ERROR)
+		return []Token{} // Return empty token slice
+	}
+
+	lex := newLexerInternal(fileText, filename) // Use the new internal constructor
 
 	for !lex.atEOF() {
 
@@ -240,9 +248,15 @@ func Tokenize(filename string, debug bool) []Token {
 		}
 
 		if !matched {
-			//errStr := fmt.Sprintf("lexer:unexpected charecter: '%c'", lex.at())
-			//report.Add(filename, lex.Position.Line, lex.Position.Line, lex.Position.Column, lex.Position.Column, errStr).SetLevel(report.CRITICAL_ERROR)
-			return nil
+			// If no pattern matches, it's an unexpected character.
+			// Report this as a critical error for now, as it means the lexer cannot proceed.
+			// In a more advanced lexer, it might try to recover or report a more specific tokenization error.
+			startPos := lex.Position
+			lex.advance(string(lex.at())) // Advance by one character
+			endPos := lex.Position
+			location := source.NewLocation(&startPos, &endPos)
+			report.Add(lex.FilePath, location, "Unexpected character: '"+string(lex.sourceCode[startPos.Index])+"'").SetLevel(report.SYNTAX_ERROR) // SYNTAX_ERROR will panic
+			return []Token{} // Return empty to signify failure, though panic would have occurred
 		}
 	}
 

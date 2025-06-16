@@ -1,0 +1,6 @@
+mod main;
+
+import "other"; // This one exists and should be fine
+import "nonexistent"; // This one should cause a tokenization/read error
+
+let x = other.y;

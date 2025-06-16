@@ -51,5 +51,11 @@ func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) {
 		evaluateTestResult(t, recover(), nodes, desc, isValid)
 	}()
 
-	nodes = p.Parse().Nodes
+	multiProg := p.ParseProgram()
+	// Assuming the test utility is interested in the nodes of the initial filePath
+	if prog, ok := multiProg.Programs[filePath]; ok && prog != nil {
+		nodes = prog.Nodes
+	}
+	// If filePath is not in multiProg.Programs (e.g., if parsing failed catastrophically for it),
+	// nodes will remain empty, which is handled by evaluateTestResult.
 }

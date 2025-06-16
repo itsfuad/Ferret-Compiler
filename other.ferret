@@ -1,0 +1,4 @@
+mod other;
+
+// export const y = 10; // Temporarily commented out for testing multi-file parsing
+const y = 10;

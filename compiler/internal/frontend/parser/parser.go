@@ -6,21 +6,26 @@ import (
 	"ferret/compiler/internal/source"
 	"ferret/compiler/report"
 	"fmt"
+	// "os" // No longer needed after removing Fprintf(os.Stderr,...)
 	"slices"
 )
 
 type Parser struct {
-	tokens   []lexer.Token
-	tokenNo  int
-	filePath string
+	tokens      []lexer.Token
+	tokenNo     int
+	filePath    string
+	fileQueue   []string
+	parsedFiles map[string]bool
 }
 
 func New(filePath string, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, debug)
 	return &Parser{
-		tokens:   tokens,
-		tokenNo:  0,
-		filePath: filePath,
+		tokens:      tokens,
+		tokenNo:     0,
+		filePath:    filePath,
+		fileQueue:   []string{filePath},
+		parsedFiles: make(map[string]bool),
 	}
 }
 
@@ -211,11 +216,13 @@ func parseNode(p *Parser) ast.Node {
 	if _, ok := node.(ast.Statement); ok {
 		//if no semicolon, show error on the previous token
 		if !p.match(lexer.SEMICOLON_TOKEN) {
-			token := p.previous()
-			loc := source.NewLocation(&token.Start, &token.End)
-			loc.Start.Column += 1
-			loc.End.Column += 1
-			report.Add(p.filePath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+			prevToken := p.previous()
+			// peekToken := p.peek() // Debug line, can be removed
+			// fmt.Printf("DEBUG: Semicolon check failed. File: %s. Previous token: '%s' (Kind: %s). Current (Peek) token: '%s' (Kind: %s). Previous Start: %v, End: %v. Peek Start: %v, End: %v\n",
+			// 	p.filePath, prevToken.Value, prevToken.Kind, peekToken.Value, peekToken.Kind, prevToken.Start, prevToken.End, peekToken.Start, peekToken.End)
+
+			loc := source.NewLocation(&prevToken.Start, &prevToken.End)
+			report.Add(p.filePath, loc, report.EXPECTED_SEMICOLON+" after "+prevToken.Value).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
 		}
 		end := p.advance()
 		node.Loc().End.Column = end.End.Column
@@ -225,8 +232,8 @@ func parseNode(p *Parser) ast.Node {
 	return node
 }
 
-// Parse is the entry point for parsing
-func (p *Parser) Parse() *ast.Program {
+// parseCurrentFile is the entry point for parsing
+func (p *Parser) parseCurrentFile() *ast.Program {
 
 	var nodes []ast.Node
 
@@ -249,4 +256,67 @@ func (p *Parser) Parse() *ast.Program {
 		Nodes:    nodes,
 		Location: *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
+}
+
+// ParseProgram is the entry point for parsing a program that may span multiple files.
+func (p *Parser) ParseProgram() *ast.MultiProgram {
+	multiProgram := &ast.MultiProgram{Programs: make(map[string]*ast.Program)}
+	processedInitialFile := false
+
+	for len(p.fileQueue) > 0 {
+		// Dequeue
+		filePathToParse := p.fileQueue[0]
+		p.fileQueue = p.fileQueue[1:]
+
+		if _, alreadyParsed := p.parsedFiles[filePathToParse]; alreadyParsed {
+			continue
+		}
+
+		// The lexer.Tokenize function handles file reading and reports I/O errors.
+		// If Tokenize encounters an error, it reports it and returns empty tokens.
+		// For the very first file (entry point), tokens are already loaded by New().
+		// For subsequent files, we load them here.
+		if !processedInitialFile && filePathToParse == p.filePath {
+			// This is the initial file path that New() already tokenized.
+			// Its tokens are in p.tokens. We don't need to re-tokenize.
+			// However, p.filePath is already correctly set by New().
+			processedInitialFile = true
+		} else {
+			// This is a new file from the queue, or we want to ensure fresh tokenization
+			// if New() behavior changes.
+			p.tokens = lexer.Tokenize(filePathToParse, false) // Assuming debug is false
+			p.filePath = filePathToParse
+			p.tokenNo = 0
+		}
+
+		// If tokenization failed (e.g., file not found), tokens might be empty or only EOF.
+		// parseCurrentFile should handle this gracefully (e.g. return empty Program).
+		// lexer.Tokenize itself uses the report package for file I/O errors.
+		// The check for p.tokens[0].Start.File was removed as Token/Position doesn't store File.
+		// Check if tokenization failed or yielded no useful tokens.
+		// lexer.Tokenize itself reports detailed errors (like file not found or actual tokenization errors).
+		if len(p.tokens) == 0 || (len(p.tokens) == 1 && p.tokens[0].Kind == lexer.EOF_TOKEN) {
+			// Add a high-level error indicating this file could not be processed.
+			// Create a placeholder location for file-level errors (e.g., start of file).
+			// Assuming Position struct is {Line int, Column int, Offset int}
+			// And NewLocation takes two *Position args.
+			// A more specific file-level location might be introduced in 'source' package later.
+			startPos := source.Position{Line: 1, Column: 0, Index: 0} // Line 1, Col 0, Index 0
+			endPos := source.Position{Line: 1, Column: 0, Index: 0}   // Same for a zero-length location
+			fileLocation := source.NewLocation(&startPos, &endPos)
+
+			// Check if lexer.Tokenize itself reported any errors. If not, this is more of a "file empty or unreadable" case.
+			// For now, we add a generic error. The `report` package might need more nuanced error querying.
+			report.Add(filePathToParse, fileLocation, "Failed to read or tokenize imported file. Check file existence and content.").SetLevel(report.NORMAL_ERROR)
+
+			p.parsedFiles[filePathToParse] = true // Mark as processed to avoid re-queueing
+			continue                              // Skip parsing this file
+		}
+
+		program := p.parseCurrentFile()
+		multiProgram.Programs[filePathToParse] = program
+		p.parsedFiles[filePathToParse] = true
+	}
+
+	return multiProgram
 }
