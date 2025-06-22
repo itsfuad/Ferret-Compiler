@@ -219,6 +219,11 @@ func Add(filePath string, location *source.Location, msg string) *Report {
 // SetLevel assigns a diagnostic level to the report, increments its count,
 // and triggers DisplayAll if the level is critical or denotes a syntax error.
 func (e *Report) SetLevel(level REPORT_TYPE) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Print()
+		}
+	}()
 	if level == NULL {
 		panic("call SetLevel() method with valid Error level")
 	}

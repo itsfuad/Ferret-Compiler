@@ -1,3 +1,3 @@
 @echo off
-
-go run compiler/main.go
+cd compiler
+go run .

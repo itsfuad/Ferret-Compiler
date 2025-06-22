@@ -1,0 +1,5 @@
+
+
+let a = 1;
+
+let name, age : str, i32 = "John", 30
