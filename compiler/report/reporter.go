@@ -34,9 +34,36 @@ var colorMap = map[REPORT_TYPE]colors.COLOR{
 }
 
 type Reports []*Report
+func (r Reports) Len() int {
+	return len(r)
+}
+func (r *Reports) HasErrors() bool {
+	for _, report := range (*r) {
+		if report.Level == NORMAL_ERROR || report.Level == CRITICAL_ERROR || report.Level == SYNTAX_ERROR || report.Level == SEMANTIC_ERROR {
+			return true
+		}
+	}
+	return false
+}
+func (r *Reports) HasWarnings() bool {
+	for _, report := range (*r) {
+		if report.Level == WARNING {
+			return true
+		}
+	}
+	return false
+}
+func (r *Reports) DisplayAll() {
+	if len(*r) == 0 {
+		return
+	}
 
-// global errors are arrays of error pointers
-var globalReports Reports
+	for _, report := range *r {
+		printReport(report)
+	}
+
+	(*r).ShowStatus()
+}
 
 type HintContainer struct {
 	hint string
@@ -50,26 +77,6 @@ type Report struct {
 	Message  string
 	Hints    HintContainer
 	Level    REPORT_TYPE
-}
-
-// GetReports returns a slice of diagnostics converted from internal reports.
-// It skips any reports that do not have a valid level.
-func GetReports() Reports {
-	var diags Reports
-	for _, r := range globalReports {
-		if r.Level == NULL {
-			// Skip reports without valid level.
-			continue
-		}
-		diags = append(diags, r)
-	}
-
-	return diags
-}
-
-func ClearReports() {
-	globalReports = Reports{}
-	colors.CYAN.Println("Reports cleared")
 }
 
 // printReport prints a formatted diagnostic report to stdout.
@@ -189,7 +196,7 @@ func (r *Report) AddHintAt(msg string, col int) *Report {
 
 // Add creates and registers a new diagnostic report with basic position validation.
 // It returns a pointer to the newly created Diagnostic.
-func Add(filePath string, location *source.Location, msg string) *Report {
+func (r *Reports) Add(filePath string, location *source.Location, msg string) *Report {
 
 	if location.Start.Line < 1 {
 		location.Start.Line = 1
@@ -211,7 +218,11 @@ func Add(filePath string, location *source.Location, msg string) *Report {
 		Level:    NULL,
 	}
 
-	globalReports = append(globalReports, report)
+	if len(*r) == 0 {
+		*r = make([]*Report, 0, 10) // Initialize with a capacity of 10
+	}
+
+	*r = append(*r, report)
 
 	return report
 }
@@ -219,46 +230,13 @@ func Add(filePath string, location *source.Location, msg string) *Report {
 // SetLevel assigns a diagnostic level to the report, increments its count,
 // and triggers DisplayAll if the level is critical or denotes a syntax error.
 func (e *Report) SetLevel(level REPORT_TYPE) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Print()
-		}
-	}()
 	if level == NULL {
 		panic("call SetLevel() method with valid Error level")
 	}
 	e.Level = level
 	if level == CRITICAL_ERROR || level == SYNTAX_ERROR {
-		panic(fmt.Sprintf("%s: %s", level, e.Message))
+		panic("critical or syntax error encountered, stopping compilation")
 	}
-}
-
-// func ShowRedeclarationError(name string, filePath string, scope *symboltable.SymbolTable, location *source.Location) {
-// 	msg := name + " already declared in"
-// 	//find previous declaration position
-// 	sym, found := scope.Resolve(name)
-// 	if found {
-// 		msg += colors.GREY.Sprintf(" %s:%d:%d", sym.FilePath, sym.Location.Start.Line, sym.Location.Start.Column)
-// 	} else {
-// 		msg += " this scope"
-// 	}
-
-// 	Add(filePath, location, msg).SetLevel(SEMANTIC_ERROR)
-// }
-
-// DisplayAll outputs all the diagnostic reports. It recovers from panics,
-// prints a summary status, and exits the process if errors are present.
-func (r Reports) DisplayAll() {
-	for i, err := range r {
-		if err.Level == NULL {
-			panic("call SetLevel() method with valid Error level")
-		}
-		if i != 0 {
-			colors.GREY.Println("------------------------------------------------")
-		}
-		printReport(err)
-	}
-	r.ShowStatus()
 }
 
 // ShowStatus displays a summary of compilation status along with counts of warnings and errors.
@@ -267,9 +245,10 @@ func (r Reports) ShowStatus() {
 	probCount := 0
 
 	for _, report := range r {
-		if report.Level == WARNING {
+		switch report.Level {
+		case WARNING:
 			warningCount++
-		} else if report.Level == NORMAL_ERROR || report.Level == CRITICAL_ERROR || report.Level == SYNTAX_ERROR || report.Level == SEMANTIC_ERROR {
+		case NORMAL_ERROR, CRITICAL_ERROR, SYNTAX_ERROR, SEMANTIC_ERROR:
 			probCount++
 		}
 	}

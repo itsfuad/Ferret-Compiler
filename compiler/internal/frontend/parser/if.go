@@ -24,7 +24,7 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 
 	if condition == nil {
 		token := p.peek()
-		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected condition after 'if'").SetLevel(report.SYNTAX_ERROR)
+		p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected condition after 'if'").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 	// Parse if body

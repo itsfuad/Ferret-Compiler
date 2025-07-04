@@ -19,7 +19,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if types.ValidateHexadecimal(value) {
 		intVal, err := types.ParseInteger(value)
 		if err != nil {
-			report.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -33,7 +33,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if types.ValidateOctal(value) {
 		intVal, err := types.ParseInteger(value)
 		if err != nil {
-			report.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -47,7 +47,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if types.ValidateBinary(value) {
 		intVal, err := types.ParseInteger(value)
 		if err != nil {
-			report.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -62,7 +62,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if types.ValidateDecimal(value) {
 		intVal, err := types.ParseInteger(value)
 		if err != nil {
-			report.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -77,7 +77,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if types.ValidateFloat(value) {
 		floatVal, err := types.ParseFloat(value)
 		if err != nil {
-			report.Add(p.filePath, &loc, report.FLOAT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, &loc, report.FLOAT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -89,7 +89,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	}
 
 	// If neither, it's an invalid number format
-	report.Add(p.filePath, &loc, report.INVALID_NUMBER).SetLevel(report.SYNTAX_ERROR)
+	p.Reports.Add(p.filePath, &loc, report.INVALID_NUMBER).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }
 
@@ -128,7 +128,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACKET)
 			if p.match(lexer.CLOSE_BRACKET) {
-				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -139,7 +139,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 	// at least one element required
 	if len(elements) == 0 {
 		peek := p.peek()
-		report.Add(p.filePath, source.NewLocation(&peek.Start, &peek.End), report.ARRAY_EMPTY).SetLevel(report.SYNTAX_ERROR)
+		p.Reports.Add(p.filePath, source.NewLocation(&peek.Start, &peek.End), report.ARRAY_EMPTY).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 

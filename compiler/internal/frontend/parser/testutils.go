@@ -43,8 +43,7 @@ func evaluateTestResult(t *testing.T, r interface{}, nodes []ast.Node, desc stri
 func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) {
 	t.Helper()
 	filePath := testUtils.CreateTestFileWithContent(t, input)
-	p := New(filePath, false)
-
+	p := NewParser(filePath, false)
 	nodes := []ast.Node{}
 
 	defer func() {

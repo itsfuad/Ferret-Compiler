@@ -19,7 +19,7 @@ func parseModule(p *Parser) ast.Node {
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PACKAGE_NAME)
 
 	if !valid {
-		report.Add(p.filePath, source.NewLocation(&start.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
+		p.Reports.Add(p.filePath, source.NewLocation(&start.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
 	}
 
 	return &ast.ModuleDeclStmt{
@@ -60,7 +60,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'").SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -71,7 +71,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		}, true
 	} else {
 		token := p.peek()
-		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier").SetLevel(report.SYNTAX_ERROR)
+		p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier").SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 }

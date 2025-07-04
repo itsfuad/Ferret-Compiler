@@ -70,7 +70,11 @@ func TestParseIntegerType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
-			p := New(filePath, false)
+			p := &Parser{
+				tokens:   lexer.Tokenize(filePath, false),
+				tokenNo:  0,
+				filePath: filePath,
+			}
 			p.tokens = []lexer.Token{
 				{Kind: lexer.IDENTIFIER_TOKEN, Value: tt.input},
 				{Kind: lexer.EOF_TOKEN},
@@ -99,7 +103,11 @@ func TestParseFloatType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
-			p := New(filePath, false)
+			p := &Parser{
+				tokens:   lexer.Tokenize(filePath, false),
+				tokenNo:  0,
+				filePath: filePath,
+			}
 			p.tokens = []lexer.Token{
 				{Kind: lexer.IDENTIFIER_TOKEN, Value: tt.input},
 				{Kind: lexer.EOF_TOKEN},
@@ -203,7 +211,11 @@ func TestParseType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
-			p := New(filePath, false)
+			p := &Parser{
+				tokens:   lexer.Tokenize(filePath, false),
+				tokenNo:  0,
+				filePath: filePath,
+			}
 			result, ok := parseType(p)
 			if !tt.isValid && ok {
 				t.Errorf("Expected nil result for invalid input %s", tt.input)

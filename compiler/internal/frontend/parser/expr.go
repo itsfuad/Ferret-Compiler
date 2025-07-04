@@ -141,7 +141,7 @@ func parseUnary(p *Parser) ast.Expression {
 			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
 				errMsg = report.INVALID_CONSECUTIVE_DECREMENT
 			}
-			report.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), errMsg).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), errMsg).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		operand := parseUnary(p)
@@ -150,13 +150,13 @@ func parseUnary(p *Parser) ast.Expression {
 			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
 				errMsg = report.INVALID_DECREMENT_OPERAND
 			}
-			report.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), errMsg).SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), errMsg).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
 		// Check if operand already has a postfix operator
 		if _, ok := operand.(*ast.PostfixExpr); ok {
-			report.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -178,7 +178,7 @@ func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	index := parseExpression(p)
 	if index == nil {
 		token := p.peek()
-		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_INDEX_EXPRESSION).SetLevel(report.SYNTAX_ERROR)
+		p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_INDEX_EXPRESSION).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
@@ -198,7 +198,7 @@ func parseIncDec(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
 			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
 		}
-		report.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), errMsg).SetLevel(report.SYNTAX_ERROR)
+		p.Reports.Add(p.filePath, source.NewLocation(&operator.Start, &operator.End), errMsg).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 	return &ast.PostfixExpr{
@@ -213,7 +213,7 @@ func handlePostfixOperator(p *Parser, expr ast.Expression) (ast.Expression, bool
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
 		if _, ok := expr.(*ast.PrefixExpr); ok {
 			current := p.peek()
-			report.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		return parseIncDec(p, expr)
@@ -278,7 +278,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		arg := parseExpression(p)
 		if arg == nil {
 			token := p.peek()
-			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected function argument").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected function argument").SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		arguments = append(arguments, arg)
@@ -288,7 +288,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}

@@ -1,5 +1,8 @@
-
+import "std/fmt";
+import "std/io";
+import "std/math";
+import "github.com/user/repo";
 
 let a = 1;
 
-let name, age : str, i32 = "John", 30
+let name, age : str, i32 = "John", 30;

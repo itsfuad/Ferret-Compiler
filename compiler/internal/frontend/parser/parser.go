@@ -1,11 +1,13 @@
 package parser
 
 import (
+	"ferret/compiler/colors"
 	"ferret/compiler/internal/frontend/ast"
 	"ferret/compiler/internal/frontend/lexer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/report"
 	"fmt"
+	"os"
 	"slices"
 )
 
@@ -13,14 +15,31 @@ type Parser struct {
 	tokens   []lexer.Token
 	tokenNo  int
 	filePath string
+	Reports  report.Reports
 }
 
-func New(filePath string, debug bool) *Parser {
+func NewParser(filePath string, debug bool) *Parser {
+
+	//must have .fer or .ferret extension
+	if len(filePath) < 5 || (filePath[len(filePath)-4:] != ".fer" && filePath[len(filePath)-7:] != ".ferret") {
+		colors.RED.Printf("Invalid file extension for `%s`, expected .fer or .ferret\n", filePath)
+		os.Exit(-1)
+		return nil
+	}
+
+	// Check if the file exists and is a regular file (not a directory or special file)
+	if fileInfo, err := os.Stat(filePath); err == nil && !fileInfo.Mode().IsRegular() {
+		colors.RED.Printf("Path %s is not a regular file\n", filePath)
+		os.Exit(-1)
+		return nil
+	}
+
 	tokens := lexer.Tokenize(filePath, debug)
 	return &Parser{
 		tokens:   tokens,
 		tokenNo:  0,
 		filePath: filePath,
+		Reports:  nil,
 	}
 }
 
@@ -81,7 +100,7 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 
 	current := p.peek()
 
-	err := report.Add(p.filePath, source.NewLocation(&current.Start, &current.End), message)
+	err := p.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), message)
 	err.SetLevel(report.SYNTAX_ERROR)
 	return p.peek()
 }
@@ -94,7 +113,7 @@ func parseExpressionList(p *Parser, first ast.Expression) ast.ExpressionList {
 		next := parseExpression(p)
 		if next == nil {
 			token := p.peek()
-			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma").SetLevel(report.SYNTAX_ERROR)
 			break
 		}
 		exprs = append(exprs, next)
@@ -120,7 +139,7 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 // handleUnexpectedToken reports an error for unexpected token and advances
 func handleUnexpectedToken(p *Parser) ast.Statement {
 	token := p.peek()
-	report.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
+	p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
 		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", token.Value)).SetLevel(report.SYNTAX_ERROR)
 
 	p.advance() // skip the invalid token
@@ -160,7 +179,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 		values = parseExpressionList(p, parseExpression(p))
 		if values == nil {
 			token := p.peek()
-			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
 		}
 		end = *values.Loc().End
 	}
@@ -215,7 +234,7 @@ func parseNode(p *Parser) ast.Node {
 			loc := source.NewLocation(&token.Start, &token.End)
 			loc.Start.Column += 1
 			loc.End.Column += 1
-			report.Add(p.filePath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+			p.Reports.Add(p.filePath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
 		}
 		end := p.advance()
 		node.Loc().End.Column = end.End.Column
