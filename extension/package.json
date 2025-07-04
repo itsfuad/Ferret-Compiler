@@ -1,0 +1,75 @@
+{
+  "name": "ferret",
+  "displayName": "Ferret",
+  "description": "Ferret Language Support",
+  "version": "0.0.2",
+  "icon": "ferret.png",
+  "publisher": "Ferret",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [],
+  "categories": [
+    "Programming Languages"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itsfuad/ferret"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "ferret",
+        "aliases": [
+          "ferret"
+        ],
+        "extensions": [
+          ".fer",
+          ".ferret"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "dark": "ferret.png",
+          "light": "ferret.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ferret",
+        "scopeName": "source.fer",
+        "path": "./syntaxes/fer.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ferret",
+        "path": "./snippets/ferret.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "ferret LSP",
+      "properties": {
+        "ferretLanguageServer.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the ferret Language Server."
+        }
+      }
+    }
+  },
+  "main": "./out/lsp.js",
+  "keywords": [
+    "ferret",
+    "Programming",
+    "Language"
+  ],
+  "author": "Fuad Hasan",
+  "license": "ISC"
+}

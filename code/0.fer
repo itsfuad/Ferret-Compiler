@@ -51,3 +51,18 @@ func main() {
     let a : Option<i32> = Some(42);
     let b = 12 + a.unwrap_or(0);
 }
+
+type MyType = i32 | str | null;
+
+let a : i32 = 10;
+let b : MyType = "Hello"; // or we could use let b : i32 | str | null = 20;
+
+fn add(a: i32, b: MyType) -> i32 {
+    return a + when b {
+        is i32 => b,
+        is str => 0, // or some other logic
+        is null => 0,
+        _ => 0, // default case for all other types. though in this case, it would never reach here
+    };
+}
+
