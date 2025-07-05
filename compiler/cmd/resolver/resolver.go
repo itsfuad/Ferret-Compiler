@@ -26,7 +26,7 @@ func GitHubPathToRawURL(importPath, defaultBranch string) (string, string) {
 	repo := parts[2]
 	subpath := parts[3]
 
-	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s",
+	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s.fer",
 		user, repo, defaultBranch, subpath,
 	)
 
@@ -84,6 +84,11 @@ func ResolveModule(filename string, importerPath string, importerLogicalPath str
 		return "", ctx.ModuleKey{}, fmt.Errorf("relative imports (./ or ../) are not supported. Use absolute paths from project root: %s", filename)
 	}
 
+	// If the importer is a remote module, treat local imports as relative to that remote repository
+	if strings.HasPrefix(importerLogicalPath, REMOTE_HOST) {
+		return resolveRemoteLocalImport(filename, importerLogicalPath, ctxx, force)
+	}
+
 	// All other paths are treated as project-root relative imports
 	return resolveProjectRootModule(filename, ctxx)
 }
@@ -95,7 +100,7 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 		return "", ctx.ModuleKey{}, fmt.Errorf("invalid GitHub import path: %s", filename)
 	}
 
-	// Append .fer if missing
+	// Always append .fer extension for remote imports
 	if !strings.HasSuffix(subpath, EXT) {
 		subpath += EXT
 	}
@@ -119,7 +124,13 @@ func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (strin
 
 // findModuleFile tries to find a valid module file with or without extension
 func findModuleFile(filePath string, ctxx *ctx.CompilerContext) (string, ctx.ModuleKey, error) {
-	// Try with extension added if needed
+	// Try with the path as is first
+	if IsValidFile(filePath) {
+		rel, _ := filepath.Rel(ctxx.RootDir, filePath)
+		return filepath.Clean(filePath), ctx.LocalModuleKey(filepath.ToSlash(rel)), nil
+	}
+
+	// Try with .fer extension added if not already present
 	if !strings.HasSuffix(filePath, EXT) {
 		withExt := filePath + EXT
 		if IsValidFile(withExt) {
@@ -128,11 +139,28 @@ func findModuleFile(filePath string, ctxx *ctx.CompilerContext) (string, ctx.Mod
 		}
 	}
 
-	// Try with the path as is
-	if IsValidFile(filePath) {
-		rel, _ := filepath.Rel(ctxx.RootDir, filePath)
-		return filepath.Clean(filePath), ctx.LocalModuleKey(filepath.ToSlash(rel)), nil
+	return "", ctx.ModuleKey{}, fmt.Errorf("module not found: %s", filePath)
+}
+
+// resolveRemoteLocalImport handles local imports within a remote module
+func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
+	// Extract the remote repository base path from the importer
+	// e.g., "github.com/itsfuad/Ferret-Programming-Language/code/remote/graphics"
+	// becomes "github.com/itsfuad/Ferret-Programming-Language"
+	parts := strings.Split(importerLogicalPath, "/")
+	if len(parts) < 3 {
+		return "", ctx.ModuleKey{}, fmt.Errorf("invalid remote import path: %s", importerLogicalPath)
 	}
 
-	return "", ctx.ModuleKey{}, fmt.Errorf("module not found: %s", filePath)
+	// Reconstruct the remote repository base path
+	remoteRepo := strings.Join(parts[:3], "/")
+
+	// Create the full remote import path
+	// For imports like "code/remote/audio", we want to import from the remote repo
+	remoteImportPath := remoteRepo + "/" + filename
+
+	fmt.Printf("Remote local import: '%s' from '%s' -> '%s'\n", filename, importerLogicalPath, remoteImportPath)
+
+	// Resolve as a remote import
+	return resolveGitHubModule(remoteImportPath, ctxx, force)
 }
