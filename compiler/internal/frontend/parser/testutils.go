@@ -2,8 +2,8 @@ package parser
 
 import (
 	"compiler/internal/frontend/ast"
-	"compiler/test"
-	"compiler/testUtils"
+	"compiler/internal/test"
+	"compiler/internal/testUtils"
 	"fmt"
 	"testing"
 )

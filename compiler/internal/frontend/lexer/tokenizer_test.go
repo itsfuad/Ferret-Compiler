@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	"compiler/testUtils"
+	"compiler/internal/testUtils"
 	"testing"
 )
 

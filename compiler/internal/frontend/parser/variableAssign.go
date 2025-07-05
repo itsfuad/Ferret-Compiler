@@ -4,7 +4,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/source"
-	"compiler/report"
+	"compiler/internal/report"
 )
 
 func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {

@@ -5,8 +5,8 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/source"
 	"compiler/internal/utils"
-	"compiler/report"
-	"compiler/types"
+	"compiler/internal/report"
+	"compiler/internal/types"
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {

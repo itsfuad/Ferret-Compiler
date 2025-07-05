@@ -4,8 +4,8 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/source"
-	"compiler/report"
-	"compiler/types"
+	"compiler/internal/report"
+	"compiler/internal/types"
 	"fmt"
 )
 
