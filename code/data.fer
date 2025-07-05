@@ -1,3 +1,4 @@
 import "./others/dummy.fer";
+import "./main.fer"; // should error because it's a circular dependency
 
 let myData = "Fuad";
