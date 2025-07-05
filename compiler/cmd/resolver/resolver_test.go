@@ -11,7 +11,7 @@ import (
 
 const (
 	CREATE_DUMP_FAILED_MSG = "Failed to create temp dir: %v"
-	VALID_FILE       = "valid.fer"
+	VALID_FILE             = "valid.fer"
 
 	TEST_FILE_CONTENT = "test content"
 )
@@ -240,7 +240,7 @@ func TestCleanImporterPath(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Create test paths using the temp directory
-	cacheDir := filepath.Join(tempDir, ".ferret", "cache", "github.com", "user", "repo")
+	cacheDir := filepath.Join(tempDir, ".ferret", "modules", "github.com", "user", "repo")
 	projectDir := filepath.Join(tempDir, "src", "project")
 
 	tests := []struct {
