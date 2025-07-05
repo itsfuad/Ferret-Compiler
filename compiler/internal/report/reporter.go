@@ -13,6 +13,14 @@ import (
 
 type REPORT_TYPE string
 
+type COMPILATION_PHASE string
+
+const (
+	LEXING_PHASE        COMPILATION_PHASE = "Lexing"
+	PARSING_PHASE       COMPILATION_PHASE = "Parsing"
+	SEMANTIC_PHASE	  	COMPILATION_PHASE = "Semantic Analysis"
+)
+
 const (
 	NULL           REPORT_TYPE = ""
 	SEMANTIC_ERROR REPORT_TYPE = "semantic error" // Semantic error
@@ -79,6 +87,7 @@ type Report struct {
 	Message  string
 	Hints    HintContainer
 	Level    REPORT_TYPE
+	Phase    COMPILATION_PHASE
 }
 
 // printReport prints a formatted diagnostic report to stdout.
@@ -106,6 +115,9 @@ func printReport(r *Report) {
 	case SEMANTIC_ERROR:
 		reportMsgType = "[Semantic Error 😱]: "
 	}
+
+	reportMsgType = fmt.Sprintf("%s :: %s", r.Phase, reportMsgType)
+
 
 	reportColor := colorMap[r.Level]
 
@@ -198,7 +210,7 @@ func (r *Report) AddHintAt(msg string, col int) *Report {
 
 // Add creates and registers a new diagnostic report with basic position validation.
 // It returns a pointer to the newly created Diagnostic.
-func (r *Reports) Add(filePath string, location *source.Location, msg string) *Report {
+func (r *Reports) Add(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 
 	if location.Start.Line < 1 {
 		location.Start.Line = 1
@@ -218,6 +230,7 @@ func (r *Reports) Add(filePath string, location *source.Location, msg string) *R
 		Location: location,
 		Message:  msg,
 		Level:    NULL,
+		Phase:    phase,
 	}
 
 	if len(*r) == 0 {

@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/source"
 	"compiler/internal/report"
+	"compiler/internal/source"
 )
 
 // parseIfStatement parses an if statement with optional else and else-if branches
@@ -24,7 +24,7 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 
 	if condition == nil {
 		token := p.peek()
-		p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected condition after 'if'").SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected condition after 'if'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 	// Parse if body

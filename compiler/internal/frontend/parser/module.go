@@ -1,11 +1,12 @@
 package parser
 
 import (
+	"compiler/cmd/resolver"
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/source"
 	"compiler/internal/report"
+	"compiler/internal/source"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ func parseImport(p *Parser) ast.Node {
 
 	parts := strings.Split(importPath.Value, "/")
 	if len(parts) == 0 {
-		p.Reports.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
@@ -29,7 +30,31 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importPath.End)
 
-	colors.BLUE.Printf("Import module found: '%s'\n", moduleName)
+	colors.BLUE.Printf("Import module name: '%s', path: '%s'\n", moduleName, importPath.Value)
+
+	resolvedPath, err := resolver.ResolveModule(importPath.Value, p.filePath, p.ctx, false)
+	if err != nil {
+		p.ctx.Reports.Add(p.filePath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	colors.YELLOW.Printf("Resolved import path: '%s'\n", resolvedPath)
+
+	// Check if the module is already cached
+	if !p.ctx.HasModule(resolvedPath) {
+
+		module := NewParser(resolvedPath, p.ctx, p.debug).Parse()
+
+		if module == nil {
+			p.ctx.Reports.Add(p.filePath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+
+		p.ctx.AddModule(resolvedPath, module)
+		colors.GREEN.Printf("Module '%s' added to cache\n", moduleName)
+	} else {
+		colors.GREEN.Printf("Module '%s' already cached\n", moduleName)
+	}
 
 	return &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
@@ -47,7 +72,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -58,7 +83,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		}, true
 	} else {
 		token := p.peek()
-		p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier").SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 }

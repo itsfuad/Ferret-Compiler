@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/source"
 	"compiler/internal/report"
+	"compiler/internal/source"
 	"compiler/internal/types"
 	"fmt"
 )
@@ -17,7 +17,7 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableToDeclare, int) {
 	for {
 		if !p.check(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_NAME).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_NAME, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, 0
 		}
 		identifierName := p.advance()
@@ -51,7 +51,7 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 		typeNode, ok := parseType(p)
 		if !ok {
 			token := p.peek()
-			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_TYPE_NAME, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		types = append(types, typeNode)
@@ -74,7 +74,7 @@ func parseInitializers(p *Parser) ([]ast.Expression, bool) {
 			value := parseExpression(p)
 			if value == nil {
 				token := p.peek()
-				p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected value after '=', got invalid expression").SetLevel(report.SYNTAX_ERROR)
+				p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected value after '=', got invalid expression", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 				return nil, false
 			}
 			values = append(values, value)
@@ -106,7 +106,7 @@ func assignTypes(p *Parser, variables []*ast.VariableToDeclare, types []ast.Data
 		return true
 	}
 	token := p.peek()
-	p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISMATCHED_VARIABLE_AND_TYPE_COUNT+fmt.Sprintf(": Expected %d types, got %d", varCount, len(types))).SetLevel(report.SYNTAX_ERROR)
+	p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISMATCHED_VARIABLE_AND_TYPE_COUNT+fmt.Sprintf(": Expected %d types, got %d", varCount, len(types)), report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 	return false
 }
 
@@ -118,7 +118,7 @@ func parseVarDecl(p *Parser) ast.Statement {
 	variables, varCount := parseIdentifiers(p)
 	if variables == nil {
 		pos := p.peek()
-		p.Reports.Add(p.filePath, source.NewLocation(&pos.Start, &pos.End), "no variables found").SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, source.NewLocation(&pos.Start, &pos.End), "no variables found", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
@@ -136,14 +136,14 @@ func parseVarDecl(p *Parser) ast.Statement {
 	if len(parsedTypes) == 0 {
 		if len(values) == 0 {
 			token := p.peek()
-			p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "cannot infer types without initializers").AddHint("👈😃 Add initializers to the variables").SetLevel(report.NORMAL_ERROR)
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "cannot infer types without initializers", report.PARSING_PHASE).AddHint("👈😃 Add initializers to the variables").SetLevel(report.NORMAL_ERROR)
 			return nil
 		}
 	}
 
 	if len(values) > varCount {
 		token := p.peek()
-		p.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "values cannot be more than the number of variables", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
