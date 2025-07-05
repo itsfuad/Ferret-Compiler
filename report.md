@@ -2,8 +2,8 @@ If we use file based import,
 
 ```rs
 
-import std::io; // std/io.fer
-import std::math; // std/math.fer
+import "std/io"; // std/io.fer (extension added automatically)
+import "std/math"; // std/math.fer (extension added automatically)
 
 ```
 
@@ -11,8 +11,8 @@ If we use module based import,
 
 ```rs
 
-import std::io; // std/io/*.fer
-import std::math; // std/math/*.fer
+import "std/io"; // std/io/*.fer (extension added automatically)
+import "std/math"; // std/math/*.fer (extension added automatically)
 
 ```
 
