@@ -29,14 +29,14 @@ func TestGitHubPathToRawURL(t *testing.T) {
 			name:          "Valid GitHub path",
 			importPath:    "github.com/user/repo/path/to/file",
 			defaultBranch: "main",
-			wantURL:       "https://raw.githubusercontent.com/user/repo/main/path/to/file",
+			wantURL:       "https://raw.githubusercontent.com/user/repo/main/path/to/file.fer",
 			wantSubpath:   "path/to/file",
 		},
 		{
 			name:          "Different branch",
 			importPath:    "github.com/user/repo/path/to/file",
 			defaultBranch: "master",
-			wantURL:       "https://raw.githubusercontent.com/user/repo/master/path/to/file",
+			wantURL:       "https://raw.githubusercontent.com/user/repo/master/path/to/file.fer",
 			wantSubpath:   "path/to/file",
 		},
 		{
