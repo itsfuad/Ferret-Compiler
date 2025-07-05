@@ -67,7 +67,7 @@ func fetchAndCache(url, localPath string, force bool) error {
 
 // ResolveModule resolves an import path to an absolute local file path, handling remote GitHub imports,
 // relative paths, and project-root relative paths.
-// importerLogicalPath: the logical import path of the importer (remote: github.com/..., local: project-relative)
+// importerLogicalPath: the logical import path of the importer (github.com/... for remote, project-relative for local)
 func ResolveModule(filename string, importerPath string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
 	filename = strings.TrimSpace(filename)
 	if filename == "" {

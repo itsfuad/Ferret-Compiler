@@ -11,15 +11,15 @@ import (
 var contextCreated = false
 
 // ModuleKey uniquely identifies a module, distinguishing local and remote modules
-// For local: Kind = "local", Path = project-relative path
-// For remote: Kind = "remote", Path = full remote import path (e.g., github.com/user/repo/path/file)
+// For local: IsRemote = false, Path = project-relative path
+// For remote: IsRemote = true, Path = full remote import path (e.g., github.com/user/repo/path/file)
 type ModuleKey struct {
-	Kind string // "local" or "remote"
-	Path string // project-relative or remote import path
+	IsRemote bool
+	Path     string // project-relative or remote import path
 }
 
 func (k ModuleKey) String() string {
-	return k.Kind + ":" + k.Path
+	return k.Path
 }
 
 type CompilerContext struct {
@@ -35,10 +35,10 @@ type CompilerContext struct {
 
 // Helpers to create module keys
 func LocalModuleKey(projectRelative string) ModuleKey {
-	return ModuleKey{Kind: "local", Path: projectRelative}
+	return ModuleKey{IsRemote: false, Path: projectRelative}
 }
 func RemoteModuleKey(importPath string) ModuleKey {
-	return ModuleKey{Kind: "remote", Path: importPath}
+	return ModuleKey{IsRemote: true, Path: importPath}
 }
 
 func (c *CompilerContext) GetModule(key ModuleKey) *ast.Program {
