@@ -119,7 +119,7 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	// 	rootDir, _ = filepath.Abs(rootDir)
 	// }
 
-	cachePath := filepath.Join(rootDir, ".ferret", "cache")
+	cachePath := filepath.Join(rootDir, ".ferret", "modules")
 	os.MkdirAll(cachePath, 0755)
 	return &CompilerContext{
 		RootDir:        rootDir,

@@ -100,7 +100,7 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 		subpath += EXT
 	}
 
-	cachePath := filepath.Join(ctxx.RootDir, ".ferret", "cache", filepath.FromSlash(filename))
+	cachePath := filepath.Join(ctxx.RootDir, ".ferret", "modules", filepath.FromSlash(filename))
 	if !strings.HasSuffix(cachePath, EXT) {
 		cachePath += EXT
 	}
@@ -139,7 +139,7 @@ func resolveRemoteRelativeModule(filename, importerLogicalPath string, ctxx *ctx
 
 // cleanImporterPath removes cache path if present
 func cleanImporterPath(importerPath string) string {
-	splitter := filepath.Join(".ferret", "cache")
+	splitter := filepath.Join(".ferret", "modules")
 	if strings.Contains(importerPath, splitter) {
 		parts := strings.Split(importerPath, splitter)
 		if len(parts) > 0 {
