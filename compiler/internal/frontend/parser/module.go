@@ -3,6 +3,7 @@ package parser
 import (
 	"compiler/cmd/resolver"
 	"compiler/colors"
+	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
@@ -56,7 +57,7 @@ func parseImport(p *Parser) ast.Node {
 	colors.YELLOW.Printf("Resolved import path: '%s'\n", resolvedPath)
 
 	// Add dependency edge and check for cycles
-	importerKey := moduleKey.Kind + ":" + importerLogicalPath
+	importerKey := ctx.ModuleKey{IsRemote: strings.HasPrefix(importerLogicalPath, "github.com/"), Path: importerLogicalPath}.String()
 	importedKey := moduleKey.String()
 	p.ctx.AddDepEdge(importerKey, importedKey)
 
@@ -65,7 +66,7 @@ func parseImport(p *Parser) ast.Node {
 	if p.ctx.RootDir != "" {
 		entryRel = filepath.ToSlash(filepath.Join("", p.ctx.EntryPoint))
 	}
-	entryKey := "local:" + entryRel
+	entryKey := ctx.ModuleKey{IsRemote: false, Path: entryRel}.String()
 	if cycle, found := p.ctx.DetectCycle(entryKey); found {
 		cycleStr := strings.Join(cycle, " -> ")
 		msg := "Circular import detected: " + cycleStr
