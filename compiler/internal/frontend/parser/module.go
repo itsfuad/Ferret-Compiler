@@ -55,6 +55,25 @@ func parseImport(p *Parser) ast.Node {
 
 	colors.YELLOW.Printf("Resolved import path: '%s'\n", resolvedPath)
 
+	// Add dependency edge and check for cycles
+	importerKey := moduleKey.Kind + ":" + importerLogicalPath
+	importedKey := moduleKey.String()
+	p.ctx.AddDepEdge(importerKey, importedKey)
+
+	// Always start cycle detection from the entrypoint
+	entryRel := p.ctx.EntryPoint
+	if p.ctx.RootDir != "" {
+		entryRel = filepath.ToSlash(filepath.Join("", p.ctx.EntryPoint))
+	}
+	entryKey := "local:" + entryRel
+	if cycle, found := p.ctx.DetectCycle(entryKey); found {
+		cycleStr := strings.Join(cycle, " -> ")
+		msg := "Circular import detected: " + cycleStr
+		p.ctx.Reports.Add(p.filePath, &loc, msg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		colors.RED.Println(msg)
+		return nil
+	}
+
 	// Check if the module is already cached
 	if !p.ctx.HasModule(moduleKey) {
 		module := NewParser(resolvedPath, p.ctx, p.debug).Parse()
