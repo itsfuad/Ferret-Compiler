@@ -6,7 +6,7 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/source"
 	"compiler/internal/utils"
-	"compiler/report"
+	"compiler/internal/report"
 )
 
 // detect if it's a function or a method

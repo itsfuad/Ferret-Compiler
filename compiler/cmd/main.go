@@ -1,9 +1,9 @@
 package main
 
 import (
-	"compiler/io"
 	"fmt"
 	"os"
+	"compiler/cmd/io"
 )
 
 func main() {

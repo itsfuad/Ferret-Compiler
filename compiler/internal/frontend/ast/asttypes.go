@@ -2,7 +2,7 @@ package ast
 
 import (
 	"compiler/internal/source"
-	"compiler/types"
+	"compiler/internal/types"
 )
 
 type DataType interface {

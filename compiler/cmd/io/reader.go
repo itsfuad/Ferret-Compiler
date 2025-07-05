@@ -75,7 +75,7 @@ func ResolveModule(filename string) (string, error) {
 
 func IsValidFile(filename string) bool {
 		// Check if the file exists and is a regular file (not a directory or special file)
-	if fileInfo, err := os.Stat(filename); err == nil && !fileInfo.Mode().IsRegular() {
+	if fileInfo, err := os.Stat(filename); err != nil || !fileInfo.Mode().IsRegular() {
 		return false
 	}
 

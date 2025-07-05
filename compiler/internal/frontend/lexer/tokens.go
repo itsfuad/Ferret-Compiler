@@ -5,7 +5,7 @@ import (
 
 	"compiler/colors"
 	"compiler/internal/source"
-	"compiler/types"
+	"compiler/internal/types"
 )
 
 type TOKEN string
