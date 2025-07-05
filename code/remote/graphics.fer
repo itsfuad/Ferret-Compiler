@@ -1,3 +1,3 @@
-import "./audio.fer";
+import "audio.fer";
 
 const graphics = "1080p Graphics";
