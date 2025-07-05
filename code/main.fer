@@ -7,11 +7,18 @@ Language Core Principles
 */
 
 import "code/data";
-//import "./data.fer";
 //import "std/fmt";
 //import "std/io";
 //import "std/math";
-//import "github.com/user/repo";
+//import "github.com/user/repo/file";
+
+// Examples of the new explicit import system:
+// - All local imports must include the root folder name (e.g., "code/data", not just "data")
+// - No relative paths (./ or ../) allowed
+// - Standard library imports use "std/" prefix
+// - External libraries use "github.com/user/repo/path" format
+// - .fer extension is automatically added by the resolver
+// - Remote modules resolve their imports relative to their own repository root
 
 let a = 1;
 

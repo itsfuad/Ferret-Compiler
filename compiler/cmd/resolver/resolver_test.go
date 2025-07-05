@@ -29,14 +29,14 @@ func TestGitHubPathToRawURL(t *testing.T) {
 			name:          "Valid GitHub path",
 			importPath:    "github.com/user/repo/path/to/file",
 			defaultBranch: "main",
-			wantURL:       "https://raw.githubusercontent.com/user/repo/main/path/to/file",
+			wantURL:       "https://raw.githubusercontent.com/user/repo/main/path/to/file.fer",
 			wantSubpath:   "path/to/file",
 		},
 		{
 			name:          "Different branch",
 			importPath:    "github.com/user/repo/path/to/file",
 			defaultBranch: "master",
-			wantURL:       "https://raw.githubusercontent.com/user/repo/master/path/to/file",
+			wantURL:       "https://raw.githubusercontent.com/user/repo/master/path/to/file.fer",
 			wantSubpath:   "path/to/file",
 		},
 		{
@@ -186,7 +186,7 @@ func TestResolveModule(t *testing.T) {
 			wantError:           true,
 		},
 		{
-			name:                "Project-root relative path",
+			name:                "Project-root relative path without extension",
 			filename:            "valid",
 			importerPath:        filepath.Join(tempDir, "some", "path"),
 			importerLogicalPath: "some/path",
@@ -195,13 +195,40 @@ func TestResolveModule(t *testing.T) {
 			wantError:           false,
 		},
 		{
-			name:                "Relative path",
-			filename:            "./test/valid",
-			importerPath:        filepath.Join(tempDir, "main.fer"), // This should be a file path, not directory
+			name:                "Project-root relative path with extension",
+			filename:            "valid.fer",
+			importerPath:        filepath.Join(tempDir, "some", "path"),
+			importerLogicalPath: "some/path",
+			force:               false,
+			wantPath:            filepath.Join(tempDir, VALID_FILE),
+			wantError:           false,
+		},
+		{
+			name:                "Project-root relative path with subdirectory without extension",
+			filename:            "test/valid",
+			importerPath:        filepath.Join(tempDir, "main.fer"),
 			importerLogicalPath: "",
 			force:               false,
 			wantPath:            filepath.Join(tempDir, "test", VALID_FILE),
 			wantError:           false,
+		},
+		{
+			name:                "Relative path (./) - should error",
+			filename:            "./test/valid",
+			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerLogicalPath: "",
+			force:               false,
+			wantPath:            "",
+			wantError:           true,
+		},
+		{
+			name:                "Relative path (../) - should error",
+			filename:            "../test/valid",
+			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerLogicalPath: "",
+			force:               false,
+			wantPath:            "",
+			wantError:           true,
 		},
 		{
 			name:                "Module not found",
@@ -225,46 +252,6 @@ func TestResolveModule(t *testing.T) {
 
 			if !tt.wantError && gotPath != tt.wantPath {
 				t.Errorf("ResolveModule() gotPath = %v, want %v", gotPath, tt.wantPath)
-			}
-		})
-	}
-}
-
-// TestCleanImporterPath tests the cleanImporterPath function
-func TestCleanImporterPath(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "ferret-clean-test")
-	if err != nil {
-		t.Fatalf(CREATE_DUMP_FAILED_MSG, err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create test paths using the temp directory
-	cacheDir := filepath.Join(tempDir, ".ferret", "modules", "github.com", "user", "repo")
-	projectDir := filepath.Join(tempDir, "src", "project")
-
-	tests := []struct {
-		name         string
-		importerPath string
-		want         string
-	}{
-		{
-			name:         "Path with cache",
-			importerPath: cacheDir,
-			want:         tempDir,
-		},
-		{
-			name:         "Path without cache",
-			importerPath: projectDir,
-			want:         projectDir,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := cleanImporterPath(tt.importerPath)
-			if got != tt.want {
-				t.Errorf("cleanImporterPath() = %v, want %v", got, tt.want)
 			}
 		})
 	}
