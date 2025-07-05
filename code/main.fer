@@ -1,0 +1,36 @@
+/*
+Language Core Principles
+
+1. Simplicity: The language should be easy to learn and use, with a clear and concise syntax.
+2. It must work as it looks. No hidden magic, no implicit behavior.
+3. Safety: The language should prevent common programming errors, such as null pointer dereferences and buffer overflows at compile time.
+*/
+
+import "./data.fer";
+//import "std/fmt";
+//import "std/io";
+//import "std/math";
+//import "github.com/user/repo";
+
+let a = 1;
+
+let name, age : str, i32 = "John", 30;
+
+// type MyType = i32 | str | null;
+
+// let a : i32 = 10;
+// let b : MyType = "Hello"; // or we could use let b : i32 | str | null = 20;
+
+// if when b { is i32 => true, _ false } {
+
+// }
+
+// fn add(a: i32, b: MyType) -> i32 {
+//     return a + when b {
+//         is i32 => b,
+//         is str => 0, // or some other logic
+//         is null => 0,
+//         _ => 0, // default case for all other types. though in this case, it would never reach here
+//     };
+// }
+

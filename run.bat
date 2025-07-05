@@ -1,3 +1,3 @@
 @echo off
-cd compiler
-go run .
+cd cmd
+go run . "./../code/main.fer"
