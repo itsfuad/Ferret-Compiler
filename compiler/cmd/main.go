@@ -33,7 +33,7 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 		colors.RED.Println("Failed to parse the program.")
 		return context
 	}
-	
+
 	context.AddModule(ctx.LocalModuleKey(filepath), program)
 
 	return context

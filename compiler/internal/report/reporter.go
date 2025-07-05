@@ -16,9 +16,9 @@ type REPORT_TYPE string
 type COMPILATION_PHASE string
 
 const (
-	LEXING_PHASE        COMPILATION_PHASE = "Lexing"
-	PARSING_PHASE       COMPILATION_PHASE = "Parsing"
-	SEMANTIC_PHASE	  	COMPILATION_PHASE = "Semantic Analysis"
+	LEXING_PHASE   COMPILATION_PHASE = "Lexing"
+	PARSING_PHASE  COMPILATION_PHASE = "Parsing"
+	SEMANTIC_PHASE COMPILATION_PHASE = "Semantic Analysis"
 )
 
 const (
@@ -117,7 +117,6 @@ func printReport(r *Report) {
 	}
 
 	reportMsgType = fmt.Sprintf("%s :: %s", r.Phase, reportMsgType)
-
 
 	reportColor := colorMap[r.Level]
 
