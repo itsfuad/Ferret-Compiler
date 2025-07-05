@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/source"
 	"compiler/internal/report"
+	"compiler/internal/source"
 )
 
 func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
@@ -21,7 +21,7 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 		val := parseExpression(p)
 		if val == nil {
 			current := p.previous()
-			p.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Expected expression in assignment").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Expected expression in assignment", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		}
 		assignees = append(assignees, val)
 	}
@@ -32,7 +32,7 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 		val := parseExpression(p)
 		if val == nil {
 			current := p.previous()
-			p.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Expected expression in assignment").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Expected expression in assignment", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		}
 		expressions = append(expressions, val)
 		if p.peek().Kind == lexer.COMMA_TOKEN {
@@ -44,7 +44,7 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 
 	if len(assignees) < len(expressions) {
 		current := p.previous()
-		p.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Mismatched number of variables and values").AddHint("Assignee count must be less than or equal to the number of expressions").SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), "Mismatched number of variables and values", report.PARSING_PHASE).AddHint("Assignee count must be less than or equal to the number of expressions").SetLevel(report.SYNTAX_ERROR)
 	}
 
 	return &ast.AssignmentStmt{
