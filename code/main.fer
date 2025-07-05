@@ -7,7 +7,7 @@ Language Core Principles
 */
 
 import "./data.fer";
-import "./data.fer";
+//import "./data.fer";
 //import "std/fmt";
 //import "std/io";
 //import "std/math";

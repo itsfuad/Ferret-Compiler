@@ -7,6 +7,7 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"path/filepath"
 	"strings"
 )
 
@@ -32,7 +33,21 @@ func parseImport(p *Parser) ast.Node {
 
 	colors.BLUE.Printf("Import module name: '%s', path: '%s'\n", moduleName, importPath.Value)
 
-	resolvedPath, err := resolver.ResolveModule(importPath.Value, p.filePath, p.ctx, false)
+	// Determine logical import path of the importer
+	var importerLogicalPath string
+	if strings.HasPrefix(p.filePath, p.ctx.CachePath) {
+		// This is a cached remote file, so get the remote import path from the cache path
+		// Remove the cache prefix and convert to github.com/... form
+		rel, _ := filepath.Rel(p.ctx.CachePath, p.filePath)
+		importerLogicalPath = filepath.ToSlash(rel)
+	} else {
+		// Local file: use project-relative path
+		rel, _ := filepath.Rel(p.ctx.RootDir, p.filePath)
+		importerLogicalPath = filepath.ToSlash(rel)
+	}
+
+	// Use new ResolveModule signature
+	resolvedPath, moduleKey, err := resolver.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
 	if err != nil {
 		p.ctx.Reports.Add(p.filePath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return nil
@@ -41,8 +56,7 @@ func parseImport(p *Parser) ast.Node {
 	colors.YELLOW.Printf("Resolved import path: '%s'\n", resolvedPath)
 
 	// Check if the module is already cached
-	if !p.ctx.HasModule(resolvedPath) {
-
+	if !p.ctx.HasModule(moduleKey) {
 		module := NewParser(resolvedPath, p.ctx, p.debug).Parse()
 
 		if module == nil {
@@ -50,7 +64,7 @@ func parseImport(p *Parser) ast.Node {
 			return nil
 		}
 
-		p.ctx.AddModule(resolvedPath, module)
+		p.ctx.AddModule(moduleKey, module)
 		colors.GREEN.Printf("Module '%s' added to cache\n", moduleName)
 	} else {
 		colors.GREEN.Printf("Module '%s' already cached\n", moduleName)
