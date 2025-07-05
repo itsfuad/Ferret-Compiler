@@ -1,4 +1,4 @@
-import "maths/math";
-//import "main"; // should error because it's a circular dependency
+import "code/maths/math";
+//import "code/main"; // should error because it's a circular dependency
 
 let myData = "Fuad";

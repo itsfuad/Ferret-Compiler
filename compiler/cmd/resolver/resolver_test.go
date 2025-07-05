@@ -186,7 +186,7 @@ func TestResolveModule(t *testing.T) {
 			wantError:           true,
 		},
 		{
-			name:                "Project-root relative path",
+			name:                "Project-root relative path without extension",
 			filename:            "valid",
 			importerPath:        filepath.Join(tempDir, "some", "path"),
 			importerLogicalPath: "some/path",
@@ -195,7 +195,16 @@ func TestResolveModule(t *testing.T) {
 			wantError:           false,
 		},
 		{
-			name:                "Project-root relative path with subdirectory",
+			name:                "Project-root relative path with extension",
+			filename:            "valid.fer",
+			importerPath:        filepath.Join(tempDir, "some", "path"),
+			importerLogicalPath: "some/path",
+			force:               false,
+			wantPath:            filepath.Join(tempDir, VALID_FILE),
+			wantError:           false,
+		},
+		{
+			name:                "Project-root relative path with subdirectory without extension",
 			filename:            "test/valid",
 			importerPath:        filepath.Join(tempDir, "main.fer"),
 			importerLogicalPath: "",
