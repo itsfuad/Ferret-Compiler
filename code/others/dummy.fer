@@ -1,3 +1,8 @@
-//import "github.com/itsfuad/Ferret-Programming-Language/code/main.fer";
+import "github.com/itsfuad/Ferret-Programming-Language/code/data.fer";
 
 let dummyData = "This is a dummy file for testing purposes.";
+
+
+
+
+

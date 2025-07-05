@@ -28,6 +28,9 @@ type CompilerContext struct {
 	ModuleASTCache map[string]*ast.Program // key: ModuleKey.String()
 	Reports        report.Reports
 	CachePath      string
+
+	// Dependency graph: key is importer, value is list of imported module keys (as strings)
+	DepGraph map[string][]string
 }
 
 // Helpers to create module keys
@@ -107,4 +110,40 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 		Reports:        nil,
 		CachePath:      cachePath,
 	}
+}
+
+// AddDepEdge adds an edge from importer to imported in the dependency graph
+func (c *CompilerContext) AddDepEdge(importer, imported string) {
+	if c.DepGraph == nil {
+		c.DepGraph = make(map[string][]string)
+	}
+	c.DepGraph[importer] = append(c.DepGraph[importer], imported)
+}
+
+// DetectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
+func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
+	visited := make(map[string]bool)
+	stack := make([]string, 0)
+	var dfs func(node string) ([]string, bool)
+	dfs = func(node string) ([]string, bool) {
+		if visited[node] {
+			for i, n := range stack {
+				if n == node {
+					return append(stack[i:], node), true
+				}
+			}
+			return nil, false
+		}
+		visited[node] = true
+		stack = append(stack, node)
+		for _, neighbor := range c.DepGraph[node] {
+			if path, found := dfs(neighbor); found {
+				return path, true
+			}
+		}
+		stack = stack[:len(stack)-1]
+		visited[node] = false
+		return nil, false
+	}
+	return dfs(start)
 }
