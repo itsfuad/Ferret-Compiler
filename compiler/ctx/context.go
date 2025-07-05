@@ -62,6 +62,24 @@ func (c *CompilerContext) RemoveModule(key ModuleKey) {
 	delete(c.ModuleASTCache, key.String())
 }
 
+func (c *CompilerContext) ModuleCount() int {
+	if c.ModuleASTCache == nil {
+		return 0
+	}
+	return len(c.ModuleASTCache)
+}
+
+func (c *CompilerContext) ModuleNames() []string {
+	if c.ModuleASTCache == nil {
+		return []string{}
+	}
+	names := make([]string, 0, len(c.ModuleASTCache))
+	for key := range c.ModuleASTCache {
+		names = append(names, key)
+	}
+	return names
+}
+
 func (c *CompilerContext) HasModule(key ModuleKey) bool {
 	if c.ModuleASTCache == nil {
 		return false

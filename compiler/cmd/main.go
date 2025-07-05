@@ -4,30 +4,39 @@ import (
 	"compiler/cmd/resolver"
 	"compiler/colors"
 	"compiler/ctx"
-	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/parser"
 	"fmt"
 	"os"
 )
 
-func Compile(filepath string, debug bool) *ast.Program {
+func Compile(filepath string, debug bool) *ctx.CompilerContext {
 
 	if !resolver.IsValidFile(filepath) {
 		panic(fmt.Errorf("invalid file: %s", filepath))
 	}
 
-	ctx := ctx.NewCompilerContext(filepath)
+	context := ctx.NewCompilerContext(filepath)
 
-	p := parser.NewParser(filepath, ctx, true)
+	p := parser.NewParser(filepath, context, true)
 
 	defer func() {
 		if r := recover(); r != nil {
 			colors.ORANGE.Println(r)
-			ctx.Reports.DisplayAll()
+			context.Reports.DisplayAll()
+			os.Exit(-1)
 		}
 	}()
 
-	return p.Parse()
+	program := p.Parse()
+
+	if program == nil {
+		colors.RED.Println("Failed to parse the program.")
+		return context
+	}
+	
+	context.AddModule(ctx.LocalModuleKey(filepath), program)
+
+	return context
 }
 
 func main() {
@@ -41,6 +50,6 @@ func main() {
 	filename := os.Args[1]
 	fmt.Printf("Compiling file: %s\n", filename)
 
-	program := Compile(filename, true)
-	fmt.Printf("Program: %v\n", program)
+	context := Compile(filename, true)
+	fmt.Printf("Compiled: %v\n", context.ModuleNames())
 }
