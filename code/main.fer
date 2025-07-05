@@ -6,12 +6,17 @@ Language Core Principles
 3. Safety: The language should prevent common programming errors, such as null pointer dereferences and buffer overflows at compile time.
 */
 
-import "./data.fer";
-//import "./data.fer";
+import "data";
 //import "std/fmt";
 //import "std/io";
 //import "std/math";
-//import "github.com/user/repo";
+//import "github.com/user/repo/file";
+
+// Examples of the new import system:
+// - All local imports use absolute paths from project root
+// - No relative paths (./ or ../) allowed
+// - Standard library imports use "std/" prefix
+// - External libraries use "github.com/user/repo/path" format
 
 let a = 1;
 

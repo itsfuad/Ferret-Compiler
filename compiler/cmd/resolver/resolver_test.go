@@ -195,13 +195,31 @@ func TestResolveModule(t *testing.T) {
 			wantError:           false,
 		},
 		{
-			name:                "Relative path",
-			filename:            "./test/valid",
-			importerPath:        filepath.Join(tempDir, "main.fer"), // This should be a file path, not directory
+			name:                "Project-root relative path with subdirectory",
+			filename:            "test/valid",
+			importerPath:        filepath.Join(tempDir, "main.fer"),
 			importerLogicalPath: "",
 			force:               false,
 			wantPath:            filepath.Join(tempDir, "test", VALID_FILE),
 			wantError:           false,
+		},
+		{
+			name:                "Relative path (./) - should error",
+			filename:            "./test/valid",
+			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerLogicalPath: "",
+			force:               false,
+			wantPath:            "",
+			wantError:           true,
+		},
+		{
+			name:                "Relative path (../) - should error",
+			filename:            "../test/valid",
+			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerLogicalPath: "",
+			force:               false,
+			wantPath:            "",
+			wantError:           true,
 		},
 		{
 			name:                "Module not found",
@@ -225,46 +243,6 @@ func TestResolveModule(t *testing.T) {
 
 			if !tt.wantError && gotPath != tt.wantPath {
 				t.Errorf("ResolveModule() gotPath = %v, want %v", gotPath, tt.wantPath)
-			}
-		})
-	}
-}
-
-// TestCleanImporterPath tests the cleanImporterPath function
-func TestCleanImporterPath(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "ferret-clean-test")
-	if err != nil {
-		t.Fatalf(CREATE_DUMP_FAILED_MSG, err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create test paths using the temp directory
-	cacheDir := filepath.Join(tempDir, ".ferret", "modules", "github.com", "user", "repo")
-	projectDir := filepath.Join(tempDir, "src", "project")
-
-	tests := []struct {
-		name         string
-		importerPath string
-		want         string
-	}{
-		{
-			name:         "Path with cache",
-			importerPath: cacheDir,
-			want:         tempDir,
-		},
-		{
-			name:         "Path without cache",
-			importerPath: projectDir,
-			want:         projectDir,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := cleanImporterPath(tt.importerPath)
-			if got != tt.want {
-				t.Errorf("cleanImporterPath() = %v, want %v", got, tt.want)
 			}
 		})
 	}

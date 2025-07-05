@@ -65,8 +65,8 @@ func fetchAndCache(url, localPath string, force bool) error {
 	return err
 }
 
-// ResolveModule resolves an import path to an absolute local file path, handling remote GitHub imports,
-// relative paths, and project-root relative paths.
+// ResolveModule resolves an import path to an absolute local file path, handling remote GitHub imports
+// and project-root relative paths only. Relative paths (./ or ../) are no longer supported.
 // importerLogicalPath: the logical import path of the importer (github.com/... for remote, project-relative for local)
 func ResolveModule(filename string, importerPath string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
 	filename = strings.TrimSpace(filename)
@@ -79,12 +79,12 @@ func ResolveModule(filename string, importerPath string, importerLogicalPath str
 		return resolveGitHubModule(filename, ctxx, force)
 	}
 
-	// Relative paths (./ or ../)
+	// Relative paths (./ or ../) are no longer supported - all local imports must be from project root
 	if strings.HasPrefix(filename, "./") || strings.HasPrefix(filename, "../") {
-		return resolveRelativeModule(filename, importerPath, importerLogicalPath, ctxx, force)
+		return "", ctx.ModuleKey{}, fmt.Errorf("relative imports (./ or ../) are not supported. Use absolute paths from project root: %s", filename)
 	}
 
-	// Project-root relative imports
+	// All other paths are treated as project-root relative imports
 	return resolveProjectRootModule(filename, ctxx)
 }
 
@@ -109,46 +109,6 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 		return "", ctx.ModuleKey{}, err
 	}
 	return filepath.Clean(cachePath), ctx.RemoteModuleKey(filename), nil
-}
-
-// resolveRelativeModule handles relative path imports (./ or ../)
-func resolveRelativeModule(filename, importerPath, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
-	// If the importer is a remote module, resolve relative to its remote path
-	if strings.HasPrefix(importerLogicalPath, REMOTE_HOST) {
-		return resolveRemoteRelativeModule(filename, importerLogicalPath, ctxx, force)
-	}
-
-	// Handle local relative paths
-	importerPath = cleanImporterPath(importerPath)
-	importerDir := filepath.Dir(importerPath)
-	resolved := filepath.Join(importerDir, filename)
-
-	return findModuleFile(resolved, ctxx)
-}
-
-// resolveRemoteRelativeModule handles relative imports from a remote module
-func resolveRemoteRelativeModule(filename, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
-	importerDir := importerLogicalPath
-	if idx := strings.LastIndex(importerDir, "/"); idx != -1 {
-		importerDir = importerDir[:idx]
-	}
-	joined := filepath.ToSlash(filepath.Clean(importerDir + "/" + filename))
-	// Recursively resolve as a remote import
-	return ResolveModule(joined, "", joined, ctxx, force)
-}
-
-// cleanImporterPath removes cache path if present
-func cleanImporterPath(importerPath string) string {
-	splitter := filepath.Join(".ferret", "modules")
-	if strings.Contains(importerPath, splitter) {
-		parts := strings.Split(importerPath, splitter)
-		if len(parts) > 0 {
-			// Return everything before the ".ferret/cache" part, trimmed of trailing separators
-			result := strings.TrimRight(parts[0], string(filepath.Separator))
-			return result
-		}
-	}
-	return importerPath
 }
 
 // resolveProjectRootModule handles project-root relative imports
