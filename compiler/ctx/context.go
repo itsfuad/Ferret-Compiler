@@ -114,7 +114,7 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	// Set root directory to the parent of the entry point's directory
 	// This ensures imports like "code/maths/symbols/pi" resolve correctly from project root
 	entryDir := filepath.Dir(entrypointPath) // returns xxx
-	rootDir := filepath.Dir(entryDir) // returns yyy
+	rootDir := filepath.Dir(entryDir)        // returns yyy
 	entryPoint := filepath.Base(entrypointPath)
 
 	// Ensure the root directory is absolute
