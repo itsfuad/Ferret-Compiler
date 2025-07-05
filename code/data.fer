@@ -1,4 +1,4 @@
-import "maths/math";
+import "code/maths/math";
 //import "./main.fer"; // should error because it's a circular dependency
 
 let myData = "Fuad";
