@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	"compiler/internal/testUtils"
+	"compiler/internal/test_helpers"
 	"testing"
 )
 
@@ -24,7 +24,7 @@ func TestNumberTokenization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
+			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
 			tokens := Tokenize(filePath, false)
 
 			if len(tokens) < 1 {
