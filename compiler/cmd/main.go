@@ -20,10 +20,12 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	p := parser.NewParser(filepath, context, true)
 
 	defer func() {
+		context.Reports.DisplayAll()
 		if r := recover(); r != nil {
 			colors.ORANGE.Println(r)
-			context.Reports.DisplayAll()
-			os.Exit(-1)
+			if context.Reports.HasErrors() {
+				os.Exit(-1)
+			}
 		}
 	}()
 
