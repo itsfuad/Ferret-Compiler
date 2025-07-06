@@ -34,11 +34,11 @@ type CompilerContext struct {
 }
 
 // Helpers to create module keys
-func LocalModuleKey(projectRelative string) ModuleKey {
-	return ModuleKey{IsRemote: false, Path: projectRelative}
+func LocalModuleKey(path string) ModuleKey {
+	return ModuleKey{IsRemote: false, Path: path}
 }
-func RemoteModuleKey(importPath string) ModuleKey {
-	return ModuleKey{IsRemote: true, Path: importPath}
+func RemoteModuleKey(path string) ModuleKey {
+	return ModuleKey{IsRemote: true, Path: path}
 }
 
 func (c *CompilerContext) GetModule(key ModuleKey) *ast.Program {
@@ -67,6 +67,18 @@ func (c *CompilerContext) ModuleCount() int {
 		return 0
 	}
 	return len(c.ModuleASTCache)
+}
+
+func (c *CompilerContext) PrintModules() {
+	modules := c.ModuleNames()
+	if len(modules) == 0 {
+		colors.YELLOW.Println("No modules in cache")
+		return
+	}
+	colors.BLUE.Println("Modules in cache:")
+	for _, name := range modules {
+		colors.GREEN.Printf("- %s\n", name)
+	}
 }
 
 func (c *CompilerContext) ModuleNames() []string {

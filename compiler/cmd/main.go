@@ -16,7 +16,6 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	}
 
 	context := ctx.NewCompilerContext(filepath)
-	defer context.Destroy()
 
 	p := parser.NewParser(filepath, context, true)
 
@@ -48,9 +47,17 @@ func main() {
 		return
 	}
 
+	debug := false
+
+	if len(os.Args) > 2 && os.Args[2] == "--debug" {
+		colors.BLUE.Println("Debug mode enabled")
+		debug = true
+	}
+
 	filename := os.Args[1]
 	fmt.Printf("Compiling file: %s\n", filename)
 
-	context := Compile(filename, true)
-	fmt.Printf("Compiled: %v\n", context.ModuleNames())
+	context := Compile(filename, debug)
+	defer context.Destroy()
+	context.PrintModules()
 }
