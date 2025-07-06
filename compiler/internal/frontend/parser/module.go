@@ -32,7 +32,14 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importPath.End)
 
-	colors.BLUE.Printf("Import module name: '%s', path: '%s'\n", moduleName, importPath.Value)
+	stmt := &ast.ImportStmt{
+		ImportPath: &ast.StringLiteral{
+			Value:    importPath.Value,
+			Location: loc,
+		},
+		ModuleName: moduleName,
+		Location:   loc,
+	}
 
 	// Determine logical import path of the importer
 	var importerLogicalPath string
@@ -51,7 +58,7 @@ func parseImport(p *Parser) ast.Node {
 	resolvedPath, moduleKey, err := resolver.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
 	if err != nil {
 		p.ctx.Reports.Add(p.filePath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		return nil
+		return stmt
 	}
 
 	colors.YELLOW.Printf("Resolved import path: '%s'\n", resolvedPath)
@@ -70,9 +77,9 @@ func parseImport(p *Parser) ast.Node {
 	if cycle, found := p.ctx.DetectCycle(entryKey); found {
 		cycleStr := strings.Join(cycle, " -> ")
 		msg := "Circular import detected: " + cycleStr
-		p.ctx.Reports.Add(p.filePath, &loc, msg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePath, &loc, msg, report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		colors.RED.Println(msg)
-		return nil
+		return stmt
 	}
 
 	// Check if the module is already cached
@@ -80,8 +87,8 @@ func parseImport(p *Parser) ast.Node {
 		module := NewParser(resolvedPath, p.ctx, p.debug).Parse()
 
 		if module == nil {
-			p.ctx.Reports.Add(p.filePath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
-			return nil
+			p.ctx.Reports.Add(p.filePath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			return &ast.ImportStmt{Location: loc}
 		}
 
 		p.ctx.AddModule(moduleKey, module)
@@ -90,14 +97,7 @@ func parseImport(p *Parser) ast.Node {
 		colors.GREEN.Printf("Module '%s' already cached\n", moduleName)
 	}
 
-	return &ast.ImportStmt{
-		ImportPath: &ast.StringLiteral{
-			Value:    importPath.Value,
-			Location: loc,
-		},
-		ModuleName: moduleName,
-		Location:   loc,
-	}
+	return stmt
 }
 
 func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool) {
