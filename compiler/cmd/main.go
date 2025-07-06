@@ -16,6 +16,7 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	}
 
 	context := ctx.NewCompilerContext(filepath)
+	defer context.Destroy()
 
 	p := parser.NewParser(filepath, context, true)
 

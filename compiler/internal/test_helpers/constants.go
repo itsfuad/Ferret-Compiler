@@ -1,4 +1,4 @@
-package testUtils
+package test_helpers
 
 const (
 	ErrMsgFmt  = "%s = %v, want %v"

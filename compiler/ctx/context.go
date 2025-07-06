@@ -133,6 +133,22 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	}
 }
 
+func (c *CompilerContext) Destroy() {
+	if !contextCreated {
+		return
+	}
+	contextCreated = false
+
+	c.ModuleASTCache = nil
+	c.Reports = nil
+	c.DepGraph = nil
+
+	// Optionally, clear the cache directory
+	if c.CachePath != "" {
+		os.RemoveAll(c.CachePath)
+	}
+}
+
 // AddDepEdge adds an edge from importer to imported in the dependency graph
 func (c *CompilerContext) AddDepEdge(importer, imported string) {
 	if c.DepGraph == nil {

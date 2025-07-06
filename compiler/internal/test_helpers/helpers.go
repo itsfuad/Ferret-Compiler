@@ -1,4 +1,4 @@
-package testUtils
+package test_helpers
 
 import (
 	"os"
