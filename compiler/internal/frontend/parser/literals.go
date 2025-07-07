@@ -5,7 +5,7 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
-	"compiler/internal/types"
+	"compiler/internal/utils/numeric"
 	"strings"
 )
 
@@ -16,8 +16,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	loc := *source.NewLocation(&number.Start, &number.End)
 
 	// Try parsing as integer first
-	if types.ValidateHexadecimal(value) {
-		intVal, err := types.ParseInteger(value)
+	if numeric.IsHexadecimal(value) {
+		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
 			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
@@ -30,8 +30,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 		}
 	}
 
-	if types.ValidateOctal(value) {
-		intVal, err := types.ParseInteger(value)
+	if numeric.IsOctal(value) {
+		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
 			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
@@ -44,8 +44,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 		}
 	}
 
-	if types.ValidateBinary(value) {
-		intVal, err := types.ParseInteger(value)
+	if numeric.IsBinary(value) {
+		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
 			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
@@ -59,8 +59,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	}
 
 	// Try as decimal integer
-	if types.ValidateDecimal(value) {
-		intVal, err := types.ParseInteger(value)
+	if numeric.IsDecimal(value) {
+		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
 			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
@@ -74,8 +74,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	}
 
 	// Then try as float (including scientific notation)
-	if types.ValidateFloat(value) {
-		floatVal, err := types.ParseFloat(value)
+	if numeric.IsFloat(value) {
+		floatVal, err := numeric.StringToFloat(value)
 		if err != nil {
 			p.ctx.Reports.Add(p.filePath, &loc, report.FLOAT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil

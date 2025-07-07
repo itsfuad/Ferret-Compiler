@@ -5,9 +5,9 @@ import (
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/fsutils/fs"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 	"path/filepath"
 	"strings"
 )

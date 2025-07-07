@@ -4,9 +4,9 @@ import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/fsutils/lists"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils/lists"
 )
 
 // detect if it's a function or a method

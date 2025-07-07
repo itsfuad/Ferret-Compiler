@@ -1,4 +1,4 @@
-package types
+package numeric
 
 import (
 	"regexp"
@@ -19,59 +19,51 @@ var (
 	scientificRegex = regexp.MustCompile(`^-?[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?[eE][+-]?[0-9]+$`)
 )
 
-// ValidateInteger checks if the string represents any valid integer format
-// (decimal, hexadecimal, octal, or binary)
-func ValidateInteger(s string) bool {
-	return ValidateDecimal(s) || ValidateHexadecimal(s) || ValidateOctal(s) || ValidateBinary(s)
-}
-
-// ValidateFloat checks if the string represents any valid float format
+// IsFloat checks if the string represents any valid float format
 // (decimal point or scientific notation)
-func ValidateFloat(s string) bool {
+func IsFloat(s string) bool {
 	return floatRegex.MatchString(s) || scientificRegex.MatchString(s)
 }
 
-// ValidateDecimal checks if the string represents a decimal integer
-func ValidateDecimal(s string) bool {
+// IsDecimal checks if the string represents a decimal
+func IsDecimal(s string) bool {
 	return decimalRegex.MatchString(s)
 }
 
-// ValidateHexadecimal checks if the string represents a hexadecimal integer
-func ValidateHexadecimal(s string) bool {
+// IsHexadecimal checks if the string represents a hexadecimal integer
+func IsHexadecimal(s string) bool {
 	return hexRegex.MatchString(s)
 }
 
-// ValidateOctal checks if the string represents an octal integer
-func ValidateOctal(s string) bool {
+// IsOctal checks if the string represents an octal integer
+func IsOctal(s string) bool {
 	return octalRegex.MatchString(s)
 }
 
-// ValidateBinary checks if the string represents a binary integer
-func ValidateBinary(s string) bool {
+// IsBinary checks if the string represents a binary integer
+func IsBinary(s string) bool {
 	return binaryRegex.MatchString(s)
 }
 
-// ParseInteger parses a string into an integer value, handling all formats
-func ParseInteger(s string) (int64, error) {
+func StringToInteger(s string) (int64, error) {
 	// Remove any underscores used for readability
 	s = strings.ReplaceAll(s, "_", "")
-
 	// Handle different bases
-	if ValidateHexadecimal(s) {
+	if IsHexadecimal(s) {
 		return strconv.ParseInt(s[2:], 16, 64)
 	}
-	if ValidateOctal(s) {
+	if IsOctal(s) {
 		return strconv.ParseInt(s[2:], 8, 64)
 	}
-	if ValidateBinary(s) {
+	if IsBinary(s) {
 		return strconv.ParseInt(s[2:], 2, 64)
 	}
 	// Default to decimal
 	return strconv.ParseInt(s, 10, 64)
 }
 
-// ParseFloat parses a string into a float value, handling decimal and scientific notation
-func ParseFloat(s string) (float64, error) {
+// StringToFloat parses a string into a float value, handling decimal and scientific notation
+func StringToFloat(s string) (float64, error) {
 	// Remove any underscores used for readability
 	s = strings.ReplaceAll(s, "_", "")
 	return strconv.ParseFloat(s, 64)
