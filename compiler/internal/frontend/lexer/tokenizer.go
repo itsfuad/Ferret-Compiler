@@ -3,6 +3,7 @@ package lexer
 import (
 	//Standard packages
 	"compiler/internal/source"
+	"fmt"
 	"os"
 	"regexp"
 )
@@ -240,15 +241,12 @@ func Tokenize(filename string, debug bool) []Token {
 		}
 
 		if !matched {
-			//errStr := fmt.Sprintf("lexer:unexpected charecter: '%c'", lex.at())
-			//p.Ctx.Reports.Add(filename, lex.Position.Line, lex.Position.Line, lex.Position.Column, lex.Position.Column, errStr).SetLevel(report.CRITICAL_ERROR)
-			return nil
+			panic(fmt.Errorf("Lexer error: Unrecognized token at %s:%d:%d\n%s", lex.FilePath, lex.Position.Line, lex.Position.Column, lex.remainder()))
 		}
 	}
 
 	lex.push(NewToken(EOF_TOKEN, "eof", lex.Position, lex.Position))
 
-	//litter.Dump(lex.Tokens)
 	if debug {
 		for _, token := range lex.Tokens {
 			token.Debug(filename)
