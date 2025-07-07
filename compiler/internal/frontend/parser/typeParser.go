@@ -3,10 +3,10 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/fsutils/lists"
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/types"
+	"compiler/internal/utils/lists"
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {

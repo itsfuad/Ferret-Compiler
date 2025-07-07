@@ -4,7 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
-	"compiler/internal/fsutils/fs"
+	"compiler/internal/utils/fs"
 	"fmt"
 	"os"
 )
