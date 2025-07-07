@@ -23,9 +23,6 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 		context.Reports.DisplayAll()
 		if r := recover(); r != nil {
 			colors.ORANGE.Println(r)
-			if context.Reports.HasErrors() {
-				os.Exit(-1)
-			}
 		}
 	}()
 
