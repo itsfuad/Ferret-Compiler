@@ -166,8 +166,6 @@ func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx 
 	// For imports like "code/remote/audio", we want to import from the remote repo
 	remoteImportPath := remoteRepo + "/" + filename
 
-	fmt.Printf("Remote local import: '%s' from '%s' -> '%s'\n", filename, importerLogicalPath, remoteImportPath)
-
 	// Resolve as a remote import
 	return resolveGitHubModule(remoteImportPath, ctxx, force)
 }

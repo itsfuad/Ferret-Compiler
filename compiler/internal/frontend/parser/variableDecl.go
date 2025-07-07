@@ -5,7 +5,6 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
-	"compiler/internal/types"
 	"fmt"
 )
 
@@ -145,17 +144,6 @@ func parseVarDecl(p *Parser) ast.Statement {
 		token := p.peek()
 		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "values cannot be more than the number of variables", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
-	}
-
-	// Add variables to symbol table
-	for _, v := range variables {
-
-		var typename types.TYPE_NAME
-		if v.ExplicitType != nil {
-			typename = v.ExplicitType.Type()
-		}
-
-		fmt.Printf("var %s's typename: %+v\n", v.Identifier.Name, typename)
 	}
 
 	return &ast.VarDeclStmt{

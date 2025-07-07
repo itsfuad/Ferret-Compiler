@@ -19,7 +19,7 @@ type Parser struct {
 }
 
 func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
-	tokens := lexer.Tokenize(filePath, debug)
+	tokens := lexer.Tokenize(filePath, false)
 	return &Parser{
 		tokens:   tokens,
 		tokenNo:  0,
