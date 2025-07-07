@@ -64,14 +64,12 @@ func (r *Reports) HasWarnings() bool {
 	return false
 }
 func (r *Reports) DisplayAll() {
-	if len(*r) == 0 {
-		return
-	}
-
+	
 	for _, report := range *r {
 		printReport(report)
 	}
-
+	
+	
 	(*r).ShowStatus()
 }
 
@@ -286,10 +284,15 @@ func (r Reports) ShowStatus() {
 		}
 	}
 
+	errCode := 0
+
 	if probCount > 0 {
+		errCode = -1
 		totalProblemsString += colorMap[NORMAL_ERROR].Sprintf("%d %s", probCount, utils.Plural("error", "errors", probCount))
 	}
 
 	messageColor.Print(totalProblemsString)
 	messageColor.Println(" -------------")
+
+	os.Exit(errCode)
 }
