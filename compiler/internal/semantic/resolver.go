@@ -1,1 +1,1 @@
-package semantic 
+package semantic

@@ -1,4 +1,4 @@
-package utils
+package lists
 
 // Has checks if a slice contains an item using a custom equality function.
 func Has[T any](slice []T, item T, equalFn func(a, b T) bool) bool {

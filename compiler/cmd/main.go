@@ -1,17 +1,17 @@
 package main
 
 import (
-	"compiler/cmd/resolver"
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/fsutils/fs"
 	"fmt"
 	"os"
 )
 
 func Compile(filepath string, debug bool) *ctx.CompilerContext {
 
-	if !resolver.IsValidFile(filepath) {
+	if !fs.IsValidFile(filepath) {
 		panic(fmt.Errorf("invalid file: %s", filepath))
 	}
 

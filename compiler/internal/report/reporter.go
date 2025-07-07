@@ -5,7 +5,7 @@ import (
 	"compiler/internal/source"
 
 	//"compiler/internal/symboltable"
-	"compiler/internal/utils"
+	_strings "compiler/internal/fsutils/strings"
 	"fmt"
 	"os"
 	"strings"
@@ -64,12 +64,11 @@ func (r *Reports) HasWarnings() bool {
 	return false
 }
 func (r *Reports) DisplayAll() {
-	
+
 	for _, report := range *r {
 		printReport(report)
 	}
-	
-	
+
 	(*r).ShowStatus()
 }
 
@@ -278,7 +277,7 @@ func (r Reports) ShowStatus() {
 	totalProblemsString := ""
 
 	if warningCount > 0 {
-		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s)", warningCount, utils.Plural("warning", "warnings ", warningCount))
+		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s)", warningCount, _strings.Plural("warning", "warnings ", warningCount))
 		if probCount > 0 {
 			totalProblemsString += colors.ORANGE.Sprintf(", ")
 		}
@@ -288,7 +287,7 @@ func (r Reports) ShowStatus() {
 
 	if probCount > 0 {
 		errCode = -1
-		totalProblemsString += colorMap[NORMAL_ERROR].Sprintf("%d %s", probCount, utils.Plural("error", "errors", probCount))
+		totalProblemsString += colorMap[NORMAL_ERROR].Sprintf("%d %s", probCount, _strings.Plural("error", "errors", probCount))
 	}
 
 	messageColor.Print(totalProblemsString)

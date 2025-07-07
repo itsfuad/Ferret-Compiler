@@ -1,4 +1,4 @@
-package resolver
+package fs
 
 import (
 	"compiler/ctx"
@@ -11,9 +11,11 @@ import (
 
 const (
 	CREATE_DUMP_FAILED_MSG = "Failed to create temp dir: %v"
+	MAIN_FILE              = "main.fer"
 	VALID_FILE             = "valid.fer"
 
 	TEST_FILE_CONTENT = "test content"
+	PATH_NAME         = "some/path"
 )
 
 // TestGitHubPathToRawURL tests the GitHubPathToRawURL function
@@ -180,7 +182,7 @@ func TestResolveModule(t *testing.T) {
 			name:                "Empty filename",
 			filename:            "",
 			importerPath:        filepath.Join(tempDir, "some", "path"),
-			importerLogicalPath: "some/path",
+			importerLogicalPath: PATH_NAME,
 			force:               false,
 			wantPath:            "",
 			wantError:           true,
@@ -189,7 +191,7 @@ func TestResolveModule(t *testing.T) {
 			name:                "Project-root relative path without extension",
 			filename:            "valid",
 			importerPath:        filepath.Join(tempDir, "some", "path"),
-			importerLogicalPath: "some/path",
+			importerLogicalPath: PATH_NAME,
 			force:               false,
 			wantPath:            filepath.Join(tempDir, VALID_FILE),
 			wantError:           false,
@@ -198,7 +200,7 @@ func TestResolveModule(t *testing.T) {
 			name:                "Project-root relative path with extension",
 			filename:            "valid.fer",
 			importerPath:        filepath.Join(tempDir, "some", "path"),
-			importerLogicalPath: "some/path",
+			importerLogicalPath: PATH_NAME,
 			force:               false,
 			wantPath:            filepath.Join(tempDir, VALID_FILE),
 			wantError:           false,
@@ -206,7 +208,7 @@ func TestResolveModule(t *testing.T) {
 		{
 			name:                "Project-root relative path with subdirectory without extension",
 			filename:            "test/valid",
-			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerPath:        filepath.Join(tempDir, MAIN_FILE),
 			importerLogicalPath: "",
 			force:               false,
 			wantPath:            filepath.Join(tempDir, "test", VALID_FILE),
@@ -215,7 +217,7 @@ func TestResolveModule(t *testing.T) {
 		{
 			name:                "Relative path (./) - should error",
 			filename:            "./test/valid",
-			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerPath:        filepath.Join(tempDir, MAIN_FILE),
 			importerLogicalPath: "",
 			force:               false,
 			wantPath:            "",
@@ -224,7 +226,7 @@ func TestResolveModule(t *testing.T) {
 		{
 			name:                "Relative path (../) - should error",
 			filename:            "../test/valid",
-			importerPath:        filepath.Join(tempDir, "main.fer"),
+			importerPath:        filepath.Join(tempDir, MAIN_FILE),
 			importerLogicalPath: "",
 			force:               false,
 			wantPath:            "",

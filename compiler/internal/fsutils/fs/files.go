@@ -1,4 +1,4 @@
-package resolver
+package fs
 
 import (
 	"compiler/ctx"
@@ -10,7 +10,14 @@ import (
 	"strings"
 )
 
+const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
+
+// Check if file exists and is a regular file
+func IsValidFile(filename string) bool {
+	fileInfo, err := os.Stat(filename)
+	return err == nil && fileInfo.Mode().IsRegular()
+}
 
 // GitHubPathToRawURL converts a GitHub import path to a raw.githubusercontent.com URL.
 // Example: "github.com/user/repo/path/file" → "https://raw.githubusercontent.com/user/repo/main/path/file"

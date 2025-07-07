@@ -4,9 +4,9 @@ import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
+	"compiler/internal/fsutils/lists"
 	"compiler/internal/report"
 	"compiler/internal/source"
-	"compiler/internal/utils"
 )
 
 // detect if it's a function or a method
@@ -71,7 +71,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		}
 
 		//check if the parameter is already defined
-		if utils.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
+		if lists.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
 			return p.Identifier.Name == b.Identifier.Name
 		}) {
 			p.ctx.Reports.Add(p.filePath, &param.Identifier.Location, report.PARAMETER_REDEFINITION, report.PARSING_PHASE).AddHint("Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
