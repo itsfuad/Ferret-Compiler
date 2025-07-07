@@ -5,7 +5,7 @@ import (
 	"compiler/internal/source"
 
 	//"compiler/internal/symboltable"
-	_strings "compiler/internal/fsutils/strings"
+	_strings "compiler/internal/utils/strings"
 	"fmt"
 	"os"
 	"strings"

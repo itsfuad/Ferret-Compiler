@@ -24,6 +24,17 @@ let a = 1;
 
 let name, age : str, i32 = "John", 30;
 
+//supports different numeric types and formatting
+let pi : f64 = 3.14159;
+//for larger numbers, use _ as a separator
+let largeNumber : i64 = 1_000_000_000_000;
+//octals, hexadecimals, and binary literals are supported
+let octal : i32 = 0o755; // octal representation
+let hex : i32 = 0xFF; // hexadecimal representation
+let binary : i32 = 0b101010; // binary representation
+//support scientific notation
+let scientific : f64 = 1.23e4; // 1.23 * 10^4
+
 // type MyType = i32 | str | null;
 
 // let a : i32 = 10;
