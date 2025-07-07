@@ -3,10 +3,10 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
+	"compiler/internal/fsutils/lists"
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/types"
-	"compiler/internal/utils"
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {
@@ -209,7 +209,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		}
 
 		// check if the method name is already declared in the interface
-		if utils.Has(methods, method, func(a ast.InterfaceMethod, b ast.InterfaceMethod) bool {
+		if lists.Has(methods, method, func(a ast.InterfaceMethod, b ast.InterfaceMethod) bool {
 			return a.Name.Name == b.Name.Name
 		}) {
 			p.ctx.Reports.Add(p.filePath, source.NewLocation(method.Location.Start, method.Location.End), report.DUPLICATE_METHOD_NAME, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)

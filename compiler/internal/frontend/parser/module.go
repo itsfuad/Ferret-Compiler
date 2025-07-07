@@ -1,11 +1,11 @@
 package parser
 
 import (
-	"compiler/cmd/resolver"
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
+	"compiler/internal/fsutils/fs"
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"path/filepath"
@@ -55,7 +55,7 @@ func parseImport(p *Parser) ast.Node {
 	}
 
 	// Use new ResolveModule signature
-	resolvedPath, moduleKey, err := resolver.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
+	resolvedPath, moduleKey, err := fs.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
 	if err != nil {
 		p.ctx.Reports.Add(p.filePath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return stmt
