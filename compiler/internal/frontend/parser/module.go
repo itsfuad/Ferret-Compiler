@@ -61,8 +61,6 @@ func parseImport(p *Parser) ast.Node {
 		return stmt
 	}
 
-	colors.YELLOW.Printf("Resolved import path: '%s'\n", resolvedPath)
-
 	// Add dependency edge and check for cycles
 	importerKey := ctx.ModuleKey{IsRemote: strings.HasPrefix(importerLogicalPath, "github.com/"), Path: importerLogicalPath}.String()
 	importedKey := moduleKey.String()
@@ -92,9 +90,9 @@ func parseImport(p *Parser) ast.Node {
 		}
 
 		p.ctx.AddModule(moduleKey, module)
-		colors.GREEN.Printf("Module '%s' added to cache\n", moduleName)
+		colors.GREEN.Printf("Cached <- Module '%s'\n", moduleName)
 	} else {
-		colors.GREEN.Printf("Module '%s' already cached\n", moduleName)
+		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", moduleName)
 	}
 
 	return stmt

@@ -105,7 +105,6 @@ func (c *CompilerContext) AddModule(key ModuleKey, module *ast.Program) {
 		c.ModuleASTCache = make(map[string]*ast.Program)
 	}
 	if _, exists := c.ModuleASTCache[key.String()]; exists {
-		colors.RED.Printf("Module '%s' already exists in cache, skipping addition\n", key.String())
 		return
 	}
 	if module == nil {
@@ -114,7 +113,6 @@ func (c *CompilerContext) AddModule(key ModuleKey, module *ast.Program) {
 		return
 	}
 	c.ModuleASTCache[key.String()] = module
-	colors.GREEN.Printf("Module '%s' added to cache\n", key.String())
 }
 
 func NewCompilerContext(entrypointPath string) *CompilerContext {

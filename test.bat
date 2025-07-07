@@ -6,33 +6,46 @@ set "passed=0"
 set "failed=0"
 set "skipped=0"
 
-:: Run go test -v and capture output
-> test_output.tmp (
-    go test ./... -v
-)
-
-:: Display test output to console
-type test_output.tmp
-
-:: Count only indented lines (subtests)
-for /f "delims=" %%A in ('findstr /R "^[ ]*--- " test_output.tmp') do (
+:: Run go test and parse each output line
+for /f "delims=" %%A in ('go test ./... -v 2^>nul') do (
     set "line=%%A"
-    echo !line! | findstr /C:"--- PASS" >nul && set /a passed+=1
-    echo !line! | findstr /C:"--- FAIL" >nul && set /a failed+=1
-    echo !line! | findstr /C:"--- SKIP" >nul && set /a skipped+=1
+    call :CheckLine
 )
 
 set /a total=passed+failed+skipped
 
-if "%total%"=="0" (
+echo.
+echo Passed : %passed%
+echo Failed : %failed%
+echo Skipped: %skipped%
+echo Total  : %total%
+
+if %total%==0 (
     echo.
     echo No subtests were run.
-    del test_output.tmp
     exit /b
 )
 
+:: Calculate percentage of passed tests
 set /a percent=100 * passed / total
+echo Success: %percent%%%
 
-echo.
-echo Passed: %passed% / %total% (%percent%%%)
-del test_output.tmp
+exit /b
+
+:: Subroutine to check and count test results
+:CheckLine
+setlocal EnableDelayedExpansion
+set "check=!line!"
+
+if not "!check:--- PASS=!"=="!check!" (
+    endlocal & set /a passed+=1 & goto :eof
+)
+if not "!check:--- FAIL=!"=="!check!" (
+    endlocal & set /a failed+=1 & goto :eof
+)
+if not "!check:--- SKIP=!"=="!check!" (
+    endlocal & set /a skipped+=1 & goto :eof
+)
+
+endlocal
+goto :eof
