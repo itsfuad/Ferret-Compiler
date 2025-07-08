@@ -41,6 +41,7 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	// --- Semantic Analysis: Name Resolution ---
 	globalTable := semantic.NewSymbolTable(nil)
 	semantic.AddPreludeSymbols(globalTable)
+	// Run resolver
 	res := resolver.NewResolver(context, filepath, &context.Reports, debug)
 	res.Symbols = globalTable
 	res.ResolveProgram(program)
@@ -50,9 +51,12 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	}
 
 	// --- Type Checking ---
-	tc := typecheck.NewTypeChecker(globalTable, &context.Reports, debug)
-	tc.SetContext(context)
-	tc.CheckProgram(program)
+	// Pass resolver's symbol tables and alias map to typechecker
+	typeChecker := typecheck.NewTypeChecker(res.Symbols, &context.Reports, debug)
+	typeChecker.SetContext(context)
+	typeChecker.ModuleTables = res.ModuleTables
+	typeChecker.AliasToPath = res.AliasToPath
+	typeChecker.CheckProgram(program)
 	if context.Reports.HasErrors() {
 		context.Reports.DisplayAll()
 		return context

@@ -66,7 +66,7 @@ func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
 		tc.checkNode(node)
 	}
 	if tc.Debug {
-		fmt.Println("[TypeChecker] Finished type checking")
+		fmt.Printf("[TypeChecker] Finished type checking for %s\n", tc.CurrentFile)
 	}
 }
 
@@ -217,47 +217,15 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 		return ""
 	case *ast.ScopeResolutionExpr:
 		alias := e.Module.Name
-		filePath, ok := tc.AliasToPath[alias]
+		importedTable, ok := tc.Symbols.Imports[alias]
 		if !ok {
 			tc.Reports.Add(tc.CurrentFile, e.Module.Loc(), fmt.Sprintf("unknown module: %s", alias), report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if tc.Debug {
-				fmt.Printf("[TypeChecker] Alias '%s' not found in import map\n", alias)
+				fmt.Printf("[TypeChecker] Alias '%s' not found in Imports map\n", alias)
 			}
 			return ""
 		}
-		modTable, found := tc.ModuleTables[filePath]
-		if !found {
-			modAST := tc.Ctx.GetModule(ctx.LocalModuleKey(filePath))
-			if modAST == nil {
-				modAST = tc.Ctx.GetModule(ctx.RemoteModuleKey(filePath))
-			}
-			if modAST == nil {
-				tc.Reports.Add(tc.CurrentFile, e.Module.Loc(), fmt.Sprintf("module not found for alias '%s' (file: %s)", alias, filePath), report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
-				if tc.Debug {
-					fmt.Printf("[TypeChecker] Module file '%s' not found for alias '%s'\n", filePath, alias)
-				}
-				return ""
-			}
-			modTable = semantic.NewSymbolTable(nil)
-			for _, node := range modAST.Nodes {
-				if v, ok := node.(*ast.VarDeclStmt); ok {
-					for _, varDecl := range v.Variables {
-						modTable.Declare(varDecl.Identifier.Name, &semantic.Symbol{Name: varDecl.Identifier.Name, Kind: semantic.SymbolVar, Type: varDecl.ExplicitType})
-					}
-				}
-			}
-			tc.ModuleTables[filePath] = modTable
-			// Recursively type check the imported module
-			checker := NewTypeChecker(modTable, tc.Reports, tc.Debug)
-			checker.SetContext(tc.Ctx)
-			checker.ModuleTables = tc.ModuleTables
-			checker.AliasToPath = tc.AliasToPath
-			checker.CheckedMods = tc.CheckedMods
-			checker.CheckProgram(modAST)
-			// Mark as checked
-			tc.CheckedMods[filePath] = true
-		}
-		sym, found := modTable.Lookup(e.Identifier.Name)
+		sym, found := importedTable.Lookup(e.Identifier.Name)
 		if found && sym.Type != nil {
 			if dt, ok := sym.Type.(ast.DataType); ok {
 				return dt.Type()
@@ -265,7 +233,7 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 		}
 		tc.Reports.Add(tc.CurrentFile, e.Identifier.Loc(), fmt.Sprintf("undeclared symbol in module '%s': %s", alias, e.Identifier.Name), report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		if tc.Debug {
-			fmt.Printf("[TypeChecker] Symbol '%s' not found in module '%s' (file: %s)\n", e.Identifier.Name, alias, filePath)
+			fmt.Printf("[TypeChecker] Symbol '%s' not found in module '%s'\n", e.Identifier.Name, alias)
 		}
 		return ""
 	default:
