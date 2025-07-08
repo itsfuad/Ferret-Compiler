@@ -29,7 +29,7 @@ let importedData = data::myData;
 //supports different numeric types and formatting
 let pi : f64 = 3.14159;
 //for larger numbers, use _ as a separator
-let largeNumber : i64 = 1_000_000_000_000;
+let largeNumber : i32 = 1_000_000;
 //octals, hexadecimals, and binary literals are supported
 let octal : i32 = 0o755; // octal representation
 let hex : i32 = 0xFF; // hexadecimal representation
@@ -55,3 +55,4 @@ let scientific : f64 = 1.23e4; // 1.23 * 10^4
 //     };
 // }
 
+let cxx : str = data::kk;

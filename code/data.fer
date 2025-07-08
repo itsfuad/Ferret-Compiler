@@ -2,3 +2,5 @@ import "code/maths/math";
 //import "code/main"; // should error because it's a circular dependency
 
 let myData = "Fuad";
+
+let kk = 10;

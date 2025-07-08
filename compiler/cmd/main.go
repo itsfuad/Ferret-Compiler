@@ -4,6 +4,9 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/semantic"
+	"compiler/internal/semantic/resolver"
+	"compiler/internal/semantic/typecheck"
 	"compiler/internal/utils/fs"
 	"fmt"
 	"os"
@@ -34,6 +37,26 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	}
 
 	context.AddModule(ctx.LocalModuleKey(filepath), program)
+
+	// --- Semantic Analysis: Name Resolution ---
+	globalTable := semantic.NewSymbolTable(nil)
+	semantic.AddPreludeSymbols(globalTable)
+	res := resolver.NewResolver(context, filepath, &context.Reports, debug)
+	res.Symbols = globalTable
+	res.ResolveProgram(program)
+	if context.Reports.HasErrors() {
+		context.Reports.DisplayAll()
+		return context
+	}
+
+	// --- Type Checking ---
+	tc := typecheck.NewTypeChecker(globalTable, &context.Reports, debug)
+	tc.SetContext(context)
+	tc.CheckProgram(program)
+	if context.Reports.HasErrors() {
+		context.Reports.DisplayAll()
+		return context
+	}
 
 	return context
 }
