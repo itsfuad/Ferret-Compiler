@@ -143,8 +143,9 @@ func printReport(r *Report) {
 // and a padding value.
 func makeParts(r *Report) (snippet, underline string) {
 	fileData, err := os.ReadFile(r.FilePath)
-	if err != nil {
-		panic(err)
+
+	if os.IsNotExist(err) {
+		panic(fmt.Sprintf("file '%s' not found", r.FilePath))
 	}
 
 	lines := strings.Split(string(fileData), "\n")

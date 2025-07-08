@@ -250,6 +250,7 @@ func (p *Parser) Parse() *ast.Program {
 
 	return &ast.Program{
 		Nodes:    nodes,
+		FilePath: p.filePath,
 		Location: *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 }

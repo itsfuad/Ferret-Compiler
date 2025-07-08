@@ -25,6 +25,7 @@ const (
 	PRIVATE_TOKEN    TOKEN = "priv"
 	RETURN_TOKEN     TOKEN = "return"
 	IMPORT_TOKEN     TOKEN = "import"
+	AS_TOKEN         TOKEN = "as"
 	MODULE_TOKEN     TOKEN = "mod"
 	//data types
 	NUMBER_TOKEN    TOKEN = "numeric literal"
