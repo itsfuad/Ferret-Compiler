@@ -2,12 +2,12 @@ package parser
 
 import (
 	"compiler/colors"
-	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/utils/fs"
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -17,6 +17,8 @@ func parseImport(p *Parser) ast.Node {
 	start := p.consume(lexer.IMPORT_TOKEN, report.EXPECTED_IMPORT_KEYWORD)
 	importPath := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
 
+	importPathStr := importPath.Value
+
 	// Support: import "path" as Alias;
 	var moduleName string
 	if p.match(lexer.AS_TOKEN) {
@@ -25,9 +27,9 @@ func parseImport(p *Parser) ast.Node {
 		moduleName = aliasToken.Value
 	} else {
 		// Default: use last part of path (without extension)
-		parts := strings.Split(importPath.Value, "/")
+		parts := strings.Split(importPathStr, "/")
 		if len(parts) == 0 {
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		sufs := strings.Split(parts[len(parts)-1], ".")
@@ -37,73 +39,59 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importPath.End)
 
-	// Determine logical import path of the importer
-	var importerLogicalPath string
-	if strings.HasPrefix(p.filePath, p.ctx.CachePath) {
-		// This is a cached remote file, so get the remote import path from the cache path
-		// Remove the cache prefix and convert to github.com/... form
-		rel, _ := filepath.Rel(p.ctx.CachePath, p.filePath)
-		importerLogicalPath = filepath.ToSlash(rel)
-	} else {
-		// Local file: use project-relative path
-		rel, _ := filepath.Rel(p.ctx.RootDir, p.filePath)
-		importerLogicalPath = filepath.ToSlash(rel)
-	}
-
 	// Use fs.ResolveModule to get the absolute path
-	absPath, moduleKey, err := fs.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
-	// Convert absPath to project-root relative, then normalize to slashes
-	relPath, _ := filepath.Rel(p.ctx.RootDir, absPath)
-	relPath = filepath.ToSlash(relPath)
+	moduleAbsPath, moduleRelPath, err := fs.ResolveModule(importPathStr, p.filePathAbs, p.ctx, false)
+	if err != nil {
+		p.ctx.Reports.Add(p.filePathAbs, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	}
 
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
-			Value:    importPath.Value,
+			Value:    importPathStr,
 			Location: loc,
 		},
 		ModuleName: moduleName,
-		FilePath:   relPath,
+		FilePath:   moduleAbsPath,
 		Location:   loc,
 	}
 
-	if err != nil {
-		p.ctx.Reports.Add(p.filePath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		return stmt
-	}
-
-	// Add dependency edge and check for cycles
-	importerKey := ctx.ModuleKey{IsRemote: strings.HasPrefix(importerLogicalPath, "github.com/"), Path: importerLogicalPath}.String()
-	importedKey := moduleKey.String()
-	p.ctx.AddDepEdge(importerKey, importedKey)
+	// Add dependency edge and check for cycles,
+	p.ctx.AddDepEdge(p.filePathAbs, moduleAbsPath)
 
 	// Always start cycle detection from the entrypoint
 	entryRel := p.ctx.EntryPoint
 	if p.ctx.RootDir != "" {
 		entryRel = filepath.ToSlash(filepath.Join("", p.ctx.EntryPoint))
 	}
-	entryKey := ctx.ModuleKey{IsRemote: false, Path: entryRel}.String()
+	entryKey := entryRel
 	if cycle, found := p.ctx.DetectCycle(entryKey); found {
 		cycleStr := strings.Join(cycle, " -> ")
 		msg := "Circular import detected: " + cycleStr
-		p.ctx.Reports.Add(p.filePath, &loc, msg, report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, &loc, msg, report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		colors.RED.Println(msg)
 		return stmt
 	}
 
 	// Check if the module is already cached
-	if !p.ctx.HasModule(moduleKey) {
-		module := NewParser(absPath, p.ctx, p.debug).Parse()
+	if !p.ctx.HasModule(moduleName) {
+
+		module := NewParser(moduleAbsPath, p.ctx, p.debug).Parse()
 
 		if module == nil {
-			p.ctx.Reports.Add(p.filePath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			return &ast.ImportStmt{Location: loc}
 		}
 
-		p.ctx.AddModule(moduleKey, module)
+		p.ctx.AddModule(moduleName, module)
 		colors.GREEN.Printf("Cached <- Module '%s'\n", moduleName)
 	} else {
 		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", moduleName)
 	}
+
+	p.ctx.AliasToPath[moduleName] = moduleRelPath
+
+	fmt.Printf("Parsing import: %s -> %s\n", p.ctx.AbsToModuleName(p.filePathAbs), moduleRelPath)
 
 	return stmt
 }
@@ -114,7 +102,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -125,7 +113,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		}, true
 	} else {
 		token := p.peek()
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 }
