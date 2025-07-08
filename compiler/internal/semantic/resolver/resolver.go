@@ -204,6 +204,8 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 				fmt.Printf("[Resolver] Built symbol table for module: %s\n", filePath)
 			}
 		}
+		// Link the imported module's symbol table in the current module's Imports map
+		r.Symbols.Imports[alias] = modTable
 		if _, found := modTable.Lookup(e.Identifier.Name); !found {
 			r.Reports.Add(r.File, e.Identifier.Loc(), "undeclared symbol in module '"+alias+"': "+e.Identifier.Name, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if r.Debug {
