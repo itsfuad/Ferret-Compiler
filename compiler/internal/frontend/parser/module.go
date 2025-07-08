@@ -17,29 +17,25 @@ func parseImport(p *Parser) ast.Node {
 	start := p.consume(lexer.IMPORT_TOKEN, report.EXPECTED_IMPORT_KEYWORD)
 	importPath := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
 
-	// Get module name from import path (last component) [e.g., "std/fmt/log.fer | .ferret]
-
-	parts := strings.Split(importPath.Value, "/")
-	if len(parts) == 0 {
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
-		return nil
+	// Support: import "path" as Alias;
+	var moduleName string
+	if p.match(lexer.AS_TOKEN) {
+		p.advance() // consume 'as'
+		aliasToken := p.consume(lexer.IDENTIFIER_TOKEN, "Expected identifier after 'as' in import")
+		moduleName = aliasToken.Value
+	} else {
+		// Default: use last part of path (without extension)
+		parts := strings.Split(importPath.Value, "/")
+		if len(parts) == 0 {
+			p.ctx.Reports.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		sufs := strings.Split(parts[len(parts)-1], ".")
+		suf := "." + sufs[len(sufs)-1]
+		moduleName = strings.TrimSuffix(parts[len(parts)-1], suf)
 	}
-
-	sufs := strings.Split(parts[len(parts)-1], ".")
-	suf := "." + sufs[len(sufs)-1]
-
-	moduleName := strings.TrimSuffix(parts[len(parts)-1], suf)
 
 	loc := *source.NewLocation(&start.Start, &importPath.End)
-
-	stmt := &ast.ImportStmt{
-		ImportPath: &ast.StringLiteral{
-			Value:    importPath.Value,
-			Location: loc,
-		},
-		ModuleName: moduleName,
-		Location:   loc,
-	}
 
 	// Determine logical import path of the importer
 	var importerLogicalPath string
@@ -54,8 +50,22 @@ func parseImport(p *Parser) ast.Node {
 		importerLogicalPath = filepath.ToSlash(rel)
 	}
 
-	// Use new ResolveModule signature
-	resolvedPath, moduleKey, err := fs.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
+	// Use fs.ResolveModule to get the absolute path
+	absPath, moduleKey, err := fs.ResolveModule(importPath.Value, p.filePath, importerLogicalPath, p.ctx, false)
+	// Convert absPath to project-root relative, then normalize to slashes
+	relPath, _ := filepath.Rel(p.ctx.RootDir, absPath)
+	relPath = filepath.ToSlash(relPath)
+
+	stmt := &ast.ImportStmt{
+		ImportPath: &ast.StringLiteral{
+			Value:    importPath.Value,
+			Location: loc,
+		},
+		ModuleName: moduleName,
+		FilePath:   relPath,
+		Location:   loc,
+	}
+
 	if err != nil {
 		p.ctx.Reports.Add(p.filePath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return stmt
@@ -82,7 +92,7 @@ func parseImport(p *Parser) ast.Node {
 
 	// Check if the module is already cached
 	if !p.ctx.HasModule(moduleKey) {
-		module := NewParser(resolvedPath, p.ctx, p.debug).Parse()
+		module := NewParser(absPath, p.ctx, p.debug).Parse()
 
 		if module == nil {
 			p.ctx.Reports.Add(p.filePath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)

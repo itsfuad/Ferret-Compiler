@@ -4,6 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -108,9 +109,7 @@ func (c *CompilerContext) AddModule(key ModuleKey, module *ast.Program) {
 		return
 	}
 	if module == nil {
-		colors.RED.Printf("Cannot add nil module for '%s'\n", key.String())
-		c.Reports.Add("CompilerContext", nil, "Cannot add nil module", report.SEMANTIC_PHASE).SetLevel(report.SYNTAX_ERROR)
-		return
+		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", key.String()))
 	}
 	c.ModuleASTCache[key.String()] = module
 }
