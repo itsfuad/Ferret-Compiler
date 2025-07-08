@@ -42,7 +42,7 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 	globalTable := semantic.NewSymbolTable(nil)
 	semantic.AddPreludeSymbols(globalTable)
 	// Run resolver
-	res := resolver.NewResolver(context, filepath, &context.Reports, debug)
+	res := resolver.NewResolver(context, filepath, debug)
 	res.Symbols = globalTable
 	res.ResolveProgram(program)
 	if context.Reports.HasErrors() {
@@ -52,8 +52,7 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 
 	// --- Type Checking ---
 	// Pass resolver's symbol tables and alias map to typechecker
-	typeChecker := typecheck.NewTypeChecker(res.Symbols, &context.Reports, debug)
-	typeChecker.SetContext(context)
+	typeChecker := typecheck.NewTypeChecker(context, res.Symbols, debug)
 	typeChecker.ModuleTables = res.ModuleTables
 	typeChecker.AliasToPath = res.AliasToPath
 	typeChecker.CheckProgram(program)
