@@ -12,18 +12,16 @@ type Resolver struct {
 	Symbols      *semantic.SymbolTable
 	ctx          *ctx.CompilerContext
 	File         string
-	Reports      *report.Reports
 	Debug        bool
 	ModuleTables map[string]*semantic.SymbolTable // module file path -> symbol table
 	AliasToPath  map[string]string                // import alias -> file path
 }
 
-func NewResolver(ctx *ctx.CompilerContext, file string, reports *report.Reports, debug bool) *Resolver {
+func NewResolver(ctx *ctx.CompilerContext, file string, debug bool) *Resolver {
 	return &Resolver{
 		Symbols:      semantic.NewSymbolTable(nil),
 		ctx:          ctx,
 		File:         file,
-		Reports:      reports,
 		Debug:        debug,
 		ModuleTables: make(map[string]*semantic.SymbolTable),
 		AliasToPath:  make(map[string]string),
@@ -41,6 +39,26 @@ func (r *Resolver) ResolveProgram(prog *ast.Program) {
 				r.AliasToPath[imp.ModuleName] = imp.FilePath
 				if r.Debug {
 					fmt.Printf("[Resolver] Import alias: %s -> %s\n", imp.ModuleName, imp.FilePath)
+				}
+				// --- Recursive import resolution ---
+				filePath := imp.FilePath
+				modAST := r.ctx.GetModule(ctx.LocalModuleKey(filePath))
+				if modAST == nil {
+					modAST = r.ctx.GetModule(ctx.RemoteModuleKey(filePath))
+				}
+				if modAST != nil {
+					modTable, found := r.ModuleTables[filePath]
+					if !found {
+						modTable = semantic.NewSymbolTable(nil)
+						r.ModuleTables[filePath] = modTable
+						// RECURSE: resolve the imported module's AST with its own symbol table
+						prevSymbols := r.Symbols
+						r.Symbols = modTable
+						r.ResolveProgram(modAST)
+						r.Symbols = prevSymbols
+					}
+					// Link the imported module's symbol table in the current module's Imports map
+					r.Symbols.Imports[imp.ModuleName] = modTable
 				}
 			}
 		}
@@ -94,14 +112,14 @@ func (r *Resolver) resolveVarDecl(stmt *ast.VarDeclStmt) {
 			typeName := string(v.ExplicitType.Type())
 			sym, found := r.Symbols.Lookup(typeName)
 			if !found || sym.Kind != semantic.SymbolType {
-				r.Reports.Add(r.File, v.Identifier.Loc(), "unknown type: "+typeName, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				r.ctx.Reports.Add(r.File, v.Identifier.Loc(), "unknown type: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			}
 		}
 		sym := &semantic.Symbol{Name: name, Kind: kind, Type: v.ExplicitType}
 		err := r.Symbols.Declare(name, sym)
 		if err != nil {
 			// Redeclaration error
-			r.Reports.Add(r.File, v.Identifier.Loc(), err.Error(), report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.File, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 		// Check initializer expression if present
 		if i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
@@ -115,13 +133,13 @@ func (r *Resolver) resolveAssignment(stmt *ast.AssignmentStmt) { // Check that a
 		if id, ok := lhs.(*ast.IdentifierExpr); ok {
 			varSym, found := r.Symbols.Lookup(id.Name)
 			if !found {
-				r.Reports.Add(r.File, id.Loc(), "assignment to undeclared variable: "+id.Name, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				r.ctx.Reports.Add(r.File, id.Loc(), "assignment to undeclared variable: "+id.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			} else if varSym.Type != nil {
 				// Type checking: ensure type exists for variable
 				typeName := string(varSym.Type.(ast.DataType).Type())
 				typeSym, found := r.Symbols.Lookup(typeName)
 				if !found || typeSym.Kind != semantic.SymbolType {
-					r.Reports.Add(r.File, id.Loc(), "unknown type for variable: "+typeName, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+					r.ctx.Reports.Add(r.File, id.Loc(), "unknown type for variable: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 				}
 			}
 		} else {
@@ -146,7 +164,7 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
 		if _, found := r.Symbols.Lookup(e.Name); !found {
-			r.Reports.Add(r.File, e.Loc(), "undeclared variable: "+e.Name, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.File, e.Loc(), "undeclared variable: "+e.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 	case *ast.BinaryExpr:
 		r.resolveExpr(e.Left)
@@ -171,7 +189,7 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 		}
 		filePath, ok := r.AliasToPath[alias]
 		if !ok {
-			r.Reports.Add(r.File, e.Module.Loc(), "unknown module: "+alias, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.File, e.Module.Loc(), "unknown module: "+alias, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if r.Debug {
 				fmt.Printf("[Resolver] Alias '%s' not found in import map\n", alias)
 			}
@@ -182,7 +200,7 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 			modAST = r.ctx.GetModule(ctx.RemoteModuleKey(filePath))
 		}
 		if modAST == nil {
-			r.Reports.Add(r.File, e.Module.Loc(), "unknown module: "+alias, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.File, e.Module.Loc(), "unknown module: "+alias, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if r.Debug {
 				fmt.Printf("[Resolver] Module file '%s' not found for alias '%s'\n", filePath, alias)
 			}
@@ -207,7 +225,7 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 		// Link the imported module's symbol table in the current module's Imports map
 		r.Symbols.Imports[alias] = modTable
 		if _, found := modTable.Lookup(e.Identifier.Name); !found {
-			r.Reports.Add(r.File, e.Identifier.Loc(), "undeclared symbol in module '"+alias+"': "+e.Identifier.Name, report.SEMANTIC_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.File, e.Identifier.Loc(), "undeclared symbol in module '"+alias+"': "+e.Identifier.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if r.Debug {
 				fmt.Printf("[Resolver] Symbol '%s' not found in module '%s' (file: %s)\n", e.Identifier.Name, alias, filePath)
 			}
