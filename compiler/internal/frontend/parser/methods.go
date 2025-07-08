@@ -18,13 +18,13 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 	}
 
 	if len(receivers) == 0 {
-		p.ctx.Reports.Add(p.filePath, &iden.Location, "Expected receiver", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, &iden.Location, "Expected receiver", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
 	if len(receivers) > 1 {
 		receiver := receivers[1]
-		p.ctx.Reports.Add(p.filePath, &receiver.Identifier.Location, "expected only one receiver", report.PARSING_PHASE).SetLevel(report.NORMAL_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, &receiver.Identifier.Location, "expected only one receiver", report.PARSING_PHASE).SetLevel(report.NORMAL_ERROR)
 	}
 
 	receiver := receivers[0]

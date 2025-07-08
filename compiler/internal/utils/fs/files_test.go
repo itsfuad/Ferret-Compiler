@@ -245,7 +245,7 @@ func TestResolveModule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPath, _, err := ResolveModule(tt.filename, tt.importerPath, tt.importerLogicalPath, compilerCtx, tt.force)
+			gotPath, _, err := ResolveModule(tt.filename, tt.importerPath, compilerCtx, tt.force)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("ResolveModule() error = %v, wantError %v", err, tt.wantError)

@@ -4,31 +4,44 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
-	"compiler/internal/semantic"
+	"path/filepath"
+	"strings"
+
 	"compiler/internal/semantic/resolver"
-	"compiler/internal/semantic/typecheck"
+	//"compiler/internal/semantic/typecheck"
 	"compiler/internal/utils/fs"
+	"compiler/internal/utils/path"
 	"fmt"
 	"os"
 )
 
-func Compile(filepath string, debug bool) *ctx.CompilerContext {
+func Compile(filePath string, debug bool) *ctx.CompilerContext {
 
-	if !fs.IsValidFile(filepath) {
-		panic(fmt.Errorf("invalid file: %s", filepath))
+	filePath = filepath.ToSlash(filePath)
+	absPath := path.ToAbs(filePath)
+
+	rootDir := filepath.Dir(absPath)
+	relPath, _ := filepath.Rel(rootDir, absPath)
+	moduleName := filepath.Base(relPath)
+	moduleName = strings.TrimSuffix(moduleName, filepath.Ext(moduleName))
+	
+	fmt.Printf("Compiling file: %s\n", filePath)
+	
+	if !fs.IsValidFile(absPath) {
+		panic(fmt.Errorf("invalid file: %s", relPath))
 	}
-
-	context := ctx.NewCompilerContext(filepath)
-
-	p := parser.NewParser(filepath, context, true)
+	
+	context := ctx.NewCompilerContext(absPath)
 
 	defer func() {
 		context.Reports.DisplayAll()
 		if r := recover(); r != nil {
 			colors.ORANGE.Println(r)
 		}
+		panic("")
 	}()
 
+	p := parser.NewParser(absPath, context, true)
 	program := p.Parse()
 
 	if program == nil {
@@ -36,30 +49,25 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 		return context
 	}
 
-	context.AddModule(ctx.LocalModuleKey(filepath), program)
+	context.AddModule(moduleName, program)
 
-	// --- Semantic Analysis: Name Resolution ---
-	globalTable := semantic.NewSymbolTable(nil)
-	semantic.AddPreludeSymbols(globalTable)
 	// Run resolver
-	res := resolver.NewResolver(context, filepath, debug)
-	res.Symbols = globalTable
-	res.ResolveProgram(program)
+	res := resolver.NewResolver(program, context, debug)
+	res.ResolveProgram()
+
 	if context.Reports.HasErrors() {
 		context.Reports.DisplayAll()
 		return context
 	}
 
-	// --- Type Checking ---
-	// Pass resolver's symbol tables and alias map to typechecker
-	typeChecker := typecheck.NewTypeChecker(context, res.Symbols, debug)
-	typeChecker.ModuleTables = res.ModuleTables
-	typeChecker.AliasToPath = res.AliasToPath
-	typeChecker.CheckProgram(program)
-	if context.Reports.HasErrors() {
-		context.Reports.DisplayAll()
-		return context
-	}
+	// // --- Type Checking ---
+	// // Pass resolver's symbol tables and alias map to typechecker
+	// typeChecker := typecheck.NewTypeChecker(program, context, debug)
+	// typeChecker.CheckProgram(program)
+	// if context.Reports.HasErrors() {
+	// 	context.Reports.DisplayAll()
+	// 	return context
+	// }
 
 	return context
 }
@@ -80,8 +88,6 @@ func main() {
 	}
 
 	filename := os.Args[1]
-	fmt.Printf("Compiling file: %s\n", filename)
-
 	context := Compile(filename, debug)
 	defer context.Destroy()
 	context.PrintModules()

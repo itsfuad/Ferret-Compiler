@@ -19,7 +19,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsHexadecimal(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -33,7 +33,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsOctal(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -47,7 +47,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsBinary(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -62,7 +62,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsDecimal(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.Add(p.filePath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -77,7 +77,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsFloat(value) {
 		floatVal, err := numeric.StringToFloat(value)
 		if err != nil {
-			p.ctx.Reports.Add(p.filePath, &loc, report.FLOAT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &loc, report.FLOAT_OUT_OF_RANGE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -89,7 +89,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	}
 
 	// If neither, it's an invalid number format
-	p.ctx.Reports.Add(p.filePath, &loc, report.INVALID_NUMBER, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+	p.ctx.Reports.Add(p.filePathAbs, &loc, report.INVALID_NUMBER, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }
 
@@ -128,7 +128,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACKET)
 			if p.match(lexer.CLOSE_BRACKET) {
-				p.ctx.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -139,7 +139,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 	// at least one element required
 	if len(elements) == 0 {
 		peek := p.peek()
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&peek.Start, &peek.End), report.ARRAY_EMPTY, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&peek.Start, &peek.End), report.ARRAY_EMPTY, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 

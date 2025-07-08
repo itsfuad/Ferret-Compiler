@@ -4,7 +4,6 @@ import (
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 	"compiler/internal/types"
 	"fmt"
 	"os"
@@ -12,31 +11,28 @@ import (
 )
 
 type TypeChecker struct {
-	Symbols      *semantic.SymbolTable
-	Debug        bool
-	ctx          *ctx.CompilerContext
-	ModuleTables map[string]*semantic.SymbolTable // module file path -> symbol table
-	AliasToPath  map[string]string                // import alias -> file path
-	CheckedMods  map[string]bool                  // file path -> checked
-	CurrentFile  string                           // current file being typechecked
+	program     *ast.Program
+	Debug       bool
+	ctx         *ctx.CompilerContext
+	CheckedMods map[string]bool // file path -> checked
+	CurrentFile string          // current file being typechecked
 }
 
-func NewTypeChecker(ctx *ctx.CompilerContext,symbols *semantic.SymbolTable, debug bool) *TypeChecker {
+func NewTypeChecker(program *ast.Program, ctx *ctx.CompilerContext, debug bool) *TypeChecker {
 	return &TypeChecker{
-		Symbols:      symbols,
-		ctx:          ctx,
-		Debug:        debug,
-		ModuleTables: make(map[string]*semantic.SymbolTable),
-		AliasToPath:  make(map[string]string),
-		CheckedMods:  make(map[string]bool),
+		program:     program,
+		ctx:         ctx,
+		Debug:       debug,
+		CheckedMods: make(map[string]bool),
 	}
 }
 
 func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
-	if prog == nil {
+	tc.CurrentFile = prog.FilePath
+	if tc.CurrentFile == "" {
+		fmt.Println("[TypeChecker] Current file is empty. Skipping type checking.")
 		return
 	}
-	tc.CurrentFile = prog.FilePath
 	if tc.Debug {
 		fmt.Printf("[TypeChecker] Starting type checking for %s\n", tc.CurrentFile)
 	}
@@ -44,7 +40,7 @@ func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
 	for _, node := range prog.Nodes {
 		if imp, ok := node.(*ast.ImportStmt); ok {
 			if imp.ModuleName != "" && imp.FilePath != "" {
-				tc.AliasToPath[imp.ModuleName] = imp.FilePath
+				tc.ctx.AliasToPath[imp.ModuleName] = imp.FilePath
 				if tc.Debug {
 					fmt.Printf("[TypeChecker] Import alias: %s -> %s\n", imp.ModuleName, imp.FilePath)
 				}
@@ -81,7 +77,7 @@ func (tc *TypeChecker) checkNode(node ast.Node) {
 			os.Exit(1)
 		}
 		alias := n.ModuleName
-		importedTable, ok := tc.Symbols.Imports[alias]
+		_, ok := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Imports[alias]
 		if !ok {
 			tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("unknown module: %s", alias), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if tc.Debug {
@@ -93,20 +89,19 @@ func (tc *TypeChecker) checkNode(node ast.Node) {
 		if tc.CheckedMods[alias] {
 			return
 		}
-		modAST := tc.ctx.GetModule(ctx.LocalModuleKey(tc.AliasToPath[alias]))
+		modAST := tc.ctx.GetModule(tc.ctx.AliasToPath[alias]).AST
 		if modAST == nil {
-			modAST = tc.ctx.GetModule(ctx.RemoteModuleKey(tc.AliasToPath[alias]))
+			modAST = tc.ctx.GetModule(tc.ctx.AliasToPath[alias]).AST
 		}
 		if modAST == nil {
-			tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("module not found for alias '%s' (file: %s)", alias, tc.AliasToPath[alias]), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("module not found for alias '%s' (file: %s)", alias, tc.ctx.AliasToPath[alias]), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if tc.Debug {
-				fmt.Printf("[TypeChecker] Module file '%s' not found for alias '%s'\n", tc.AliasToPath[alias], alias)
+				fmt.Printf("[TypeChecker] Module file '%s' not found for alias '%s'\n", tc.ctx.AliasToPath[alias], alias)
 			}
 			return
 		}
-		checker := NewTypeChecker(tc.ctx, importedTable, tc.Debug)
+		checker := NewTypeChecker(modAST, tc.ctx, tc.Debug)
 		checker.CheckedMods = tc.CheckedMods
-		checker.AliasToPath = tc.AliasToPath
 		checker.CheckProgram(modAST)
 		tc.CheckedMods[alias] = true
 	default:
@@ -158,7 +153,7 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 	case *ast.ByteLiteral:
 		return types.BYTE
 	case *ast.IdentifierExpr:
-		sym, found := tc.Symbols.Lookup(e.Name)
+		sym, found := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Lookup(e.Name)
 		if found && sym.Type != nil {
 			if dt, ok := sym.Type.(ast.DataType); ok {
 				return dt.Type()
@@ -191,7 +186,7 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 		return ""
 	case *ast.ScopeResolutionExpr:
 		alias := e.Module.Name
-		importedTable, ok := tc.Symbols.Imports[alias]
+		importedTable, ok := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Imports[alias]
 		if !ok {
 			tc.ctx.Reports.Add(tc.CurrentFile, e.Module.Loc(), fmt.Sprintf("unknown module: %s", alias), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			if tc.Debug {
