@@ -14,7 +14,7 @@ func parseIntegerType(p *Parser) (ast.DataType, bool) {
 	typename := types.TYPE_NAME(token.Value)
 	bitSize := types.GetNumberBitSize(typename)
 	if bitSize == 0 {
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
@@ -46,7 +46,7 @@ func parseFloatType(p *Parser) (ast.DataType, bool) {
 	typename := types.TYPE_NAME(token.Value)
 	bitSize := types.GetNumberBitSize(typename)
 	if bitSize == 0 {
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
@@ -135,7 +135,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 	// Check for empty struct
 	if p.peek().Kind == lexer.CLOSE_CURLY {
 		token := p.peek()
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
+		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End),
 			report.EMPTY_STRUCT_NOT_ALLOWED, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
@@ -153,7 +153,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 		// Check for duplicate field names
 		if fieldNames[field.FieldIdentifier.Name] {
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(field.Location.Start, field.Location.End),
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(field.Location.Start, field.Location.End),
 				report.DUPLICATE_FIELD_NAME, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
@@ -167,7 +167,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
 			if p.match(lexer.CLOSE_CURLY) {
-				p.ctx.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -212,7 +212,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		if lists.Has(methods, method, func(a ast.InterfaceMethod, b ast.InterfaceMethod) bool {
 			return a.Name.Name == b.Name.Name
 		}) {
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(method.Location.Start, method.Location.End), report.DUPLICATE_METHOD_NAME, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(method.Location.Start, method.Location.End), report.DUPLICATE_METHOD_NAME, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 
@@ -224,7 +224,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 			//must be a comma
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
 			if p.match(lexer.CLOSE_CURLY) {
-				p.ctx.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -305,7 +305,7 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	underlyingType, ok := parseType(p)
 	if !ok {
 		token := p.peek()
-		p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
+		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End),
 			report.EXPECTED_TYPE, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
