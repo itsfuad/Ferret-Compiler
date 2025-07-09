@@ -5,7 +5,6 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
-	"compiler/internal/utils/path"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -114,7 +113,10 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	}
 	contextCreated = true
 
-	entrypointPath = path.ToAbs(entrypointPath)
+	entrypointPath, err := filepath.Abs(entrypointPath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get absolute path: %w", err))
+	}
 	entrypointPath = filepath.ToSlash(entrypointPath)
 
 	// Set root directory to the parent of the entry point's directory

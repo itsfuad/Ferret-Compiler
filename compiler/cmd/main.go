@@ -11,7 +11,6 @@ import (
 	"compiler/internal/semantic/resolver"
 	//"compiler/internal/semantic/typecheck"
 	"compiler/internal/utils/fs"
-	"compiler/internal/utils/path"
 	"fmt"
 	"os"
 )
@@ -19,7 +18,10 @@ import (
 func Compile(filePath string, debug bool) *ctx.CompilerContext {
 
 	filePath = filepath.ToSlash(filePath)
-	absPath := path.ToAbs(filePath)
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get absolute path: %w", err))
+	}
 	absPath = filepath.ToSlash(absPath)
 
 	rootDir := filepath.Dir(absPath)
