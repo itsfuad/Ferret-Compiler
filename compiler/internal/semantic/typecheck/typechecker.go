@@ -130,7 +130,8 @@ func (tc *TypeChecker) checkAssignment(stmt *ast.AssignmentStmt) {
 	for i, lhs := range *stmt.Left {
 		lhsType := tc.checkExpr(&lhs)
 		if i < len(*stmt.Right) {
-			rhsType := tc.checkExpr(&(*stmt.Right)[i])
+			rightElem := (*stmt.Right)[i]
+			rhsType := tc.checkExpr(&rightElem)
 			if lhsType != rhsType {
 				tc.ctx.Reports.Add(tc.CurrentFile, lhs.Loc(), fmt.Sprintf("type mismatch in assignment: %s = %s", lhsType, rhsType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 				if tc.Debug {
