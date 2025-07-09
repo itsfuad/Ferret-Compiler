@@ -42,6 +42,14 @@ func GitHubPathToRawURL(importPath, defaultBranch string) (string, string) {
 
 // fetchAndCache downloads the remote file and caches it locally if not cached or if forced.
 func fetchAndCache(url, localPath string, force bool) error {
+
+	defer func() error {
+		if r := recover(); r != nil {
+			return fmt.Errorf("failed to fetch %s: %v", url, r)
+		}
+		return nil
+	}()
+
 	if !force && IsValidFile(localPath) {
 		return nil // Already cached
 	}
@@ -129,7 +137,7 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 
 // resolveProjectRootModule handles project-root relative imports
 func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (string, string, error) {
-	resolved := filepath.Join(ctxx.RootDir, filename + EXT)
+	resolved := filepath.Join(ctxx.RootDir, filename+EXT)
 	resolved = filepath.ToSlash(resolved)
 
 	if IsValidFile(resolved) {
@@ -143,9 +151,8 @@ func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (strin
 	return "", "", fmt.Errorf("module not found: %s", resolved)
 }
 
-
 // resolveRemoteLocalImport handles local imports within a remote module
-func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
+func resolveRemoteLocalImport(remoteFilename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
 	// Extract the remote repository base path from the importer
 	// e.g., "github.com/itsfuad/Ferret-Programming-Language/code/remote/graphics"
 	// becomes "github.com/itsfuad/Ferret-Programming-Language"
@@ -159,7 +166,7 @@ func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx 
 
 	// Create the full remote import path
 	// For imports like "code/remote/audio", we want to import from the remote repo
-	remoteImportPath := filepath.Join(remoteRepo, filename)
+	remoteImportPath := filepath.Join(remoteRepo, remoteFilename)
 	remoteImportPath = filepath.ToSlash(remoteImportPath)
 
 	// Resolve as a remote import

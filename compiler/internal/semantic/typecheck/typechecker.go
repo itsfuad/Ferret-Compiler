@@ -64,7 +64,7 @@ func (tc *TypeChecker) checkNode(node ast.Node) {
 	case *ast.ExpressionStmt:
 		if n.Expressions != nil {
 			for _, expr := range *n.Expressions {
-				tc.checkExpr(expr)
+				tc.checkExpr(&expr)
 			}
 		}
 	case *ast.Block:
@@ -113,7 +113,8 @@ func (tc *TypeChecker) checkNode(node ast.Node) {
 func (tc *TypeChecker) checkVarDecl(stmt *ast.VarDeclStmt) {
 	for i, v := range stmt.Variables {
 		if v.ExplicitType != nil && i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			initType := tc.checkExpr(stmt.Initializers[i])
+			initializer := stmt.Initializers[i]
+			initType := tc.checkExpr(&initializer)
 			declType := v.ExplicitType.Type()
 			if initType != declType {
 				tc.ctx.Reports.Add(tc.CurrentFile, v.Identifier.Loc(), fmt.Sprintf("type mismatch: expected %s, got %s", declType, initType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
@@ -126,10 +127,11 @@ func (tc *TypeChecker) checkVarDecl(stmt *ast.VarDeclStmt) {
 }
 
 func (tc *TypeChecker) checkAssignment(stmt *ast.AssignmentStmt) {
-	for i, lhs := range stmt.Left {
-		lhsType := tc.checkExpr(lhs)
-		if i < len(stmt.Right) {
-			rhsType := tc.checkExpr(stmt.Right[i])
+	for i, lhs := range *stmt.Left {
+		lhsType := tc.checkExpr(&lhs)
+		if i < len(*stmt.Right) {
+			rightElem := (*stmt.Right)[i]
+			rhsType := tc.checkExpr(&rightElem)
 			if lhsType != rhsType {
 				tc.ctx.Reports.Add(tc.CurrentFile, lhs.Loc(), fmt.Sprintf("type mismatch in assignment: %s = %s", lhsType, rhsType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 				if tc.Debug {
@@ -140,8 +142,8 @@ func (tc *TypeChecker) checkAssignment(stmt *ast.AssignmentStmt) {
 	}
 }
 
-func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
-	switch e := expr.(type) {
+func (tc *TypeChecker) checkExpr(expr *ast.Expression) types.TYPE_NAME {
+	switch e := (*expr).(type) {
 	case *ast.IntLiteral:
 		return types.INT32
 	case *ast.FloatLiteral:
@@ -181,25 +183,6 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 	case *ast.FieldAccessExpr:
 		fmt.Println("[TypeChecker] type checking for FieldAccessExpr is not implemented yet.")
 		os.Exit(0)
-		return ""
-	case *ast.ScopeResolutionExpr:
-		alias := e.Module.Name
-		importedTable, ok := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Imports[alias]
-		if !ok {
-			tc.ctx.Reports.Add(tc.CurrentFile, e.Module.Loc(), fmt.Sprintf("unknown module: %s", alias), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-			if tc.Debug {
-				fmt.Printf("[TypeChecker] Alias '%s' not found in Imports map\n", alias)
-			}
-			return ""
-		}
-		sym, found := importedTable.Lookup(e.Identifier.Name)
-		if found && sym.Type != nil {
-			return sym.Type.Type()
-		}
-		tc.ctx.Reports.Add(tc.CurrentFile, e.Identifier.Loc(), fmt.Sprintf("undeclared symbol in module '%s': %s", alias, e.Identifier.Name), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		if tc.Debug {
-			fmt.Printf("[TypeChecker] Symbol '%s' not found in module '%s'\n", e.Identifier.Name, alias)
-		}
 		return ""
 	default:
 		fmt.Printf("[TypeChecker] type checking for <%s> is not implemented yet.\n", reflect.TypeOf(expr))
