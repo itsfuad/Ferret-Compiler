@@ -61,7 +61,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		paramType, ok := parseType(p)
 		if !ok {
 			token := p.peek()
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_PARAMETER_TYPE, report.PARSING_PHASE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.EXPECTED_PARAMETER_TYPE, report.PARSING_PHASE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -74,7 +74,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		if lists.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
 			return p.Identifier.Name == b.Identifier.Name
 		}) {
-			p.ctx.Reports.Add(p.filePath, &param.Identifier.Location, report.PARAMETER_REDEFINITION, report.PARSING_PHASE).AddHint("Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, &param.Identifier.Location, report.PARAMETER_REDEFINITION, report.PARSING_PHASE).AddHint("Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
 			return nil
 		}
 
@@ -89,7 +89,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -108,7 +108,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		returnType, ok := parseType(p)
 		if !ok {
 			token := p.previous()
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return []ast.DataType{returnType}
@@ -121,7 +121,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		returnType, ok := parseType(p)
 		if !ok {
 			token := p.previous()
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		returnTypes = append(returnTypes, returnType)
@@ -131,7 +131,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}

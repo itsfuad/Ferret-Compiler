@@ -75,36 +75,40 @@ func fetchAndCache(url, localPath string, force bool) error {
 // ResolveModule resolves an import path to an absolute local file path, handling remote GitHub imports
 // and project-root relative paths only. Relative paths (./ or ../) are no longer supported.
 // importerLogicalPath: the logical import path of the importer (github.com/... for remote, project-relative for local)
-func ResolveModule(filename string, importerPath string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
-	filename = strings.TrimSpace(filename)
-	if filename == "" {
-		return "", ctx.ModuleKey{}, fmt.Errorf("filename cannot be empty")
+func ResolveModule(modulePath string, importerPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
+
+	modulePath = strings.TrimSpace(modulePath)
+
+	if modulePath == "" {
+		return "", "", fmt.Errorf("filename cannot be empty")
 	}
 
 	// Handle GitHub-style imports (github.com/user/repo/...)
-	if strings.HasPrefix(filename, REMOTE_HOST) {
-		return resolveGitHubModule(filename, ctxx, force)
+	if strings.HasPrefix(modulePath, REMOTE_HOST) {
+		return resolveGitHubModule(modulePath, ctxx, force)
 	}
 
 	// Relative paths (./ or ../) are no longer supported - all local imports must be from project root
-	if strings.HasPrefix(filename, "./") || strings.HasPrefix(filename, "../") {
-		return "", ctx.ModuleKey{}, fmt.Errorf("relative imports (./ or ../) are not supported. Use absolute paths from project root: %s", filename)
+	if strings.HasPrefix(modulePath, "./") || strings.HasPrefix(modulePath, "../") {
+		return "", "", fmt.Errorf("relative imports (./ or ../) are not supported. Use absolute paths from project root: %s", modulePath)
 	}
 
 	// If the importer is a remote module, treat local imports as relative to that remote repository
-	if strings.HasPrefix(importerLogicalPath, REMOTE_HOST) {
-		return resolveRemoteLocalImport(filename, importerLogicalPath, ctxx, force)
+	if strings.HasPrefix(importerPath, REMOTE_HOST) {
+		// TODO: check slash later
+		return resolveRemoteLocalImport(modulePath, importerPath, ctxx, force)
 	}
 
 	// All other paths are treated as project-root relative imports
-	return resolveProjectRootModule(filename, ctxx)
+	return resolveProjectRootModule(modulePath, ctxx)
 }
 
 // resolveGitHubModule handles GitHub-style imports (github.com/user/repo/...)
-func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
+func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
+
 	url, subpath := GitHubPathToRawURL(filename, "main")
 	if url == "" {
-		return "", ctx.ModuleKey{}, fmt.Errorf("invalid GitHub import path: %s", filename)
+		return "", "", fmt.Errorf("invalid GitHub import path: %s", filename)
 	}
 
 	// Always append .fer extension for remote imports
@@ -118,45 +122,36 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 	}
 
 	if err := fetchAndCache(url, cachePath, force); err != nil {
-		return "", ctx.ModuleKey{}, err
+		return "", "", err
 	}
-	return filepath.Clean(cachePath), ctx.RemoteModuleKey(filename), nil
+	return cachePath, filename, nil
 }
 
 // resolveProjectRootModule handles project-root relative imports
-func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (string, ctx.ModuleKey, error) {
-	resolved := filepath.Join(ctxx.RootDir, filename)
-	return findModuleFile(resolved, ctxx)
-}
+func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (string, string, error) {
+	resolved := filepath.Join(ctxx.RootDir, filename + EXT)
+	resolved = filepath.ToSlash(resolved)
 
-// findModuleFile tries to find a valid module file with or without extension
-func findModuleFile(filePath string, ctxx *ctx.CompilerContext) (string, ctx.ModuleKey, error) {
-	// Try with the path as is first
-	if IsValidFile(filePath) {
-		rel, _ := filepath.Rel(ctxx.RootDir, filePath)
-		return filepath.Clean(filePath), ctx.LocalModuleKey(filepath.ToSlash(rel)), nil
-	}
-
-	// Try with .fer extension added if not already present
-	if !strings.HasSuffix(filePath, EXT) {
-		withExt := filePath + EXT
-		if IsValidFile(withExt) {
-			rel, _ := filepath.Rel(ctxx.RootDir, withExt)
-			return filepath.Clean(withExt), ctx.LocalModuleKey(filepath.ToSlash(rel)), nil
+	if IsValidFile(resolved) {
+		rel, err := filepath.Rel(ctxx.RootDir, resolved)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get relative path: %w", err)
 		}
+		return resolved, filepath.ToSlash(rel), nil
 	}
 
-	return "", ctx.ModuleKey{}, fmt.Errorf("module not found: %s", filePath)
+	return "", "", fmt.Errorf("module not found: %s", resolved)
 }
+
 
 // resolveRemoteLocalImport handles local imports within a remote module
-func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, ctx.ModuleKey, error) {
+func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
 	// Extract the remote repository base path from the importer
 	// e.g., "github.com/itsfuad/Ferret-Programming-Language/code/remote/graphics"
 	// becomes "github.com/itsfuad/Ferret-Programming-Language"
 	parts := strings.Split(importerLogicalPath, "/")
 	if len(parts) < 3 {
-		return "", ctx.ModuleKey{}, fmt.Errorf("invalid remote import path: %s", importerLogicalPath)
+		return "", "", fmt.Errorf("invalid remote import path: %s", importerLogicalPath)
 	}
 
 	// Reconstruct the remote repository base path
@@ -164,7 +159,8 @@ func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx 
 
 	// Create the full remote import path
 	// For imports like "code/remote/audio", we want to import from the remote repo
-	remoteImportPath := remoteRepo + "/" + filename
+	remoteImportPath := filepath.Join(remoteRepo, filename)
+	remoteImportPath = filepath.ToSlash(remoteImportPath)
 
 	// Resolve as a remote import
 	return resolveGitHubModule(remoteImportPath, ctxx, force)
