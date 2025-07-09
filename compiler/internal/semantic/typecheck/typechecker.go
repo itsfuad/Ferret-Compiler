@@ -155,9 +155,7 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 	case *ast.IdentifierExpr:
 		sym, found := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Lookup(e.Name)
 		if found && sym.Type != nil {
-			if dt, ok := sym.Type.(ast.DataType); ok {
-				return dt.Type()
-			}
+			return sym.Type.Type()
 		}
 		return ""
 	case *ast.BinaryExpr:
@@ -196,9 +194,7 @@ func (tc *TypeChecker) checkExpr(expr ast.Expression) types.TYPE_NAME {
 		}
 		sym, found := importedTable.Lookup(e.Identifier.Name)
 		if found && sym.Type != nil {
-			if dt, ok := sym.Type.(ast.DataType); ok {
-				return dt.Type()
-			}
+			return sym.Type.Type()
 		}
 		tc.ctx.Reports.Add(tc.CurrentFile, e.Identifier.Loc(), fmt.Sprintf("undeclared symbol in module '%s': %s", alias, e.Identifier.Name), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		if tc.Debug {

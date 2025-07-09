@@ -61,7 +61,6 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	context.AddModule(moduleName, program)
 
 	// Run resolver
-	//semantic.AddPreludeSymbols(context.GetModule(moduleName).SymbolTable)
 	res := resolver.NewResolver(program, context, debug)
 	res.ResolveProgram()
 	

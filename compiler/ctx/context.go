@@ -31,16 +31,12 @@ type CompilerContext struct {
 }
 
 func (c *CompilerContext) GetModule(key string) *Module {
-	module := &Module{
-		AST:         &ast.Program{},
-		SymbolTable: semantic.NewSymbolTable(c.Builtins),
-	}
 	if c.Modules == nil {
-		return module
+		return nil
 	}
 	module, exists := c.Modules[key]
 	if !exists {
-		return module
+		return nil
 	}
 	return module
 }
