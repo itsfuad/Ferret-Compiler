@@ -106,10 +106,10 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 			return nil, false
 		}
 		member := parseIdentifier(p)
-		return &ast.ScopeResolutionExpr{
-			Module:     module,
-			Identifier: member,
-			Location:   *source.NewLocation(module.Loc().Start, member.Loc().End),
+		return &ast.VarScopeResolution{
+			Module:   module,
+			Var:      member,
+			Location: *source.NewLocation(module.Loc().Start, member.Loc().End),
 		}, true
 	} else {
 		token := p.peek()

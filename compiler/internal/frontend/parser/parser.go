@@ -172,7 +172,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 	}
 
 	return &ast.ReturnStmt{
-		Values:   values,
+		Values:   &values,
 		Location: *source.NewLocation(&start, &end),
 	}
 }
