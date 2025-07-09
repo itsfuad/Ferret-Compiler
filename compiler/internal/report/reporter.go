@@ -16,9 +16,10 @@ type REPORT_TYPE string
 type COMPILATION_PHASE string
 
 const (
-	LEXING_PHASE   COMPILATION_PHASE = "Lexing"
-	PARSING_PHASE  COMPILATION_PHASE = "Parsing"
-	SEMANTIC_PHASE COMPILATION_PHASE = "Semantic Analysis"
+	LEXING_PHASE    COMPILATION_PHASE = "Lexing"
+	PARSING_PHASE   COMPILATION_PHASE = "Parsing"
+	RESOLVER_PHASE  COMPILATION_PHASE = "Resolver"
+	TYPECHECK_PHASE COMPILATION_PHASE = "Type Checking"
 )
 
 const (
@@ -143,8 +144,9 @@ func printReport(r *Report) {
 // and a padding value.
 func makeParts(r *Report) (snippet, underline string) {
 	fileData, err := os.ReadFile(r.FilePath)
-	if err != nil {
-		panic(err)
+
+	if os.IsNotExist(err) {
+		panic(fmt.Sprintf("file '%s' not found", r.FilePath))
 	}
 
 	lines := strings.Split(string(fileData), "\n")
@@ -283,15 +285,15 @@ func (r Reports) ShowStatus() {
 		}
 	}
 
-	errCode := 0
+	//errCode := 0
 
 	if probCount > 0 {
-		errCode = -1
+		//errCode = -1
 		totalProblemsString += colorMap[NORMAL_ERROR].Sprintf("%d %s", probCount, _strings.Plural("error", "errors", probCount))
 	}
 
 	messageColor.Print(totalProblemsString)
-	messageColor.Println(" -------------")
+	messageColor.Println("-------------")
 
-	os.Exit(errCode)
+	//os.Exit(errCode)
 }
