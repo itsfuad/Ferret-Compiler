@@ -55,4 +55,4 @@ let scientific : f64 = 1.23e4; // 1.23 * 10^4
 //     };
 // }
 
-let cxx : i32 = data::kk;
+let cxx : data::MyType = data::kk;
