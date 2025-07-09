@@ -4,6 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/semantic"
 	"path/filepath"
 	"strings"
 
@@ -19,12 +20,19 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 
 	filePath = filepath.ToSlash(filePath)
 	absPath := path.ToAbs(filePath)
+	absPath = filepath.ToSlash(absPath)
 
 	rootDir := filepath.Dir(absPath)
-	relPath, _ := filepath.Rel(rootDir, absPath)
+	rootDir = filepath.ToSlash(rootDir)
+	relPath, err := filepath.Rel(rootDir, absPath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get relative path: %w", err))
+	}
+	relPath = filepath.ToSlash(relPath)
 	moduleName := filepath.Base(relPath)
 	moduleName = strings.TrimSuffix(moduleName, filepath.Ext(moduleName))
-	
+	moduleName = filepath.ToSlash(moduleName)
+
 	fmt.Printf("Compiling file: %s\n", filePath)
 	
 	if !fs.IsValidFile(absPath) {
@@ -52,13 +60,16 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	context.AddModule(moduleName, program)
 
 	// Run resolver
+	semantic.AddPreludeSymbols(context.GetModule(moduleName).SymbolTable)
 	res := resolver.NewResolver(program, context, debug)
 	res.ResolveProgram()
-
+	
 	if context.Reports.HasErrors() {
 		context.Reports.DisplayAll()
 		return context
 	}
+	
+	colors.GREEN.Println("Resolver done!")
 
 	// // --- Type Checking ---
 	// // Pass resolver's symbol tables and alias map to typechecker

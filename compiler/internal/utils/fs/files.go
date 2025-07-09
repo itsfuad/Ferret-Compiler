@@ -129,30 +129,20 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 
 // resolveProjectRootModule handles project-root relative imports
 func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (string, string, error) {
-	resolved := filepath.Join(ctxx.RootDir, filename)
+	resolved := filepath.Join(ctxx.RootDir, filename + EXT)
 	resolved = filepath.ToSlash(resolved)
-	return findModuleFile(resolved, ctxx)
-}
 
-// findModuleFile tries to find a valid module file with or without extension
-func findModuleFile(filePath string, ctxx *ctx.CompilerContext) (string, string, error) {
-	// Try with the path as is first
-	if IsValidFile(filePath) {
-		rel, _ := filepath.Rel(ctxx.RootDir, filePath)
-		return filePath, filepath.ToSlash(rel), nil
-	}
-
-	// Try with .fer extension added if not already present
-	if !strings.HasSuffix(filePath, EXT) {
-		withExt := filePath + EXT
-		if IsValidFile(withExt) {
-			rel, _ := filepath.Rel(ctxx.RootDir, withExt)
-			return withExt, filepath.ToSlash(rel), nil
+	if IsValidFile(resolved) {
+		rel, err := filepath.Rel(ctxx.RootDir, resolved)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get relative path: %w", err)
 		}
+		return resolved, filepath.ToSlash(rel), nil
 	}
 
-	return "", "", fmt.Errorf("module not found: %s", filePath)
+	return "", "", fmt.Errorf("fn() module not found: %s", resolved)
 }
+
 
 // resolveRemoteLocalImport handles local imports within a remote module
 func resolveRemoteLocalImport(filename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
