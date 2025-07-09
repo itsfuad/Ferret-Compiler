@@ -31,10 +31,27 @@ func parseIntegerType(p *Parser) (ast.DataType, bool) {
 func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 	if p.match(lexer.IDENTIFIER_TOKEN) {
 		token := p.advance()
-		return &ast.UserDefinedType{
-			TypeName: types.TYPE_NAME(token.Value),
+		iden := &ast.IdentifierExpr{
+			Name:     token.Value,
 			Location: *source.NewLocation(&token.Start, &token.End),
-		}, true
+		}
+		if p.peek().Kind == lexer.SCOPE_TOKEN {
+			p.advance()
+			typeNode, ok := parseType(p)
+			if !ok {
+				return nil, false
+			}
+			return &ast.ScopeResolutionType{
+				Module:     iden,
+				TypeNode:   typeNode,
+				Location:   *source.NewLocation(iden.Start, typeNode.Loc().End),
+			}, true
+		} else {
+			return &ast.UserDefinedType{
+				TypeName: types.TYPE_NAME(token.Value),
+				Location: *source.NewLocation(&token.Start, &token.End),
+			}, true
+		}
 	}
 	return nil, false
 }

@@ -1,5 +1,9 @@
 package semantic
 
+import (
+	"compiler/internal/frontend/ast"
+)
+
 // SymbolKind represents the kind of symbol (variable, constant, function, type, etc.)
 type SymbolKind int
 
@@ -15,6 +19,5 @@ const (
 type Symbol struct {
 	Name string
 	Kind SymbolKind
-	Type any // Replace 'any' with ast.DataType or a more specific type when type checking is added
-	// Add more fields as needed for functions, structs, etc.
+	Type ast.DataType
 }
