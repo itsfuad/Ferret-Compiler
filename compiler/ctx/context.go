@@ -20,23 +20,23 @@ type Module struct {
 }
 
 type CompilerContext struct {
-	RootDir     string             // Root directory of the project
-	EntryPoint  string             // Entry point file
-	Modules     map[string]*Module // key: ModuleKey.String()
-	Reports     report.Reports
-	CachePath   string
-	AliasToPath map[string]string // import alias -> file path
+	RootDir           string             // Root directory of the project
+	EntryPoint        string             // Entry point file
+	Modules           map[string]*Module // key: ModuleKey.String()
+	Reports           report.Reports
+	CachePath         string
+	AliasToModuleName map[string]string // import alias -> file path
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 }
 
 func (c *CompilerContext) GetModule(key string) *Module {
 	if c.Modules == nil {
-		return nil
+		return &Module{}
 	}
 	module, exists := c.Modules[key]
 	if !exists {
-		return nil
+		return &Module{}
 	}
 	return module
 }
@@ -110,11 +110,14 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	contextCreated = true
 
 	entrypointPath = path.ToAbs(entrypointPath)
+	entrypointPath = filepath.ToSlash(entrypointPath)
 
 	// Set root directory to the parent of the entry point's directory
 	// This ensures imports like "code/maths/symbols/pi" resolve correctly from project root
 	rootDir := filepath.Dir(entrypointPath)
+	rootDir = filepath.ToSlash(rootDir)
 	entryPoint := filepath.Base(entrypointPath)
+	entryPoint = filepath.ToSlash(entryPoint)
 
 	colors.ORANGE.Printf("Root dir: %s\n", rootDir)
 	colors.ORANGE.Printf("Entry point: %s\n", entryPoint)
@@ -122,12 +125,12 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	cachePath := filepath.Join(rootDir, ".ferret", "modules")
 	os.MkdirAll(cachePath, 0755)
 	return &CompilerContext{
-		RootDir:     rootDir,
-		EntryPoint:  entryPoint,
-		Modules:     make(map[string]*Module),
-		Reports:     report.Reports{},
-		AliasToPath: make(map[string]string),
-		CachePath:   cachePath,
+		RootDir:           rootDir,
+		EntryPoint:        entryPoint,
+		Modules:           make(map[string]*Module),
+		Reports:           report.Reports{},
+		AliasToModuleName: make(map[string]string),
+		CachePath:         cachePath,
 	}
 }
 
@@ -186,9 +189,9 @@ func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
 func (c *CompilerContext) AbsToModuleName(absPath string) string {
 	relPath, err := filepath.Rel(c.RootDir, absPath)
 	if err != nil {
-		panic(err)
+		return absPath // Fallback to absolute path if relative path cannot be determined
 	}
-	moduleName := filepath.Base(relPath)
-	moduleName = strings.TrimSuffix(moduleName, filepath.Ext(moduleName))
+	relPath = filepath.ToSlash(relPath)
+	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
 	return moduleName
 }

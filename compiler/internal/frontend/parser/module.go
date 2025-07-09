@@ -17,7 +17,7 @@ func parseImport(p *Parser) ast.Node {
 	start := p.consume(lexer.IMPORT_TOKEN, report.EXPECTED_IMPORT_KEYWORD)
 	importPath := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
 
-	importPathStr := importPath.Value
+	canonicalName := importPath.Value
 
 	// Support: import "path" as Alias;
 	var moduleName string
@@ -27,7 +27,7 @@ func parseImport(p *Parser) ast.Node {
 		moduleName = aliasToken.Value
 	} else {
 		// Default: use last part of path (without extension)
-		parts := strings.Split(importPathStr, "/")
+		parts := strings.Split(canonicalName, "/")
 		if len(parts) == 0 {
 			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
@@ -40,7 +40,7 @@ func parseImport(p *Parser) ast.Node {
 	loc := *source.NewLocation(&start.Start, &importPath.End)
 
 	// Use fs.ResolveModule to get the absolute path
-	moduleAbsPath, moduleRelPath, err := fs.ResolveModule(importPathStr, p.filePathAbs, p.ctx, false)
+	moduleAbsPath, _, err := fs.ResolveModule(canonicalName, p.filePathAbs, p.ctx, false)
 	if err != nil {
 		p.ctx.Reports.Add(p.filePathAbs, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return nil
@@ -48,7 +48,7 @@ func parseImport(p *Parser) ast.Node {
 
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
-			Value:    importPathStr,
+			Value:    canonicalName,
 			Location: loc,
 		},
 		ModuleName: moduleName,
@@ -74,7 +74,7 @@ func parseImport(p *Parser) ast.Node {
 	}
 
 	// Check if the module is already cached
-	if !p.ctx.HasModule(moduleName) {
+	if !p.ctx.HasModule(canonicalName) {
 
 		module := NewParser(moduleAbsPath, p.ctx, p.debug).Parse()
 
@@ -83,15 +83,15 @@ func parseImport(p *Parser) ast.Node {
 			return &ast.ImportStmt{Location: loc}
 		}
 
-		p.ctx.AddModule(moduleName, module)
-		colors.GREEN.Printf("Cached <- Module '%s'\n", moduleName)
+		p.ctx.AddModule(canonicalName, module)
+		colors.GREEN.Printf("Cached <- Module '%s'\n", canonicalName)
 	} else {
-		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", moduleName)
+		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", canonicalName)
 	}
 
-	p.ctx.AliasToPath[moduleName] = moduleRelPath
+	p.ctx.AliasToModuleName[moduleName] = canonicalName
 
-	fmt.Printf("Parsing import: %s -> %s\n", p.ctx.AbsToModuleName(p.filePathAbs), moduleRelPath)
+	fmt.Printf("Parsing import: %s -> %s\n", p.ctx.AbsToModuleName(p.filePathAbs), canonicalName)
 
 	return stmt
 }

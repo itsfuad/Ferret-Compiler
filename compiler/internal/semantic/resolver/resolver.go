@@ -30,73 +30,57 @@ func (r *Resolver) ResolveProgram() {
 		fmt.Printf("[Resolver] Starting semantic analysis for %s\n", r.program.FilePath)
 	}
 
-	// Build import alias map: alias -> file path
-	for _, node := range r.program.Nodes {
-		if imp, ok := node.(*ast.ImportStmt); ok {
-			if imp.ModuleName != "" && imp.FilePath != "" {
-				if r.Debug {
-					fmt.Printf("[Resolver] Import alias: %s -> %s\n", imp.ModuleName, imp.FilePath)
-				}
-				modulePath := imp.FilePath
-				colors.PURPLE.Printf("Root dir: %s\n", r.ctx.RootDir)
-				colors.PURPLE.Printf("Got module key: %s for module: %s\n", modulePath, modulePath)
-				modAST := r.ctx.GetModule(modulePath).AST
-				colors.PURPLE.Printf("Imported module: %s\n", modAST.FilePath)
-				if modAST == nil {
-					modAST = r.ctx.GetModule(modulePath).AST
-				}
-				if modAST != nil {
-					colors.PURPLE.Printf("Searching for module: %s\n", modulePath)
-					module, found := r.ctx.Modules[modulePath]
-					if !found {
-						r.ctx.Reports.Add(r.program.FilePath, imp.Loc(), "module not found: "+modulePath, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
-					}
-					semantic.AddPreludeSymbols(module.SymbolTable)
-					resolver := NewResolver(modAST, r.ctx, r.Debug)
-					resolver.ResolveProgram()
-				}
-			}
-		}
-	}
-
 	for _, node := range r.program.Nodes {
 		fmt.Printf("[Resolver] Resolving node: %T\n", node)
-		r.resolveNode(node)
+		resolveNode(r, node)
 	}
 	if r.Debug {
 		fmt.Printf("[Resolver] Finished semantic analysis for %s\n", r.program.FilePath)
 	}
 }
 
-func (r *Resolver) resolveNode(node ast.Node) {
+func resolveNode(r *Resolver, node ast.Node) {
+	currentModuleName := r.ctx.AbsToModuleName(r.program.FilePath)
+	currentModule := r.ctx.GetModule(currentModuleName)
+	if currentModule == nil {
+		r.ctx.Reports.Add(r.program.FilePath, r.program.Loc(), "current module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		return
+	}
 	switch n := node.(type) {
+	case *ast.ImportStmt:
+		resolveImport(r, currentModule, n)
 	case *ast.VarDeclStmt:
-		r.resolveVarDecl(n)
+		resolveVarDecl(r, n)
 	case *ast.AssignmentStmt:
-		r.resolveAssignment(n)
+		resolveAssignment(r, n)
 	case *ast.ExpressionStmt:
-		r.resolveExpressionStmt(n)
-	case *ast.Block:
-		if r.Debug {
-			fmt.Println("[Resolver] Entering new scope")
-		}
-		outer := r.ctx.Modules[r.program.FilePath].SymbolTable
-		r.ctx.Modules[r.program.FilePath].SymbolTable = semantic.NewSymbolTable(outer)
-		for _, sub := range n.Nodes {
-			r.resolveNode(sub)
-		}
-		r.ctx.Modules[r.program.FilePath].SymbolTable = outer
-		if r.Debug {
-			fmt.Println("[Resolver] Exiting scope")
-		}
+		resolveExpressionStmt(r, n)
 	default:
 		fmt.Printf("[Resolver] Node <%T> is not implemented yet\n", n)
 		os.Exit(-1)
 	}
 }
 
-func (r *Resolver) resolveVarDecl(stmt *ast.VarDeclStmt) {
-	
+func resolveImport(r *Resolver, currentModule *ctx.Module, importStmt *ast.ImportStmt) {
+	if r.Debug {
+		fmt.Printf("[Resolver] Resolving import: %s\n", importStmt.ModuleName)
+	}
+	if importStmt.ModuleName != "" && importStmt.FilePath != "" {
+		importModule := r.ctx.GetModule(importStmt.ImportPath.Value)
+		if importModule == nil {
+			r.ctx.Reports.Add(r.program.FilePath, importStmt.Loc(), "module not found: "+importStmt.ModuleName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		}
+		colors.GREEN.Printf("Retrieved module '%s' for import alias '%s'\n", importStmt.ImportPath.Value, importStmt.ModuleName)
+		importModuleAST := importModule.AST
+		semantic.AddPreludeSymbols(importModule.SymbolTable)
+		resolver := NewResolver(importModuleAST, r.ctx, r.Debug)
+		resolver.ResolveProgram()
+		currentModule.SymbolTable.Imports[importStmt.ModuleName] = importModule.SymbolTable
+	}
+}
+
+func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
+	currentModuleName := r.ctx.AbsToModuleName(r.program.FilePath)
 	for i, v := range stmt.Variables {
 		name := v.Identifier.Name
 		kind := semantic.SymbolVar
@@ -104,32 +88,36 @@ func (r *Resolver) resolveVarDecl(stmt *ast.VarDeclStmt) {
 			kind = semantic.SymbolConst
 		}
 		// Type checking: ensure explicit type exists if provided
+		currentModule := r.ctx.GetModule(currentModuleName)
+		if currentModule == nil {
+			r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+			return
+		}
+		
 		if v.ExplicitType != nil {
 			typeName := string(v.ExplicitType.Type())
-			sym, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(typeName)
+
+			sym, found := currentModule.SymbolTable.Lookup(typeName)
 			if !found || sym.Kind != semantic.SymbolType {
 				r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "unknown type: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			}
 		}
+
 		sym := &semantic.Symbol{Name: name, Kind: kind, Type: v.ExplicitType}
-		//err := r.ctx.Modules[r.program.FilePath].SymbolTable.Declare(name, sym)
-		mod := r.ctx.Modules[r.program.FilePath]
-		if mod == nil {
-			r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "module not found: "+r.program.FilePath, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
-		}
-		err := mod.SymbolTable.Declare(name, sym)
+
+		err := currentModule.SymbolTable.Declare(name, sym)
 		if err != nil {
 			// Redeclaration error
 			r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 		// Check initializer expression if present
 		if i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			r.resolveExpr(stmt.Initializers[i])
+			resolveExpr(r, stmt.Initializers[i])
 		}
 	}
 }
 
-func (r *Resolver) resolveAssignment(stmt *ast.AssignmentStmt) { // Check that all left-hand side variables are declared
+func resolveAssignment(r *Resolver, stmt *ast.AssignmentStmt) { // Check that all left-hand side variables are declared
 	for _, lhs := range stmt.Left {
 		if id, ok := lhs.(*ast.IdentifierExpr); ok {
 			varSym, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(id.Name)
@@ -144,75 +132,94 @@ func (r *Resolver) resolveAssignment(stmt *ast.AssignmentStmt) { // Check that a
 				}
 			}
 		} else {
-			r.resolveExpr(lhs)
+			resolveExpr(r, lhs)
 		}
 	}
 	// Check right-hand side expressions
 	for _, rhs := range stmt.Right {
-		r.resolveExpr(rhs)
+		resolveExpr(r, rhs)
 	}
 }
 
-func (r *Resolver) resolveExpressionStmt(stmt *ast.ExpressionStmt) {
+func resolveExpressionStmt(r *Resolver, stmt *ast.ExpressionStmt) {
 	if stmt.Expressions != nil {
 		for _, expr := range *stmt.Expressions {
-			r.resolveExpr(expr)
+			resolveExpr(r, expr)
 		}
 	}
 }
 
-func (r *Resolver) resolveExpr(expr ast.Expression) {
+func resolveExpr(r *Resolver, expr ast.Expression) {
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
 		if _, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(e.Name); !found {
 			r.ctx.Reports.Add(r.program.FilePath, e.Loc(), "undeclared variable: "+e.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 	case *ast.BinaryExpr:
-		r.resolveExpr(e.Left)
-		r.resolveExpr(e.Right)
+		resolveExpr(r, e.Left)
+		resolveExpr(r, e.Right)
 	case *ast.UnaryExpr:
-		r.resolveExpr(e.Operand)
+		resolveExpr(r, e.Operand)
 	case *ast.PrefixExpr:
-		r.resolveExpr(e.Operand)
+		resolveExpr(r, e.Operand)
 	case *ast.PostfixExpr:
-		r.resolveExpr(e.Operand)
+		resolveExpr(r, e.Operand)
 	case *ast.FunctionCallExpr:
-		r.resolveExpr(e.Caller)
+		resolveExpr(r, e.Caller)
 		for _, arg := range e.Arguments {
-			r.resolveExpr(arg)
+			resolveExpr(r, arg)
 		}
 	case *ast.FieldAccessExpr:
-		r.resolveExpr(e.Object)
+		resolveExpr(r, e)
 	case *ast.ScopeResolutionExpr:
-		alias := e.Module.Name
-		if r.Debug {
-			fmt.Printf("[Resolver] Resolving module alias: %s\n", alias)
-		}
-		filePath, ok := r.ctx.AliasToPath[alias]
-		if !ok {
-			r.ctx.Reports.Add(r.program.FilePath, e.Module.Loc(), "unknown module: "+alias, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
-			if r.Debug {
-				fmt.Printf("[Resolver] Alias '%s' not found in import map\n", alias)
-			}
-			return
-		}
-		modTable, found := r.ctx.Modules[filePath]
-		if !found {
-			panic(fmt.Sprintf("Module table for %s not found during scope resolution", filePath))
-		}
-		// Link the imported module's symbol table in the current module's Imports map (idempotent)
-		r.ctx.Modules[r.program.FilePath].SymbolTable.Imports[alias] = modTable.SymbolTable
-		if _, found := modTable.SymbolTable.Lookup(e.Identifier.Name); !found {
-			r.ctx.Reports.Add(r.program.FilePath, e.Identifier.Loc(), "undeclared symbol in module '"+alias+"': "+e.Identifier.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
-			if r.Debug {
-				fmt.Printf("[Resolver] Symbol '%s' not found in module '%s' (file: %s)\n", e.Identifier.Name, alias, filePath)
-			}
-		} else if r.Debug {
-			fmt.Printf("[Resolver] Resolved '%s::%s' (file: %s)\n", alias, e.Identifier.Name, filePath)
-		}
+		resolveScopeResolution(r, e)
 	default:
 		fmt.Printf("[Resolver] Expression <%T> is not implemented yet\n", e)
-		os.Exit(-1)
 	}
 	// Add more cases as needed for literals, etc.
+}
+
+func resolveScopeResolution(r *Resolver, expr *ast.ScopeResolutionExpr) {
+	alias := expr.Module.Name
+	if r.Debug {
+		fmt.Printf("[Resolver] Resolving module alias: %s\n", alias)
+	}
+
+	importModuleName, ok := r.ctx.AliasToModuleName[alias]
+	if !ok {
+		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).AddHint("Check if the module is imported correctly").SetLevel(report.SEMANTIC_ERROR)
+		return
+	}
+
+	if r.Debug {
+		fmt.Printf("[Resolver] Found module '%s' for alias '%s'\n", importModuleName, alias)
+	}
+
+	currentModuleName := r.ctx.AbsToModuleName(r.program.FilePath)
+	if r.Debug {
+		fmt.Printf("[Resolver] Current module: %s\n", currentModuleName)
+	}
+
+	currentModule := r.ctx.GetModule(currentModuleName)
+	if currentModule == nil {
+		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), "current module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		return
+	}
+
+	fmt.Printf("[Resolver] Resolving '%s::%s'\n", alias, expr.Identifier.Name)
+	
+	importModuleSymbolTable, ok := currentModule.SymbolTable.Imports[alias]
+	if !ok {
+		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), "module '%s' is not imported in current module '%s'", report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		return
+	}
+	//currecurrentModule.SymbolTable.Imports[alias] = importModule.SymbolTable
+	if _, found := importModuleSymbolTable.Lookup(expr.Identifier.Name); !found {
+		r.ctx.Reports.Add(r.program.FilePath, expr.Identifier.Loc(), fmt.Sprintf("symbol '%s' not found in module '%s'", expr.Identifier.Name, alias), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		if r.Debug {
+			fmt.Printf("[Resolver] Symbol '%s' not found in module '%s' (file: %s)\n", expr.Identifier.Name, alias, importModuleName)
+		}
+	} else if r.Debug {
+		fmt.Printf("[Resolver] Resolved '%s::%s' (file: %s)\n", alias, expr.Identifier.Name, importModuleName)
+	}
 }

@@ -285,15 +285,15 @@ func (r Reports) ShowStatus() {
 		}
 	}
 
-	errCode := 0
+	//errCode := 0
 
 	if probCount > 0 {
-		errCode = -1
+		//errCode = -1
 		totalProblemsString += colorMap[NORMAL_ERROR].Sprintf("%d %s", probCount, _strings.Plural("error", "errors", probCount))
 	}
 
 	messageColor.Print(totalProblemsString)
-	messageColor.Println(" -------------")
+	messageColor.Println("-------------")
 
-	os.Exit(errCode)
+	//os.Exit(errCode)
 }
