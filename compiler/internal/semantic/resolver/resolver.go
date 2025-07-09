@@ -283,7 +283,7 @@ func resolveScopeResolution(r *Resolver, expr *ast.ScopeResolutionExpr) {
 
 	importModuleSymbolTable, ok := currentModule.SymbolTable.Imports[alias]
 	if !ok {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), "module '%s' is not imported in current module '%s'", report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), fmt.Sprintf("module '%s' is not imported in current module '%s'", alias, currentModuleName), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 	//currecurrentModule.SymbolTable.Imports[alias] = importModule.SymbolTable
