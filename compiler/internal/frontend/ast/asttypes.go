@@ -120,9 +120,9 @@ type Parameter struct {
 }
 
 type StructField struct {
-	FieldIdentifier IdentifierExpr
-	FieldType       DataType   // nil for literal
-	FieldValue      Expression // nil for type
+	FieldIdentifier *IdentifierExpr
+	FieldType       DataType    // nil for literal
+	FieldValue      *Expression // nil for type
 	source.Location
 }
 
@@ -138,7 +138,7 @@ func (s *StructType) Type() types.TYPE_NAME { return s.TypeName }
 func (s *StructType) Loc() *source.Location { return &s.Location }
 
 type InterfaceMethod struct {
-	Name       IdentifierExpr
+	Name       *IdentifierExpr
 	Params     []Parameter
 	ReturnType []DataType
 	source.Location
@@ -165,13 +165,3 @@ type FunctionType struct {
 func (f *FunctionType) INode() Node           { return f }
 func (f *FunctionType) Type() types.TYPE_NAME { return f.TypeName }
 func (f *FunctionType) Loc() *source.Location { return &f.Location }
-
-type ScopeResolutionType struct {
-	Module     *IdentifierExpr
-	TypeNode   DataType
-	source.Location
-}
-
-func (s *ScopeResolutionType) INode() Node           { return s }
-func (s *ScopeResolutionType) Type() types.TYPE_NAME { return types.TYPE_NAME(s.Module.Name + "::" + string(s.TypeNode.Type())) }
-func (s *ScopeResolutionType) Loc() *source.Location { return &s.Location }

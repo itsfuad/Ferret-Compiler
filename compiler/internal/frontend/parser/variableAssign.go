@@ -48,8 +48,8 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 	}
 
 	return &ast.AssignmentStmt{
-		Left:     assignees,
-		Right:    expressions,
+		Left:     &assignees,
+		Right:    &expressions,
 		Location: *source.NewLocation(assignees[0].Loc().Start, expressions[len(expressions)-1].Loc().End),
 	}
 }
