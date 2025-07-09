@@ -200,7 +200,7 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	function := parseFunctionLiteral(p, &start.Start, false, true)
 
 	return &ast.FunctionDecl{
-		Identifier: *name,
+		Identifier: name,
 		Function:   function,
 		Location:   *source.NewLocation(&start.Start, function.Loc().End),
 	}
