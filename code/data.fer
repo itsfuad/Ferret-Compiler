@@ -4,3 +4,5 @@ import "maths/math";
 let myData = "Fuad";
 
 let kk = 10;
+
+type MyType i32;
