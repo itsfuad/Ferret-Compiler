@@ -32,8 +32,8 @@ type VariableToDeclare struct {
 }
 
 type AssignmentStmt struct {
-	Left  ExpressionList
-	Right ExpressionList
+	Left  *ExpressionList
+	Right *ExpressionList
 	source.Location
 }
 
@@ -54,7 +54,7 @@ func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
-	Values ExpressionList
+	Values *ExpressionList
 	source.Location
 }
 

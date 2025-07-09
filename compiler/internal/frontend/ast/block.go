@@ -14,7 +14,7 @@ func (b *Block) Loc() *source.Location { return &b.Location }
 
 // FunctionDecl represents both named and anonymous function declarations
 type FunctionDecl struct {
-	Identifier IdentifierExpr
+	Identifier *IdentifierExpr
 	Function   *FunctionLiteral // Function literal
 	source.Location
 }
@@ -25,7 +25,7 @@ func (f *FunctionDecl) Loc() *source.Location { return &f.Location }
 
 // IfStmt represents an if statement with optional else and else-if branches
 type IfStmt struct {
-	Condition   Expression
+	Condition   *Expression
 	Body        *Block
 	Alternative Node
 	source.Location
@@ -37,7 +37,7 @@ func (i *IfStmt) Loc() *source.Location { return &i.Location }
 
 // MethodDecl represents a method declaration
 type MethodDecl struct {
-	Method   IdentifierExpr
+	Method   *IdentifierExpr
 	Receiver *Parameter // Receiver parameter: e.g. in `fn (t *T) M(n int)`, `t` is the receiver
 	IsRRef   bool       // Whether the receiver is a reference
 	Function *FunctionLiteral

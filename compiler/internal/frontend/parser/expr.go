@@ -20,9 +20,9 @@ func parseLogicalOr(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseLogicalAnd(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -38,9 +38,9 @@ func parseLogicalAnd(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseEquality(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -56,9 +56,9 @@ func parseEquality(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseComparison(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -74,9 +74,9 @@ func parseComparison(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseAdditive(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -92,9 +92,9 @@ func parseAdditive(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseMultiplicative(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -110,9 +110,9 @@ func parseMultiplicative(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseUnary(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -127,7 +127,7 @@ func parseUnary(p *Parser) ast.Expression {
 		right := parseUnary(p)
 		return &ast.UnaryExpr{
 			Operator: operator,
-			Operand:  right,
+			Operand:  &right,
 			Location: *source.NewLocation(&operator.Start, right.Loc().End),
 		}
 	}
@@ -162,7 +162,7 @@ func parseUnary(p *Parser) ast.Expression {
 
 		return &ast.PrefixExpr{
 			Operator: operator,
-			Operand:  operand,
+			Operand:  &operand,
 			Location: *source.NewLocation(&operator.Start, operand.Loc().End),
 		}
 	}
@@ -184,8 +184,8 @@ func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 
 	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
 	return &ast.IndexableExpr{
-		Indexable: expr,
-		Index:     index,
+		Indexable: &expr,
+		Index:     &index,
 		Location:  *source.NewLocation(start, &end.End),
 	}, true
 }
@@ -202,7 +202,7 @@ func parseIncDec(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 		return nil, false
 	}
 	return &ast.PostfixExpr{
-		Operand:  expr,
+		Operand:  &expr,
 		Operator: operator,
 		Location: *source.NewLocation(expr.Loc().Start, &operator.End),
 	}, true
@@ -297,7 +297,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 	end := p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
 
 	return &ast.FunctionCallExpr{
-		Caller:    caller,
+		Caller:    &caller,
 		Arguments: arguments,
 		Location:  *source.NewLocation(start, &end.End),
 	}, true

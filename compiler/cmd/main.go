@@ -36,11 +36,11 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	moduleName = filepath.ToSlash(moduleName)
 
 	fmt.Printf("Compiling file: %s\n", filePath)
-	
+
 	if !fs.IsValidFile(absPath) {
 		panic(fmt.Errorf("invalid file: %s", relPath))
 	}
-	
+
 	context := ctx.NewCompilerContext(absPath)
 
 	defer func() {
@@ -63,11 +63,11 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	// Run resolver
 	res := resolver.NewResolver(program, context, debug)
 	res.ResolveProgram()
-	
+
 	if context.Reports.HasErrors() {
 		panic("")
 	}
-	
+
 	colors.GREEN.Println("Resolver done!")
 
 	// // --- Type Checking ---

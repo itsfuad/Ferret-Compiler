@@ -32,7 +32,7 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 	funcLit := parseFunctionLiteral(p, &name.Start, false, true)
 
 	return &ast.MethodDecl{
-		Method:   iden,
+		Method:   &iden,
 		Receiver: &receiver,
 		Function: funcLit,
 		Location: *source.NewLocation(startPos, funcLit.Loc().End),
