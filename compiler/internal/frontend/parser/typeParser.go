@@ -41,10 +41,10 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 			if !ok {
 				return nil, false
 			}
-			return &ast.ScopeResolutionType{
-				Module:     iden,
-				TypeNode:   typeNode,
-				Location:   *source.NewLocation(iden.Start, typeNode.Loc().End),
+			return &ast.TypeScopeResolution{
+				Module:   iden,
+				TypeNode: typeNode,
+				Location: *source.NewLocation(iden.Start, typeNode.Loc().End),
 			}, true
 		} else {
 			return &ast.UserDefinedType{
@@ -129,7 +129,7 @@ func parseStructField(p *Parser) *ast.StructField {
 		return nil
 	} else {
 		return &ast.StructField{
-			FieldIdentifier: ast.IdentifierExpr{
+			FieldIdentifier: &ast.IdentifierExpr{
 				Name:     fieldName,
 				Location: *source.NewLocation(&nameToken.Start, &nameToken.End),
 			},
@@ -217,7 +217,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		end := p.previous().End
 
 		method := ast.InterfaceMethod{
-			Name:       *name,
+			Name:       name,
 			Params:     params,
 			ReturnType: returnTypes,
 			Location:   source.Location{Start: &start, End: &end},
