@@ -93,7 +93,7 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 			r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 			return
 		}
-		
+
 		if v.ExplicitType != nil {
 			typeName := string(v.ExplicitType.Type())
 
@@ -220,6 +220,6 @@ func resolveScopeResolution(r *Resolver, expr *ast.ScopeResolutionExpr) {
 			fmt.Printf("[Resolver] Symbol '%s' not found in module '%s' (file: %s)\n", expr.Identifier.Name, alias, importModuleName)
 		}
 	} else if r.Debug {
-		fmt.Printf("[Resolver] Resolved '%s::%s' (file: %s)\n", alias, expr.Identifier.Name, importModuleName)
+		fmt.Printf("[Resolver] Resolved '%s::%s' (module: %s)\n", alias, expr.Identifier.Name, importModuleName)
 	}
 }
