@@ -140,7 +140,7 @@ func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (strin
 		return resolved, filepath.ToSlash(rel), nil
 	}
 
-	return "", "", fmt.Errorf("fn() module not found: %s", resolved)
+	return "", "", fmt.Errorf("module not found: %s", resolved)
 }
 
 
