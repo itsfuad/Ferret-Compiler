@@ -4,20 +4,44 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
+	//"compiler/internal/semantic"
+	"path/filepath"
+	"strings"
+
+	"compiler/internal/semantic/resolver"
+	//"compiler/internal/semantic/typecheck"
 	"compiler/internal/utils/fs"
 	"fmt"
 	"os"
 )
 
-func Compile(filepath string, debug bool) *ctx.CompilerContext {
+func Compile(filePath string, debug bool) *ctx.CompilerContext {
 
-	if !fs.IsValidFile(filepath) {
-		panic(fmt.Errorf("invalid file: %s", filepath))
+	filePath = filepath.ToSlash(filePath)
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get absolute path: %w", err))
 	}
+	absPath = filepath.ToSlash(absPath)
 
-	context := ctx.NewCompilerContext(filepath)
+	rootDir := filepath.Dir(absPath)
+	rootDir = filepath.ToSlash(rootDir)
+	relPath, err := filepath.Rel(rootDir, absPath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get relative path: %w", err))
+	}
+	relPath = filepath.ToSlash(relPath)
+	moduleName := filepath.Base(relPath)
+	moduleName = strings.TrimSuffix(moduleName, filepath.Ext(moduleName))
+	moduleName = filepath.ToSlash(moduleName)
 
-	p := parser.NewParser(filepath, context, true)
+	fmt.Printf("Compiling file: %s\n", filePath)
+	
+	if !fs.IsValidFile(absPath) {
+		panic(fmt.Errorf("invalid file: %s", relPath))
+	}
+	
+	context := ctx.NewCompilerContext(absPath)
 
 	defer func() {
 		context.Reports.DisplayAll()
@@ -26,6 +50,7 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 		}
 	}()
 
+	p := parser.NewParser(absPath, context, true)
 	program := p.Parse()
 
 	if program == nil {
@@ -33,7 +58,26 @@ func Compile(filepath string, debug bool) *ctx.CompilerContext {
 		return context
 	}
 
-	context.AddModule(ctx.LocalModuleKey(filepath), program)
+	context.AddModule(moduleName, program)
+
+	// Run resolver
+	res := resolver.NewResolver(program, context, debug)
+	res.ResolveProgram()
+	
+	if context.Reports.HasErrors() {
+		panic("")
+	}
+	
+	colors.GREEN.Println("Resolver done!")
+
+	// // --- Type Checking ---
+	// // Pass resolver's symbol tables and alias map to typechecker
+	// typeChecker := typecheck.NewTypeChecker(program, context, debug)
+	// typeChecker.CheckProgram(program)
+	// if context.Reports.HasErrors() {
+	// 	context.Reports.DisplayAll()
+	// 	return context
+	// }
 
 	return context
 }
@@ -54,8 +98,6 @@ func main() {
 	}
 
 	filename := os.Args[1]
-	fmt.Printf("Compiling file: %s\n", filename)
-
 	context := Compile(filename, debug)
 	defer context.Destroy()
 	context.PrintModules()

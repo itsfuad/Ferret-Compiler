@@ -4,69 +4,58 @@ import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var contextCreated = false
 
-// ModuleKey uniquely identifies a module, distinguishing local and remote modules
-// For local: IsRemote = false, Path = project-relative path
-// For remote: IsRemote = true, Path = full remote import path (e.g., github.com/user/repo/path/file)
-type ModuleKey struct {
-	IsRemote bool
-	Path     string // project-relative or remote import path
-}
-
-func (k ModuleKey) String() string {
-	return k.Path
+type Module struct {
+	AST         *ast.Program
+	SymbolTable *semantic.SymbolTable
 }
 
 type CompilerContext struct {
-	RootDir        string                  // Root directory of the project
-	EntryPoint     string                  // Entry point file
-	ModuleASTCache map[string]*ast.Program // key: ModuleKey.String()
-	Reports        report.Reports
-	CachePath      string
-
+	RootDir           string                // Root directory of the project
+	EntryPoint        string                // Entry point file
+	Builtins          *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules           map[string]*Module    // key: ModuleKey.String()
+	Reports           report.Reports
+	CachePath         string
+	AliasToModuleName map[string]string // import alias -> file path
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 }
 
-// Helpers to create module keys
-func LocalModuleKey(path string) ModuleKey {
-	return ModuleKey{IsRemote: false, Path: path}
-}
-func RemoteModuleKey(path string) ModuleKey {
-	return ModuleKey{IsRemote: true, Path: path}
-}
-
-func (c *CompilerContext) GetModule(key ModuleKey) *ast.Program {
-	if c.ModuleASTCache == nil {
+func (c *CompilerContext) GetModule(key string) *Module {
+	if c.Modules == nil {
 		return nil
 	}
-	module, exists := c.ModuleASTCache[key.String()]
+	module, exists := c.Modules[key]
 	if !exists {
 		return nil
 	}
 	return module
 }
 
-func (c *CompilerContext) RemoveModule(key ModuleKey) {
-	if c.ModuleASTCache == nil {
+func (c *CompilerContext) RemoveModule(key string) {
+	if c.Modules == nil {
 		return
 	}
-	if _, exists := c.ModuleASTCache[key.String()]; !exists {
+	if _, exists := c.Modules[key]; !exists {
 		return
 	}
-	delete(c.ModuleASTCache, key.String())
+	delete(c.Modules, key)
 }
 
 func (c *CompilerContext) ModuleCount() int {
-	if c.ModuleASTCache == nil {
+	if c.Modules == nil {
 		return 0
 	}
-	return len(c.ModuleASTCache)
+	return len(c.Modules)
 }
 
 func (c *CompilerContext) PrintModules() {
@@ -82,37 +71,36 @@ func (c *CompilerContext) PrintModules() {
 }
 
 func (c *CompilerContext) ModuleNames() []string {
-	if c.ModuleASTCache == nil {
+	if c.Modules == nil {
 		return []string{}
 	}
-	names := make([]string, 0, len(c.ModuleASTCache))
-	for key := range c.ModuleASTCache {
+	names := make([]string, 0, len(c.Modules))
+	for key := range c.Modules {
 		names = append(names, key)
 	}
 	return names
 }
 
-func (c *CompilerContext) HasModule(key ModuleKey) bool {
-	if c.ModuleASTCache == nil {
+func (c *CompilerContext) HasModule(moduleName string) bool {
+	if c.Modules == nil {
 		return false
 	}
-	_, exists := c.ModuleASTCache[key.String()]
+	_, exists := c.Modules[moduleName]
 	return exists
 }
 
-func (c *CompilerContext) AddModule(key ModuleKey, module *ast.Program) {
-	if c.ModuleASTCache == nil {
-		c.ModuleASTCache = make(map[string]*ast.Program)
+func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
+	colors.GREEN.Printf("Adding module: Key: %s, FilePath: %s\n", moduleName, module.FilePath)
+	if c.Modules == nil {
+		c.Modules = make(map[string]*Module)
 	}
-	if _, exists := c.ModuleASTCache[key.String()]; exists {
+	if _, exists := c.Modules[moduleName]; exists {
 		return
 	}
 	if module == nil {
-		colors.RED.Printf("Cannot add nil module for '%s'\n", key.String())
-		c.Reports.Add("CompilerContext", nil, "Cannot add nil module", report.SEMANTIC_PHASE).SetLevel(report.SYNTAX_ERROR)
-		return
+		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", moduleName))
 	}
-	c.ModuleASTCache[key.String()] = module
+	c.Modules[moduleName] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
 }
 
 func NewCompilerContext(entrypointPath string) *CompilerContext {
@@ -121,25 +109,32 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	}
 	contextCreated = true
 
+	entrypointPath, err := filepath.Abs(entrypointPath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get absolute path: %w", err))
+	}
+	entrypointPath = filepath.ToSlash(entrypointPath)
+
 	// Set root directory to the parent of the entry point's directory
 	// This ensures imports like "code/maths/symbols/pi" resolve correctly from project root
-	entryDir := filepath.Dir(entrypointPath) // returns xxx
-	rootDir := filepath.Dir(entryDir)        // returns yyy
+	rootDir := filepath.Dir(entrypointPath)
+	rootDir = filepath.ToSlash(rootDir)
 	entryPoint := filepath.Base(entrypointPath)
+	entryPoint = filepath.ToSlash(entryPoint)
 
-	// Ensure the root directory is absolute
-	// if !filepath.IsAbs(rootDir) {
-	// 	rootDir, _ = filepath.Abs(rootDir)
-	// }
+	colors.ORANGE.Printf("Root dir: %s\n", rootDir)
+	colors.ORANGE.Printf("Entry point: %s\n", entryPoint)
 
 	cachePath := filepath.Join(rootDir, ".ferret", "modules")
 	os.MkdirAll(cachePath, 0755)
 	return &CompilerContext{
-		RootDir:        rootDir,
-		EntryPoint:     entryPoint,
-		ModuleASTCache: make(map[string]*ast.Program),
-		Reports:        nil,
-		CachePath:      cachePath,
+		RootDir:           rootDir,
+		EntryPoint:        entryPoint,
+		Builtins:          semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:           make(map[string]*Module),
+		Reports:           report.Reports{},
+		AliasToModuleName: make(map[string]string),
+		CachePath:         cachePath,
 	}
 }
 
@@ -149,7 +144,7 @@ func (c *CompilerContext) Destroy() {
 	}
 	contextCreated = false
 
-	c.ModuleASTCache = nil
+	c.Modules = nil
 	c.Reports = nil
 	c.DepGraph = nil
 
@@ -193,4 +188,14 @@ func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
 		return nil, false
 	}
 	return dfs(start)
+}
+
+func (c *CompilerContext) AbsToModuleName(absPath string) string {
+	relPath, err := filepath.Rel(c.RootDir, absPath)
+	if err != nil {
+		return absPath // Fallback to absolute path if relative path cannot be determined
+	}
+	relPath = filepath.ToSlash(relPath)
+	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+	return moduleName
 }

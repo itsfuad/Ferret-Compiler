@@ -11,21 +11,22 @@ import (
 )
 
 type Parser struct {
-	tokens   []lexer.Token
-	tokenNo  int
-	filePath string
-	ctx      *ctx.CompilerContext
-	debug    bool // debug mode for additional logging
+	tokens      []lexer.Token
+	tokenNo     int
+	filePathAbs string
+	ctx         *ctx.CompilerContext
+	debug       bool // debug mode for additional logging
 }
 
 func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
+
 	tokens := lexer.Tokenize(filePath, false)
 	return &Parser{
-		tokens:   tokens,
-		tokenNo:  0,
-		ctx:      ctx,
-		filePath: filePath,
-		debug:    debug,
+		tokens:      tokens,
+		tokenNo:     0,
+		ctx:         ctx,
+		filePathAbs: filePath,
+		debug:       debug,
 	}
 }
 
@@ -86,7 +87,7 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 
 	current := p.peek()
 
-	err := p.ctx.Reports.Add(p.filePath, source.NewLocation(&current.Start, &current.End), message, report.PARSING_PHASE)
+	err := p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&current.Start, &current.End), message, report.PARSING_PHASE)
 	err.SetLevel(report.SYNTAX_ERROR)
 	return p.peek()
 }
@@ -99,7 +100,7 @@ func parseExpressionList(p *Parser, first ast.Expression) ast.ExpressionList {
 		next := parseExpression(p)
 		if next == nil {
 			token := p.peek()
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			break
 		}
 		exprs = append(exprs, next)
@@ -125,7 +126,7 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 // handleUnexpectedToken reports an error for unexpected token and advances
 func handleUnexpectedToken(p *Parser) ast.Statement {
 	token := p.peek()
-	p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
+	p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End),
 		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", token.Value), report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 
 	p.advance() // skip the invalid token
@@ -165,7 +166,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 		values = parseExpressionList(p, parseExpression(p))
 		if values == nil {
 			token := p.peek()
-			p.ctx.Reports.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
 		}
 		end = *values.Loc().End
 	}
@@ -218,7 +219,7 @@ func parseNode(p *Parser) ast.Node {
 			loc := source.NewLocation(&token.Start, &token.End)
 			loc.Start.Column += 1
 			loc.End.Column += 1
-			p.ctx.Reports.Add(p.filePath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.filePathAbs, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
 		}
 		end := p.advance()
 		node.Loc().End.Column = end.End.Column
@@ -250,6 +251,7 @@ func (p *Parser) Parse() *ast.Program {
 
 	return &ast.Program{
 		Nodes:    nodes,
+		FilePath: p.filePathAbs,
 		Location: *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 }
