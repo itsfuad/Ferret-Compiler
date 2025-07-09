@@ -31,13 +31,11 @@ func parseIntegerType(p *Parser) (ast.DataType, bool) {
 func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 	if p.match(lexer.IDENTIFIER_TOKEN) {
 		token := p.advance()
-
 		return &ast.UserDefinedType{
 			TypeName: types.TYPE_NAME(token.Value),
 			Location: *source.NewLocation(&token.Start, &token.End),
 		}, true
 	}
-
 	return nil, false
 }
 

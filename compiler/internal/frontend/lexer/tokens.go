@@ -108,6 +108,7 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	RETURN_TOKEN:    true,
 	IMPORT_TOKEN:    true,
 	MODULE_TOKEN:    true,
+	AS_TOKEN:        true,
 }
 
 func IsKeyword(token string) bool {
