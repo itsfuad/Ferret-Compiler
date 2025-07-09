@@ -20,10 +20,10 @@ type Module struct {
 }
 
 type CompilerContext struct {
-	RootDir           string             // Root directory of the project
-	EntryPoint        string             // Entry point file
-	Builtins		  *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules           map[string]*Module // key: ModuleKey.String()
+	RootDir           string                // Root directory of the project
+	EntryPoint        string                // Entry point file
+	Builtins          *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules           map[string]*Module    // key: ModuleKey.String()
 	Reports           report.Reports
 	CachePath         string
 	AliasToModuleName map[string]string // import alias -> file path
@@ -32,12 +32,16 @@ type CompilerContext struct {
 }
 
 func (c *CompilerContext) GetModule(key string) *Module {
+	module := &Module{
+		AST:         &ast.Program{},
+		SymbolTable: semantic.NewSymbolTable(c.Builtins),
+	}
 	if c.Modules == nil {
-		return &Module{}
+		return module
 	}
 	module, exists := c.Modules[key]
 	if !exists {
-		return &Module{}
+		return module
 	}
 	return module
 }
