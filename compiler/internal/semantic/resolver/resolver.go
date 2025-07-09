@@ -4,8 +4,10 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
+	"compiler/internal/types"
 	"fmt"
 	"os"
 )
@@ -55,9 +57,20 @@ func resolveNode(r *Resolver, node ast.Node) {
 		resolveAssignment(r, n)
 	case *ast.ExpressionStmt:
 		resolveExpressionStmt(r, n)
+	case *ast.TypeDeclStmt:
+		resolveTypeDecl(r, n)
 	default:
 		fmt.Printf("[Resolver] Node <%T> is not implemented yet\n", n)
 		os.Exit(-1)
+	}
+}
+
+func resolveTypeDecl(r *Resolver, stmt *ast.TypeDeclStmt) {
+	// check if type is already declared or built-in or keyword
+	typeName := stmt.Alias.Name
+	if lexer.IsKeyword(typeName) || types.IsPrimitiveType(typeName) {
+		r.ctx.Reports.Add(r.program.FilePath, stmt.Alias.Loc(), "cannot declare type with reserved keyword: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		return
 	}
 }
 
@@ -72,7 +85,7 @@ func resolveImport(r *Resolver, currentModule *ctx.Module, importStmt *ast.Impor
 		}
 		colors.GREEN.Printf("Retrieved module '%s' for import alias '%s'\n", importStmt.ImportPath.Value, importStmt.ModuleName)
 		importModuleAST := importModule.AST
-		semantic.AddPreludeSymbols(importModule.SymbolTable)
+		//semantic.AddPreludeSymbols(importModule.SymbolTable)
 		resolver := NewResolver(importModuleAST, r.ctx, r.Debug)
 		resolver.ResolveProgram()
 		currentModule.SymbolTable.Imports[importStmt.ModuleName] = importModule.SymbolTable

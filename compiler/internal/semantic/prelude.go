@@ -4,7 +4,7 @@ import (
 	"compiler/internal/types"
 )
 
-func AddPreludeSymbols(table *SymbolTable) {
+func AddPreludeSymbols(table *SymbolTable) *SymbolTable {
 	table.Declare("i8", &Symbol{Name: "i8", Kind: SymbolType, Type: types.INT8})
 	table.Declare("i16", &Symbol{Name: "i16", Kind: SymbolType, Type: types.INT16})
 	table.Declare("i32", &Symbol{Name: "i32", Kind: SymbolType, Type: types.INT32})
@@ -19,4 +19,5 @@ func AddPreludeSymbols(table *SymbolTable) {
 	table.Declare("bool", &Symbol{Name: "bool", Kind: SymbolType, Type: types.BOOL})
 	table.Declare("byte", &Symbol{Name: "byte", Kind: SymbolType, Type: types.BYTE})
 	table.Declare("void", &Symbol{Name: "void", Kind: SymbolType, Type: types.VOID})
+	return table
 }

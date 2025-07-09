@@ -4,7 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
-	"compiler/internal/semantic"
+	//"compiler/internal/semantic"
 	"path/filepath"
 	"strings"
 
@@ -60,13 +60,12 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	context.AddModule(moduleName, program)
 
 	// Run resolver
-	semantic.AddPreludeSymbols(context.GetModule(moduleName).SymbolTable)
+	//semantic.AddPreludeSymbols(context.GetModule(moduleName).SymbolTable)
 	res := resolver.NewResolver(program, context, debug)
 	res.ResolveProgram()
 	
 	if context.Reports.HasErrors() {
-		context.Reports.DisplayAll()
-		return context
+		panic("")
 	}
 	
 	colors.GREEN.Println("Resolver done!")

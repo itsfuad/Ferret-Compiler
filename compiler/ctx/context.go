@@ -22,6 +22,7 @@ type Module struct {
 type CompilerContext struct {
 	RootDir           string             // Root directory of the project
 	EntryPoint        string             // Entry point file
+	Builtins		  *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
 	Modules           map[string]*Module // key: ModuleKey.String()
 	Reports           report.Reports
 	CachePath         string
@@ -100,7 +101,7 @@ func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
 	if module == nil {
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", moduleName))
 	}
-	c.Modules[moduleName] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(nil)}
+	c.Modules[moduleName] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
 }
 
 func NewCompilerContext(entrypointPath string) *CompilerContext {
@@ -127,6 +128,7 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	return &CompilerContext{
 		RootDir:           rootDir,
 		EntryPoint:        entryPoint,
+		Builtins:          semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
 		Modules:           make(map[string]*Module),
 		Reports:           report.Reports{},
 		AliasToModuleName: make(map[string]string),
