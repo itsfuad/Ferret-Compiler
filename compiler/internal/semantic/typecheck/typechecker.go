@@ -113,7 +113,8 @@ func (tc *TypeChecker) checkNode(node ast.Node) {
 func (tc *TypeChecker) checkVarDecl(stmt *ast.VarDeclStmt) {
 	for i, v := range stmt.Variables {
 		if v.ExplicitType != nil && i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			initType := tc.checkExpr(&stmt.Initializers[i])
+			initializer := stmt.Initializers[i]
+			initType := tc.checkExpr(&initializer)
 			declType := v.ExplicitType.Type()
 			if initType != declType {
 				tc.ctx.Reports.Add(tc.CurrentFile, v.Identifier.Loc(), fmt.Sprintf("type mismatch: expected %s, got %s", declType, initType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
