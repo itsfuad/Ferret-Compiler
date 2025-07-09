@@ -165,3 +165,13 @@ type FunctionType struct {
 func (f *FunctionType) INode() Node           { return f }
 func (f *FunctionType) Type() types.TYPE_NAME { return f.TypeName }
 func (f *FunctionType) Loc() *source.Location { return &f.Location }
+
+type ScopeResolutionType struct {
+	Module     *IdentifierExpr
+	TypeNode   DataType
+	source.Location
+}
+
+func (s *ScopeResolutionType) INode() Node           { return s }
+func (s *ScopeResolutionType) Type() types.TYPE_NAME { return types.TYPE_NAME(s.Module.Name + "::" + string(s.TypeNode.Type())) }
+func (s *ScopeResolutionType) Loc() *source.Location { return &s.Location }

@@ -46,7 +46,6 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 		if r := recover(); r != nil {
 			colors.ORANGE.Println(r)
 		}
-		panic("")
 	}()
 
 	p := parser.NewParser(absPath, context, true)

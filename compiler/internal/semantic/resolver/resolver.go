@@ -10,6 +10,7 @@ import (
 	"compiler/internal/types"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Resolver struct {
@@ -72,6 +73,14 @@ func resolveTypeDecl(r *Resolver, stmt *ast.TypeDeclStmt) {
 		r.ctx.Reports.Add(r.program.FilePath, stmt.Alias.Loc(), "cannot declare type with reserved keyword: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
+	//declare the type in the current module
+	moduleName := r.ctx.AbsToModuleName(r.program.FilePath)
+	currentModule := r.ctx.GetModule(moduleName)
+	if currentModule == nil {
+		r.ctx.Reports.Add(r.program.FilePath, stmt.Alias.Loc(), "current module not found: "+moduleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		return
+	}
+	currentModule.SymbolTable.Declare(typeName, &semantic.Symbol{Name: typeName, Kind: semantic.SymbolType, Type: stmt.BaseType})
 }
 
 func resolveImport(r *Resolver, currentModule *ctx.Module, importStmt *ast.ImportStmt) {
@@ -110,7 +119,25 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 		if v.ExplicitType != nil {
 			typeName := string(v.ExplicitType.Type())
 
-			sym, found := currentModule.SymbolTable.Lookup(typeName)
+			var sym *semantic.Symbol
+			var found bool
+
+			if strings.Contains(typeName, "::") {
+				parts := strings.Split(typeName, "::")
+				moduleName := parts[0]
+				symbolName := parts[1]
+				module := r.ctx.GetModule(moduleName)
+				if module == nil {
+					r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "module not found: "+moduleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+					return
+				}
+
+				sym, found = module.SymbolTable.Lookup(symbolName)
+
+				v.ExplicitType = sym.Type
+			} else {
+				sym, found = currentModule.SymbolTable.Lookup(typeName)
+			}
 			if !found || sym.Kind != semantic.SymbolType {
 				r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "unknown type: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			}
@@ -138,7 +165,7 @@ func resolveAssignment(r *Resolver, stmt *ast.AssignmentStmt) { // Check that al
 				r.ctx.Reports.Add(r.program.FilePath, id.Loc(), "assignment to undeclared variable: "+id.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			} else if varSym.Type != nil {
 				// Type checking: ensure type exists for variable
-				typeName := string(varSym.Type.(ast.DataType).Type())
+				typeName := string(varSym.Type.Type())
 				typeSym, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(typeName)
 				if !found || typeSym.Kind != semantic.SymbolType {
 					r.ctx.Reports.Add(r.program.FilePath, id.Loc(), "unknown type for variable: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
@@ -183,13 +210,46 @@ func resolveExpr(r *Resolver, expr ast.Expression) {
 			resolveExpr(r, arg)
 		}
 	case *ast.FieldAccessExpr:
-		resolveExpr(r, e)
+		resolveExpr(r, e.Object)
 	case *ast.ScopeResolutionExpr:
 		resolveScopeResolution(r, e)
+	// Literal expressions - no resolution needed, just validate they exist
+	case *ast.StringLiteral:
+		// String literals don't need resolution
+	case *ast.IntLiteral:
+		// Integer literals don't need resolution
+	case *ast.FloatLiteral:
+		// Float literals don't need resolution
+	case *ast.BoolLiteral:
+		// Boolean literals don't need resolution
+	case *ast.ByteLiteral:
+		// Byte literals don't need resolution
+	case *ast.ArrayLiteralExpr:
+		// Resolve array elements
+		for _, element := range e.Elements {
+			resolveExpr(r, element)
+		}
+	case *ast.StructLiteralExpr:
+		// Resolve struct field values
+		for _, field := range e.Fields {
+			if field.FieldValue != nil {
+				resolveExpr(r, field.FieldValue)
+			}
+		}
+	case *ast.IndexableExpr:
+		// Resolve the indexable expression and the index
+		resolveExpr(r, e.Indexable)
+		resolveExpr(r, e.Index)
+	case *ast.FunctionLiteral:
+		// Resolve function body
+		if e.Body != nil {
+			for _, node := range e.Body.Nodes {
+				resolveNode(r, node)
+			}
+		}
 	default:
 		fmt.Printf("[Resolver] Expression <%T> is not implemented yet\n", e)
 	}
-	// Add more cases as needed for literals, etc.
 }
 
 func resolveScopeResolution(r *Resolver, expr *ast.ScopeResolutionExpr) {
@@ -220,7 +280,7 @@ func resolveScopeResolution(r *Resolver, expr *ast.ScopeResolutionExpr) {
 	}
 
 	fmt.Printf("[Resolver] Resolving '%s::%s'\n", alias, expr.Identifier.Name)
-	
+
 	importModuleSymbolTable, ok := currentModule.SymbolTable.Imports[alias]
 	if !ok {
 		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), "module '%s' is not imported in current module '%s'", report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
