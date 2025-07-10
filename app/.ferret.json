@@ -1,8 +1,4 @@
 {
-  "project": {
-    "name": "app",
-    "version": "0.1.0"
-  },
   "compiler": {
     "version": "0.1.0"
   },
@@ -14,6 +10,9 @@
     "share": true
   },
   "dependencies": {
-    "github.com/itsfuad/Ferret-Compiler/code/remote/graphics": "0.1.0"
+      "github.com/itsfuad/Ferret-Compiler/app": [
+          "code/remote/graphics",
+          "code/remote/audio"
+        ]
   }
 }

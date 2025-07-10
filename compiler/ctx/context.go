@@ -29,6 +29,10 @@ type CompilerContext struct {
 	AliasToModuleName map[string]string // import alias -> file path
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
+	// Track modules that are currently being parsed to prevent infinite recursion
+	ParsingModules map[string]bool
+	// Keep track of the parsing stack to show cycle paths
+	ParsingStack []string
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
@@ -181,42 +185,86 @@ func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
 	c.Modules[moduleName] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
 }
 
-func NewCompilerContext(entrypointPath string) *CompilerContext {
+// IsModuleParsing checks if a module is currently being parsed
+func (c *CompilerContext) IsModuleParsing(modulePath string) bool {
+	if c.ParsingModules == nil {
+		return false
+	}
+	return c.ParsingModules[modulePath]
+}
+
+// GetCyclePath returns the cycle path if the given module is already being parsed
+// Returns the complete path from the entry point, showing the full import chain
+func (c *CompilerContext) GetCyclePath(modulePath string) ([]string, bool) {
+	if !c.IsModuleParsing(modulePath) {
+		return nil, false
+	}
+
+	// Return the complete parsing stack plus the module that creates the cycle
+	// This shows the full import chain from the entry point
+	completePath := make([]string, len(c.ParsingStack)+1)
+	copy(completePath, c.ParsingStack)
+	completePath[len(completePath)-1] = modulePath // Add the module that completes the cycle
+	return completePath, true
+}
+
+// StartParsing marks a module as currently being parsed
+func (c *CompilerContext) StartParsing(modulePath string) {
+	if c.ParsingModules == nil {
+		c.ParsingModules = make(map[string]bool)
+	}
+	if c.ParsingStack == nil {
+		c.ParsingStack = make([]string, 0)
+	}
+
+	c.ParsingModules[modulePath] = true
+	c.ParsingStack = append(c.ParsingStack, modulePath)
+	colors.YELLOW.Printf("Started parsing: %s (stack: %v)\n", modulePath, c.ParsingStack)
+}
+
+// FinishParsing marks a module as no longer being parsed
+func (c *CompilerContext) FinishParsing(modulePath string) {
+	if c.ParsingModules != nil {
+		delete(c.ParsingModules, modulePath)
+	}
+
+	// Remove from stack (should be the last element)
+	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == modulePath {
+		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
+	}
+
+	colors.YELLOW.Printf("Finished parsing: %s (stack: %v)\n", modulePath, c.ParsingStack)
+}
+
+func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
 	}
 	contextCreated = true
 
-	entrypointPath, err := filepath.Abs(entrypointPath)
-	if err != nil {
-		panic(fmt.Errorf("failed to get full path: %w", err))
-	}
-	entrypointPath = filepath.ToSlash(entrypointPath)
-
 	// Load project configuration
-	projectConfig, projectRoot, err := config.LoadProjectConfig(filepath.Dir(entrypointPath))
+	root, err := config.FindProjectRoot(entrypointFullpath)
 	if err != nil {
-		// If no project config found, create a default one
-		colors.YELLOW.Printf("No ferret.project.json found, creating default configuration\n")
-		projectRoot = filepath.Dir(entrypointPath)
-		if err := config.CreateDefaultProjectConfig(projectRoot); err != nil {
-			panic(fmt.Errorf("failed to create default project config: %w", err))
-		}
-		projectConfig, _, err = config.LoadProjectConfig(projectRoot)
-		if err != nil {
-			panic(fmt.Errorf("failed to load default project config: %w", err))
-		}
+		panic(err)
 	}
 
-	// Set root directory to the project root
-	entryPoint := filepath.Base(entrypointPath)
-	entryPoint = filepath.ToSlash(entryPoint)
+	projectConfig, err := config.LoadProjectConfig(root)
+	if err != nil {
+		panic(fmt.Errorf("failed to load project config: %w", err))
+	}
 
-	colors.ORANGE.Printf("Project root: %s\n", projectRoot)
+	//get the entry point relative to the project root
+	entryPoint, err := filepath.Rel(root, entrypointFullpath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get relative path for entry point: %w", err))
+	}
+	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
+
+	colors.ORANGE.Printf("Project root: %s\n", root)
 	colors.ORANGE.Printf("Entry point: %s\n", entryPoint)
 
 	// Use cache path from project config
-	cachePath := filepath.Join(projectRoot, projectConfig.Cache.Path)
+	cachePath := filepath.Join(root, projectConfig.Cache.Path)
 	cachePath = filepath.ToSlash(cachePath)
 	os.MkdirAll(cachePath, 0755)
 
@@ -228,7 +276,7 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 		AliasToModuleName: make(map[string]string),
 		CachePath:         cachePath,
 		ProjectConfig:     projectConfig,
-		ProjectRoot:       projectRoot,
+		ProjectRoot:       root,
 	}
 }
 
@@ -253,35 +301,73 @@ func (c *CompilerContext) AddDepEdge(importer, imported string) {
 	if c.DepGraph == nil {
 		c.DepGraph = make(map[string][]string)
 	}
+	colors.CYAN.Printf("Adding dependency edge: %s -> %s\n", importer, imported)
 	c.DepGraph[importer] = append(c.DepGraph[importer], imported)
+
+	// Debug: print current dependency graph
+	colors.YELLOW.Println("Current dependency graph:")
+	for from, tos := range c.DepGraph {
+		for _, to := range tos {
+			colors.YELLOW.Printf("  %s -> %s\n", from, to)
+		}
+	}
 }
 
 // DetectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
 func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
-	visited := make(map[string]bool)
+	colors.BLUE.Printf("Starting cycle detection from: %s\n", start)
+
+	// Use three states: 0=unvisited, 1=visiting (in stack), 2=visited (completely processed)
+	state := make(map[string]int)
 	stack := make([]string, 0)
+
 	var dfs func(node string) ([]string, bool)
 	dfs = func(node string) ([]string, bool) {
-		if visited[node] {
+		colors.BLUE.Printf("DFS visiting node: %s (state: %d)\n", node, state[node])
+
+		if state[node] == 1 { // Currently visiting (in recursion stack) - cycle detected!
+			colors.RED.Printf("CYCLE DETECTED! Node %s is already in the recursion stack\n", node)
+			// Find the cycle in the stack
 			for i, n := range stack {
 				if n == node {
-					return append(stack[i:], node), true
+					cycle := append(stack[i:], node) // Include the node that creates the cycle
+					colors.RED.Printf("Cycle path: %v\n", cycle)
+					return cycle, true
 				}
 			}
+			// If not found in stack, this shouldn't happen, but handle gracefully
+			return []string{node}, true
+		}
+
+		if state[node] == 2 { // Already completely processed
+			colors.GREEN.Printf("Node %s already processed, skipping\n", node)
 			return nil, false
 		}
-		visited[node] = true
+
+		// Mark as visiting and add to stack
+		state[node] = 1
 		stack = append(stack, node)
-		for _, neighbor := range c.DepGraph[node] {
+		colors.BLUE.Printf("Added to stack: %s (stack: %v)\n", node, stack)
+
+		// Visit all neighbors
+		neighbors := c.DepGraph[node]
+		colors.BLUE.Printf("Node %s has %d neighbors: %v\n", node, len(neighbors), neighbors)
+		for _, neighbor := range neighbors {
 			if path, found := dfs(neighbor); found {
 				return path, true
 			}
 		}
+
+		// Mark as completely processed and remove from stack
 		stack = stack[:len(stack)-1]
-		visited[node] = false
+		state[node] = 2
+		colors.GREEN.Printf("Completed processing node: %s\n", node)
 		return nil, false
 	}
-	return dfs(start)
+
+	result, found := dfs(start)
+	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, result)
+	return result, found
 }
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
