@@ -1,4 +1,4 @@
 @echo off
 cls
 cd compiler/cmd
-go run . "./../../code/main.fer" --debug
+go run . "./../../app/cmd/main.fer" --debug

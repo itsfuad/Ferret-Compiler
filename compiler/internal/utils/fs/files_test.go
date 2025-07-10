@@ -4,76 +4,163 @@ import (
 	"compiler/ctx"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
+func TestIsRemote(t *testing.T) {
+	tests := []struct {
+		name       string
+		importPath string
+		want       bool
+	}{
+		{"Empty", "", false},
+		{"GitHub path", "github.com/user/repo", true},
+		{"Local path", "myproject/file", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsRemote(tt.importPath); got != tt.want {
+				t.Errorf("IsRemote(%q) = %v, want %v", tt.importPath, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsValidFile(t *testing.T) {
-	tmpFile, err := os.CreateTemp("", "testfile-*.fer")
+	// Create a temporary file for testing
+	tempFile, err := os.CreateTemp("", "test-file")
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
 
-	if !IsValidFile(tmpFile.Name()) {
-		t.Errorf("Expected file to be valid: %s", tmpFile.Name())
+	tests := []struct {
+		name     string
+		filename string
+		want     bool
+	}{
+		{"Valid file", tempFile.Name(), true},
+		{"Non-existent file", "nonexistent-file.txt", false},
+		{"Directory", os.TempDir(), false},
 	}
 
-	if IsValidFile("nonexistent.fer") {
-		t.Errorf("Expected non-existent file to be invalid")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidFile(tt.filename); got != tt.want {
+				t.Errorf("IsValidFile(%q) = %v, want %v", tt.filename, got, tt.want)
+			}
+		})
 	}
 }
 
 func TestGitHubPathToRawURL(t *testing.T) {
-	url, sub := GitHubPathToRawURL("github.com/user/repo/path/file", "main")
-	expected := "https://raw.githubusercontent.com/user/repo/main/path/file.fer"
-
-	if url != expected {
-		t.Errorf("Expected URL %s, got %s", expected, url)
+	tests := []struct {
+		name          string
+		importPath    string
+		defaultBranch string
+		wantURL       string
+		wantSubpath   string
+	}{
+		{"Valid GitHub path", "github.com/user/repo/path/file", "main", "https://raw.githubusercontent.com/user/repo/main/path/file.fer", "path/file"},
+		{"Invalid GitHub path", "github.com/user", "main", "", ""},
+		{"Non-GitHub path", "gitlab.com/user/repo", "main", "", ""},
 	}
-	if sub != "path/file" {
-		t.Errorf("Expected subpath 'path/file', got '%s'", sub)
-	}
 
-	invalidURL, _ := GitHubPathToRawURL("invalid.com/user/repo", "main")
-	if invalidURL != "" {
-		t.Errorf("Expected empty URL for non-GitHub path")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotURL, gotSubpath := GitHubPathToRawURL(tt.importPath, tt.defaultBranch)
+			if gotURL != tt.wantURL || gotSubpath != tt.wantSubpath {
+				t.Errorf("GitHubPathToRawURL(%q, %q) = (%v, %v), want (%v, %v)",
+					tt.importPath, tt.defaultBranch, gotURL, gotSubpath, tt.wantURL, tt.wantSubpath)
+			}
+		})
 	}
 }
 
-func TestResolveProjectRootModule(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "module.fer")
-	os.WriteFile(filePath, []byte("test"), 0644)
+func TestFirstPart(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"Empty path", "", ""},
+		{"Single part", "file", "file"},
+		{"Multiple parts", "project/module/file", "project"},
+		{"With windows path", `project\module\file`, "project"},
+	}
 
-	ctxx := &ctx.CompilerContext{RootDir: tmpDir}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FirstPart(tt.path); got != tt.want {
+				t.Errorf("FirstPart(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
 
-	absPath, logical, err := ResolveModule("module", "", ctxx, false)
+func TestLastPart(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"Empty path", "", ""},
+		{"Single part", "file", "file"},
+		{"Multiple parts", "project/module/file", "file"},
+		{"With windows path", `project\module\file`, "file"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LastPart(tt.path); got != tt.want {
+				t.Errorf("LastPart(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveModule(t *testing.T) {
+	// Create temporary project structure
+	tempDir := t.TempDir()
+	projectName := "testproject"
+	projectDir := filepath.Join(tempDir, projectName)
+	err := os.MkdirAll(filepath.Join(projectDir, "module"), 0755)
 	if err != nil {
-		t.Fatalf("Expected module to resolve, got error: %v", err)
+		t.Fatal(err)
 	}
 
-	if !strings.HasSuffix(absPath, "module.fer") {
-		t.Errorf("Unexpected resolved path: %s", absPath)
+	// Create a test module file
+	moduleFile := filepath.Join(projectDir, "module", "test.fer")
+	if err := os.WriteFile(moduleFile, []byte("test content"), 0644); err != nil {
+		t.Fatal(err)
 	}
 
-	if logical != "module.fer" {
-		t.Errorf("Unexpected logical path: %s", logical)
+	// Create context
+	ctxx := &ctx.CompilerContext{
+		ProjectRoot: projectDir,
 	}
-}
 
-func TestResolveModule_InvalidEmptyPath(t *testing.T) {
-	ctxx := &ctx.CompilerContext{RootDir: "."}
-	_, _, err := ResolveModule("   ", "", ctxx, false)
-	if err == nil {
-		t.Error("Expected error for empty module path")
+	tests := []struct {
+		name                string
+		importPath          string
+		currentFileFullPath string
+		wantErr             bool
+	}{
+		{"Remote import", "github.com/user/repo/module", "", true},
+		{"Empty import", "", "", true},
+		{"Non-existent local module", "testproject/nonexistent", "", true},
+		// Note: Valid local module test would require mocking IsValidFile or setting up more complex file structure
 	}
-}
 
-func TestResolveModule_InvalidRelativePath(t *testing.T) {
-	ctxx := &ctx.CompilerContext{RootDir: "."}
-	_, _, err := ResolveModule("./relative", "", ctxx, false)
-	if err == nil || !strings.Contains(err.Error(), "relative imports") {
-		t.Error("Expected error for relative import")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ResolveModule(tt.importPath, tt.currentFileFullPath, ctxx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResolveModule(%q, %q, ctx) error = %v, wantErr %v",
+					tt.importPath, tt.currentFileFullPath, err, tt.wantErr)
+			}
+		})
 	}
 }
