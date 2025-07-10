@@ -24,7 +24,7 @@ let a = 1;
 
 let name, age : str, i32 = "John", 30;
 
-let importedData = data::myData;
+let importedData = datsa::myDatad;
 
 //supports different numeric types and formatting
 let pi : f64 = 3.14159;
