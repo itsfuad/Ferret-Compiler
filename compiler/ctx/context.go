@@ -78,10 +78,6 @@ func (c *CompilerContext) SetRemoteConfig(configFilepath string, data []byte) er
 func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.ProjectConfig {
 
 	logicalPath = filepath.ToSlash(logicalPath)
-	fmt.Printf("Logical Path: %s\n", logicalPath)
-	for key, value := range c.RemoteConfigs {
-		fmt.Printf("Key: %s, Value: %s\n", key, value)
-	}
 
 	if c.RemoteConfigs == nil {
 		return nil
@@ -200,12 +196,23 @@ func (c *CompilerContext) GetCyclePath(modulePath string) ([]string, bool) {
 		return nil, false
 	}
 
-	// Return the complete parsing stack plus the module that creates the cycle
-	// This shows the full import chain from the entry point
-	completePath := make([]string, len(c.ParsingStack)+1)
-	copy(completePath, c.ParsingStack)
-	completePath[len(completePath)-1] = modulePath // Add the module that completes the cycle
-	return completePath, true
+	// Find the first occurrence of the module that creates the cycle
+	cycleStartIndex := -1
+	for i, stackModule := range c.ParsingStack {
+		if stackModule == modulePath {
+			cycleStartIndex = i
+			break
+		}
+	}
+
+	if cycleStartIndex == -1 {
+		// This shouldn't happen, but handle it gracefully
+		return c.ParsingStack, true
+	}
+
+	// Return the current parsing stack which shows the complete path from entry point
+	// to where the cycle would occur (the unambiguous cycle path)
+	return c.ParsingStack, true
 }
 
 // StartParsing marks a module as currently being parsed
@@ -219,7 +226,6 @@ func (c *CompilerContext) StartParsing(modulePath string) {
 
 	c.ParsingModules[modulePath] = true
 	c.ParsingStack = append(c.ParsingStack, modulePath)
-	colors.YELLOW.Printf("Started parsing: %s (stack: %v)\n", modulePath, c.ParsingStack)
 }
 
 // FinishParsing marks a module as no longer being parsed
@@ -232,8 +238,6 @@ func (c *CompilerContext) FinishParsing(modulePath string) {
 	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == modulePath {
 		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
 	}
-
-	colors.YELLOW.Printf("Finished parsing: %s (stack: %v)\n", modulePath, c.ParsingStack)
 }
 
 func NewCompilerContext(entrypointFullpath string) *CompilerContext {
@@ -317,57 +321,53 @@ func (c *CompilerContext) AddDepEdge(importer, imported string) {
 func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
 	colors.BLUE.Printf("Starting cycle detection from: %s\n", start)
 
-	// Use three states: 0=unvisited, 1=visiting (in stack), 2=visited (completely processed)
-	state := make(map[string]int)
-	stack := make([]string, 0)
+	state := make(map[string]int) // 0 = unvisited, 1 = visiting, 2 = visited
+	var stack []string
 
-	var dfs func(node string) ([]string, bool)
-	dfs = func(node string) ([]string, bool) {
-		colors.BLUE.Printf("DFS visiting node: %s (state: %d)\n", node, state[node])
+	var visit func(string) ([]string, bool)
 
-		if state[node] == 1 { // Currently visiting (in recursion stack) - cycle detected!
+	visit = func(node string) ([]string, bool) {
+		switch state[node] {
+		case 1:
+			// Cycle found
 			colors.RED.Printf("CYCLE DETECTED! Node %s is already in the recursion stack\n", node)
-			// Find the cycle in the stack
 			for i, n := range stack {
 				if n == node {
-					cycle := append(stack[i:], node) // Include the node that creates the cycle
+					cycle := append(stack[i:], node)
 					colors.RED.Printf("Cycle path: %v\n", cycle)
 					return cycle, true
 				}
 			}
-			// If not found in stack, this shouldn't happen, but handle gracefully
 			return []string{node}, true
-		}
 
-		if state[node] == 2 { // Already completely processed
+		case 2:
+			// Already visited
 			colors.GREEN.Printf("Node %s already processed, skipping\n", node)
 			return nil, false
 		}
 
-		// Mark as visiting and add to stack
+		// Mark as visiting
 		state[node] = 1
 		stack = append(stack, node)
-		colors.BLUE.Printf("Added to stack: %s (stack: %v)\n", node, stack)
+		colors.BLUE.Printf("Visiting node: %s (stack: %v)\n", node, stack)
 
-		// Visit all neighbors
-		neighbors := c.DepGraph[node]
-		colors.BLUE.Printf("Node %s has %d neighbors: %v\n", node, len(neighbors), neighbors)
-		for _, neighbor := range neighbors {
-			if path, found := dfs(neighbor); found {
-				return path, true
+		// Visit neighbors
+		for _, neighbor := range c.DepGraph[node] {
+			if cycle, found := visit(neighbor); found {
+				return cycle, true
 			}
 		}
 
-		// Mark as completely processed and remove from stack
+		// Done processing
 		stack = stack[:len(stack)-1]
 		state[node] = 2
 		colors.GREEN.Printf("Completed processing node: %s\n", node)
 		return nil, false
 	}
 
-	result, found := dfs(start)
-	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, result)
-	return result, found
+	cycle, found := visit(start)
+	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, cycle)
+	return cycle, found
 }
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
