@@ -71,9 +71,9 @@ func TestParseIntegerType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
 			p := &Parser{
-				tokens:      lexer.Tokenize(filePath, false),
-				tokenNo:     0,
-				filePathAbs: filePath,
+				tokens:   lexer.Tokenize(filePath, false),
+				tokenNo:  0,
+				fullPath: filePath,
 			}
 			p.tokens = []lexer.Token{
 				{Kind: lexer.IDENTIFIER_TOKEN, Value: tt.input},
@@ -104,9 +104,9 @@ func TestParseFloatType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
 			p := &Parser{
-				tokens:      lexer.Tokenize(filePath, false),
-				tokenNo:     0,
-				filePathAbs: filePath,
+				tokens:   lexer.Tokenize(filePath, false),
+				tokenNo:  0,
+				fullPath: filePath,
 			}
 			p.tokens = []lexer.Token{
 				{Kind: lexer.IDENTIFIER_TOKEN, Value: tt.input},
@@ -212,9 +212,9 @@ func TestParseType(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
 			p := &Parser{
-				tokens:      lexer.Tokenize(filePath, false),
-				tokenNo:     0,
-				filePathAbs: filePath,
+				tokens:   lexer.Tokenize(filePath, false),
+				tokenNo:  0,
+				fullPath: filePath,
 			}
 			result, ok := parseType(p)
 			if !tt.isValid && ok {

@@ -1,0 +1,11 @@
+{
+  "compiler": {
+    "version": "0.1.0",
+    "cache": {
+      "path": ".ferret/modules"
+    },
+    "remote": {
+      "enabled": true
+    }
+  }
+}

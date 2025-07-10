@@ -19,7 +19,7 @@ type Resolver struct {
 }
 
 func NewResolver(program *ast.Program, ctx *ctx.CompilerContext, debug bool) *Resolver {
-	colors.BLUE.Printf("New Resolver set for: %s\n", program.FilePath)
+	colors.BLUE.Printf("New Resolver set for: %s\n", program.FullPath)
 	return &Resolver{
 		ctx:     ctx,
 		program: program,
@@ -29,7 +29,7 @@ func NewResolver(program *ast.Program, ctx *ctx.CompilerContext, debug bool) *Re
 
 func (r *Resolver) ResolveProgram() {
 	if r.Debug {
-		fmt.Printf("[Resolver] Starting semantic analysis for %s\n", r.program.FilePath)
+		fmt.Printf("[Resolver] Starting semantic analysis for %s\n", r.program.FullPath)
 	}
 
 	for _, node := range r.program.Nodes {
@@ -37,15 +37,16 @@ func (r *Resolver) ResolveProgram() {
 		resolveNode(r, node)
 	}
 	if r.Debug {
-		fmt.Printf("[Resolver] Finished semantic analysis for %s\n", r.program.FilePath)
+		fmt.Printf("[Resolver] Finished semantic analysis for %s\n", r.program.FullPath)
 	}
 }
 
 func resolveNode(r *Resolver, node ast.Node) {
-	currentModuleName := r.ctx.AbsToModuleName(r.program.FilePath)
+	currentModuleName := r.program.ImportPath
+	colors.PURPLE.Printf("Resolving node: %s\n", currentModuleName)
 	currentModule := r.ctx.GetModule(currentModuleName)
 	if currentModule == nil {
-		r.ctx.Reports.Add(r.program.FilePath, r.program.Loc(), "current module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, r.program.Loc(), "module not found for node: "+currentModuleName+"\n"+r.program.FullPath, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 	switch n := node.(type) {
@@ -69,14 +70,14 @@ func resolveTypeDecl(r *Resolver, stmt *ast.TypeDeclStmt) {
 	// check if type is already declared or built-in or keyword
 	typeName := stmt.Alias.Name
 	if lexer.IsKeyword(typeName) || types.IsPrimitiveType(typeName) {
-		r.ctx.Reports.Add(r.program.FilePath, stmt.Alias.Loc(), "cannot declare type with reserved keyword: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, stmt.Alias.Loc(), "cannot declare type with reserved keyword: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 	//declare the type in the current module
-	moduleName := r.ctx.AbsToModuleName(r.program.FilePath)
-	currentModule := r.ctx.GetModule(moduleName)
+	currentModuleName := r.program.ImportPath
+	currentModule := r.ctx.GetModule(currentModuleName)
 	if currentModule == nil {
-		r.ctx.Reports.Add(r.program.FilePath, stmt.Alias.Loc(), "current module not found: "+moduleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, stmt.Alias.Loc(), "<type decl> current module not found for type declaration: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 	currentModule.SymbolTable.Declare(typeName, &semantic.Symbol{Name: typeName, Kind: semantic.SymbolType, Type: stmt.BaseType})
@@ -86,10 +87,10 @@ func resolveImport(r *Resolver, currentModule *ctx.Module, importStmt *ast.Impor
 	if r.Debug {
 		fmt.Printf("[Resolver] Resolving import: %s\n", importStmt.ModuleName)
 	}
-	if importStmt.ModuleName != "" && importStmt.FilePath != "" {
+	if importStmt.ModuleName != "" && importStmt.FullPath != "" {
 		importModule := r.ctx.GetModule(importStmt.ImportPath.Value)
 		if importModule == nil {
-			r.ctx.Reports.Add(r.program.FilePath, importStmt.Loc(), "module not found: "+importStmt.ModuleName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.program.FullPath, importStmt.Loc(), "<import resolver> module not found: "+importStmt.ModuleName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 		colors.GREEN.Printf("Retrieved module '%s' for import alias '%s'\n", importStmt.ImportPath.Value, importStmt.ModuleName)
 		importModuleAST := importModule.AST
@@ -101,7 +102,7 @@ func resolveImport(r *Resolver, currentModule *ctx.Module, importStmt *ast.Impor
 }
 
 func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
-	currentModuleName := r.ctx.AbsToModuleName(r.program.FilePath)
+	currentModuleName := r.program.ImportPath
 	for i, v := range stmt.Variables {
 		name := v.Identifier.Name
 		kind := semantic.SymbolVar
@@ -111,7 +112,7 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 		// Type checking: ensure explicit type exists if provided
 		currentModule := r.ctx.GetModule(currentModuleName)
 		if currentModule == nil {
-			r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+			r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), "<var decl resolver> module not found: "+currentModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 			return
 		}
 
@@ -125,13 +126,13 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 				alias := typeNode.Module.Name
 				importModuleName, ok := r.ctx.AliasToModuleName[alias]
 				if !ok {
-					r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+					r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 					return
 				}
 
 				importModule := r.ctx.GetModule(importModuleName)
 				if importModule == nil {
-					r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+					r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), "<var decl> imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 					return
 				}
 
@@ -140,14 +141,14 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 				if userType, ok := typeNode.TypeNode.(*ast.UserDefinedType); ok {
 					typeName = string(userType.TypeName)
 				} else {
-					r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "invalid type in scope resolution", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+					r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), "invalid type in scope resolution", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 					return
 				}
 
 				// Verify the type exists in the imported module
 				symbol, found := importModule.SymbolTable.Lookup(typeName)
 				if !found || symbol.Kind != semantic.SymbolType {
-					r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), fmt.Sprintf("type '%s' not found in module '%s'", typeName, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+					r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), fmt.Sprintf("type '%s' not found in module '%s'", typeName, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 					return
 				}
 
@@ -156,7 +157,7 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 				typeName := string(v.ExplicitType.Type())
 				sym, found := currentModule.SymbolTable.Lookup(typeName)
 				if !found || sym.Kind != semantic.SymbolType {
-					r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), "unknown type: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+					r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), "unknown type: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 				}
 			}
 		}
@@ -166,7 +167,7 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 		err := currentModule.SymbolTable.Declare(name, sym)
 		if err != nil {
 			// Redeclaration error
-			r.ctx.Reports.Add(r.program.FilePath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.ctx.Reports.Add(r.program.FullPath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 		// Check initializer expression if present
 		if i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
@@ -178,15 +179,15 @@ func resolveVarDecl(r *Resolver, stmt *ast.VarDeclStmt) {
 func resolveAssignment(r *Resolver, stmt *ast.AssignmentStmt) { // Check that all left-hand side variables are declared
 	for _, lhs := range *stmt.Left {
 		if id, ok := lhs.(*ast.IdentifierExpr); ok {
-			varSym, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(id.Name)
+			varSym, found := r.ctx.Modules[r.program.FullPath].SymbolTable.Lookup(id.Name)
 			if !found {
-				r.ctx.Reports.Add(r.program.FilePath, id.Loc(), "assignment to undeclared variable: "+id.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				r.ctx.Reports.Add(r.program.FullPath, id.Loc(), "assignment to undeclared variable: "+id.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			} else if varSym.Type != nil {
 				// Type checking: ensure type exists for variable
 				typeName := string(varSym.Type.Type())
-				typeSym, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(typeName)
+				typeSym, found := r.ctx.Modules[r.program.FullPath].SymbolTable.Lookup(typeName)
 				if !found || typeSym.Kind != semantic.SymbolType {
-					r.ctx.Reports.Add(r.program.FilePath, id.Loc(), "unknown type for variable: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+					r.ctx.Reports.Add(r.program.FullPath, id.Loc(), "unknown type for variable: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 				}
 			}
 		} else {
@@ -210,8 +211,8 @@ func resolveExpressionStmt(r *Resolver, stmt *ast.ExpressionStmt) {
 func resolveExpr(r *Resolver, expr ast.Expression) {
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
-		if _, found := r.ctx.Modules[r.program.FilePath].SymbolTable.Lookup(e.Name); !found {
-			r.ctx.Reports.Add(r.program.FilePath, e.Loc(), "undeclared variable: "+e.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		if _, found := r.ctx.Modules[r.program.FullPath].SymbolTable.Lookup(e.Name); !found {
+			r.ctx.Reports.Add(r.program.FullPath, e.Loc(), "undeclared variable: "+e.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 	case *ast.BinaryExpr:
 		resolveExpr(r, *e.Left)
@@ -280,14 +281,14 @@ func resolveTypeScopeResolution(r *Resolver, expr ast.TypeScopeResolution) {
 
 	importModuleName, ok := r.ctx.AliasToModuleName[alias]
 	if !ok {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).AddHint("Check if the module is imported correctly").SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.Module.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).AddHint("Check if the module is imported correctly").SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 
 	// Get the imported module's symbol table
 	importModule := r.ctx.GetModule(importModuleName)
 	if importModule == nil {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), "imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.Module.Loc(), "<type scope> imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 
@@ -296,20 +297,20 @@ func resolveTypeScopeResolution(r *Resolver, expr ast.TypeScopeResolution) {
 	if userType, ok := expr.TypeNode.(*ast.UserDefinedType); ok {
 		typeName = string(userType.TypeName)
 	} else {
-		r.ctx.Reports.Add(r.program.FilePath, expr.TypeNode.Loc(), "invalid type in scope resolution", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.TypeNode.Loc(), "invalid type in scope resolution", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 
 	// Look up the type symbol in the imported module's symbol table
 	symbol, found := importModule.SymbolTable.Lookup(typeName)
 	if !found {
-		r.ctx.Reports.Add(r.program.FilePath, expr.TypeNode.Loc(), fmt.Sprintf("type '%s' not found in module '%s'", typeName, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.TypeNode.Loc(), fmt.Sprintf("type '%s' not found in module '%s'", typeName, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 
 	// Verify it's actually a type
 	if symbol.Kind != semantic.SymbolType {
-		r.ctx.Reports.Add(r.program.FilePath, expr.TypeNode.Loc(), fmt.Sprintf("expected type but found variable '%s' in module '%s'", typeName, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.TypeNode.Loc(), fmt.Sprintf("expected type but found variable '%s' in module '%s'", typeName, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 
@@ -326,27 +327,27 @@ func resolveVarScopeResolution(r *Resolver, expr ast.VarScopeResolution) {
 
 	importModuleName, ok := r.ctx.AliasToModuleName[alias]
 	if !ok {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).AddHint("Check if the module is imported correctly").SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.Module.Loc(), fmt.Sprintf("module '%s' not found", alias), report.RESOLVER_PHASE).AddHint("Check if the module is imported correctly").SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 
 	// Get the imported module's symbol table
 	importModule := r.ctx.GetModule(importModuleName)
 	if importModule == nil {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Module.Loc(), "imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.Module.Loc(), "<var scope> imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 
 	// Look up the variable symbol in the imported module's symbol table
 	symbol, found := importModule.SymbolTable.Lookup(expr.Var.Name)
 	if !found {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Var.Loc(), fmt.Sprintf("variable '%s' not found in module '%s'", expr.Var.Name, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.Var.Loc(), fmt.Sprintf("variable '%s' not found in module '%s'", expr.Var.Name, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 
 	// Verify it's actually a variable (not a type)
 	if symbol.Kind == semantic.SymbolType {
-		r.ctx.Reports.Add(r.program.FilePath, expr.Var.Loc(), fmt.Sprintf("expected variable but found type '%s' in module '%s'", expr.Var.Name, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		r.ctx.Reports.Add(r.program.FullPath, expr.Var.Loc(), fmt.Sprintf("expected variable but found type '%s' in module '%s'", expr.Var.Name, alias), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
 

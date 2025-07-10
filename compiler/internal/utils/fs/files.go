@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"compiler/colors"
 	"compiler/ctx"
 	"fmt"
 	"io"
@@ -12,6 +13,10 @@ import (
 
 const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
+
+func IsRemote(importPath string) bool {
+	return strings.HasPrefix(importPath, REMOTE_HOST)
+}
 
 // Check if file exists and is a regular file
 func IsValidFile(filename string) bool {
@@ -80,7 +85,7 @@ func fetchAndCache(url, localPath string, force bool) error {
 	return err
 }
 
-// ResolveModule resolves an import path to an absolute local file path, handling remote GitHub imports
+// ResolveModule resolves an import path to an full local file path, handling remote GitHub imports
 // and project-root relative paths only. Relative paths (./ or ../) are no longer supported.
 // importerLogicalPath: the logical import path of the importer (github.com/... for remote, project-relative for local)
 func ResolveModule(modulePath string, importerPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
@@ -92,23 +97,37 @@ func ResolveModule(modulePath string, importerPath string, ctxx *ctx.CompilerCon
 	}
 
 	// Handle GitHub-style imports (github.com/user/repo/...)
-	if strings.HasPrefix(modulePath, REMOTE_HOST) {
+	if IsRemote(modulePath) {
+		colors.BLUE.Printf("Resolving remote module: %s\n", modulePath)
 		return resolveGitHubModule(modulePath, ctxx, force)
 	}
 
 	// Relative paths (./ or ../) are no longer supported - all local imports must be from project root
 	if strings.HasPrefix(modulePath, "./") || strings.HasPrefix(modulePath, "../") {
-		return "", "", fmt.Errorf("relative imports (./ or ../) are not supported. Use absolute paths from project root: %s", modulePath)
+		return "", "", fmt.Errorf("relative imports (./ or ../) are not supported. Use full paths from project root: %s", modulePath)
 	}
 
 	// If the importer is a remote module, treat local imports as relative to that remote repository
-	if strings.HasPrefix(importerPath, REMOTE_HOST) {
-		// TODO: check slash later
-		return resolveRemoteLocalImport(modulePath, importerPath, ctxx, force)
+	if remote, ok := IsRemoteLocal(importerPath, ctxx); ok {
+		colors.PURPLE.Printf("Resolving remote local module: %s, importer: %s\n", modulePath, remote)
+		return resolveRemoteLocalImport(modulePath, remote, ctxx, force)
 	}
 
 	// All other paths are treated as project-root relative imports
 	return resolveProjectRootModule(modulePath, ctxx)
+}
+
+func IsRemoteLocal(importPath string, ctxx *ctx.CompilerContext) (string, bool) {
+	hasCache := strings.HasPrefix(importPath, filepath.ToSlash(ctxx.CachePath))
+	ok := IsRemote(importPath) || hasCache
+	if ok {
+		return CacheToRemote(importPath, ctxx), true
+	}
+	return "", false
+}
+
+func CacheToRemote(importPath string, ctxx *ctx.CompilerContext) string {
+	return strings.TrimPrefix(importPath, filepath.ToSlash(ctxx.CachePath+"/"))
 }
 
 // resolveGitHubModule handles GitHub-style imports (github.com/user/repo/...)
@@ -163,6 +182,8 @@ func resolveRemoteLocalImport(remoteFilename string, importerLogicalPath string,
 
 	// Reconstruct the remote repository base path
 	remoteRepo := strings.Join(parts[:3], "/")
+
+	fmt.Printf("Remote Repo: %s\n", remoteRepo)
 
 	// Create the full remote import path
 	// For imports like "code/remote/audio", we want to import from the remote repo
