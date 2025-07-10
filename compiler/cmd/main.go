@@ -100,6 +100,10 @@ func main() {
 
 	filename := os.Args[1]
 	context := Compile(filename, debug)
-	defer context.Destroy()
-	context.PrintModules()
+
+	// Only destroy and print modules if context is not nil
+	if context != nil {
+		defer context.Destroy()
+		context.PrintModules()
+	}
 }

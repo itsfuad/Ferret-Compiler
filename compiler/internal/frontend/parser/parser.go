@@ -28,7 +28,7 @@ func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, false)
 
 	//relative path to the file
-	relPath, err := filepath.Rel(ctx.RootDir, filePath)
+	relPath, err := filepath.Rel(ctx.ProjectRoot, filePath)
 	if err != nil {
 		panic(err)
 	}
