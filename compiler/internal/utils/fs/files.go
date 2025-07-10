@@ -75,7 +75,7 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 	}
 
 	projectRoot := LastPart(ctxx.ProjectRoot)
-	if importRoot == "" {
+	if projectRoot == "" {
 		return "", fmt.Errorf("invalid project root: %s", ctxx.ProjectRoot)
 	}
 
