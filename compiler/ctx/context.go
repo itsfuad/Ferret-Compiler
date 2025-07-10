@@ -90,7 +90,7 @@ func (c *CompilerContext) HasModule(moduleName string) bool {
 }
 
 func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
-	colors.GREEN.Printf("Adding module: Key: %s, FilePath: %s\n", moduleName, module.FilePath)
+	colors.GREEN.Printf("Adding module: Key: %s, FilePath: %s\n", moduleName, module.FullPath)
 	if c.Modules == nil {
 		c.Modules = make(map[string]*Module)
 	}
@@ -111,7 +111,7 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 
 	entrypointPath, err := filepath.Abs(entrypointPath)
 	if err != nil {
-		panic(fmt.Errorf("failed to get absolute path: %w", err))
+		panic(fmt.Errorf("failed to get full path: %w", err))
 	}
 	entrypointPath = filepath.ToSlash(entrypointPath)
 
@@ -126,6 +126,7 @@ func NewCompilerContext(entrypointPath string) *CompilerContext {
 	colors.ORANGE.Printf("Entry point: %s\n", entryPoint)
 
 	cachePath := filepath.Join(rootDir, ".ferret", "modules")
+	cachePath = filepath.ToSlash(cachePath)
 	os.MkdirAll(cachePath, 0755)
 	return &CompilerContext{
 		RootDir:           rootDir,
@@ -190,10 +191,10 @@ func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
 	return dfs(start)
 }
 
-func (c *CompilerContext) AbsToModuleName(absPath string) string {
-	relPath, err := filepath.Rel(c.RootDir, absPath)
+func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
+	relPath, err := filepath.Rel(c.RootDir, fullPath)
 	if err != nil {
-		return absPath // Fallback to absolute path if relative path cannot be determined
+		return fullPath // Fallback to full path if relative path cannot be determined
 	}
 	relPath = filepath.ToSlash(relPath)
 	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))

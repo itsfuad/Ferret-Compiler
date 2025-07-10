@@ -4,6 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
+
 	//"compiler/internal/semantic"
 	"path/filepath"
 	"strings"
@@ -18,15 +19,15 @@ import (
 func Compile(filePath string, debug bool) *ctx.CompilerContext {
 
 	filePath = filepath.ToSlash(filePath)
-	absPath, err := filepath.Abs(filePath)
+	fullPath, err := filepath.Abs(filePath)
 	if err != nil {
-		panic(fmt.Errorf("failed to get absolute path: %w", err))
+		panic(fmt.Errorf("failed to get full path: %w", err))
 	}
-	absPath = filepath.ToSlash(absPath)
+	fullPath = filepath.ToSlash(fullPath)
 
-	rootDir := filepath.Dir(absPath)
+	rootDir := filepath.Dir(fullPath)
 	rootDir = filepath.ToSlash(rootDir)
-	relPath, err := filepath.Rel(rootDir, absPath)
+	relPath, err := filepath.Rel(rootDir, fullPath)
 	if err != nil {
 		panic(fmt.Errorf("failed to get relative path: %w", err))
 	}
@@ -37,11 +38,11 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 
 	fmt.Printf("Compiling file: %s\n", filePath)
 
-	if !fs.IsValidFile(absPath) {
+	if !fs.IsValidFile(fullPath) {
 		panic(fmt.Errorf("invalid file: %s", relPath))
 	}
 
-	context := ctx.NewCompilerContext(absPath)
+	context := ctx.NewCompilerContext(fullPath)
 
 	defer func() {
 		context.Reports.DisplayAll()
@@ -50,7 +51,7 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 		}
 	}()
 
-	p := parser.NewParser(absPath, context, true)
+	p := parser.NewParser(fullPath, context, true)
 	program := p.Parse()
 
 	if program == nil {
