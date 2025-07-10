@@ -7,6 +7,7 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -24,23 +25,34 @@ type Parser struct {
 
 func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
 
-	filePath = filepath.ToSlash(filePath)
-	tokens := lexer.Tokenize(filePath, false)
+	if ctx == nil {
+		panic("Cannot create parser: Compiler context is nil")
+	}
+	if filePath == "" {
+		panic("Cannot create parser: File path is empty")
+	}
+
+	filePath = filepath.ToSlash(filePath) // Ensure forward slashes for consistency
+	fmt.Printf("Project root: %s\n", ctx.ProjectRoot)
+	fmt.Printf("File path: %s\n", filePath)
+
+	if !fs.IsValidFile(filePath) {
+		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
+	}
 
 	//relative path to the file
-	relPath, err := filepath.Rel(ctx.ProjectRoot, filePath)
+	importPath, err := filepath.Rel(ctx.ProjectRoot, filePath)
 	if err != nil {
-		panic(err)
+		panic("Cannot create parser: Failed to get relative path: " + err.Error())
 	}
-	// if contains cache path, remove it
-	importPath := filepath.ToSlash(relPath)
-	if after, ok := strings.CutPrefix(filePath, ctx.CachePath+"/"); ok {
-		importPath = after
-	}
+	// Ensure forward slashes for consistency
+	importPath = filepath.ToSlash(importPath)
 
 	importPath = strings.TrimSuffix(importPath, filepath.Ext(importPath))
 
 	colors.ORANGE.Printf("New Parser: %s -> %s\n", filePath, importPath)
+
+	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
 		tokens:     tokens,
@@ -253,7 +265,6 @@ func parseNode(p *Parser) ast.Node {
 
 // Parse is the entry point for parsing
 func (p *Parser) Parse() *ast.Program {
-
 	var nodes []ast.Node
 
 	for !p.isAtEnd() {
