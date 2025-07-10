@@ -64,7 +64,7 @@ func parseImport(p *Parser) ast.Node {
 
 	// Always start cycle detection from the entrypoint
 	entryRel := p.ctx.EntryPoint
-	if p.ctx.RootDir != "" {
+	if p.ctx.ProjectRoot != "" {
 		entryRel = filepath.ToSlash(filepath.Join("", p.ctx.EntryPoint))
 	}
 	entryKey := entryRel
