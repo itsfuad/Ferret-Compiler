@@ -10,7 +10,7 @@
     "share": true
   },
   "dependencies": {
-      "github.com/itsfuad/Ferret-Compiler/app": [
+      "modules": [
           "code/remote/graphics",
           "code/remote/audio"
         ]
