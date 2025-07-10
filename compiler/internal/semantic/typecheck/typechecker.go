@@ -28,7 +28,7 @@ func NewTypeChecker(program *ast.Program, ctx *ctx.CompilerContext, debug bool) 
 }
 
 func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
-	tc.CurrentFile = prog.FilePath
+	tc.CurrentFile = prog.FullPath
 	if tc.CurrentFile == "" {
 		fmt.Println("[TypeChecker] Current file is empty. Skipping type checking.")
 		return
@@ -39,10 +39,10 @@ func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
 	// Build import alias map: alias -> file path (for error reporting only)
 	for _, node := range prog.Nodes {
 		if imp, ok := node.(*ast.ImportStmt); ok {
-			if imp.ModuleName != "" && imp.FilePath != "" {
-				tc.ctx.AliasToModuleName[imp.ModuleName] = imp.FilePath
+			if imp.ModuleName != "" && imp.FullPath != "" {
+				tc.ctx.AliasToModuleName[imp.ModuleName] = imp.FullPath
 				if tc.Debug {
-					fmt.Printf("[TypeChecker] Import alias: %s -> %s\n", imp.ModuleName, imp.FilePath)
+					fmt.Printf("[TypeChecker] Import alias: %s -> %s\n", imp.ModuleName, imp.FullPath)
 				}
 			}
 		}

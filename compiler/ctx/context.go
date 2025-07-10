@@ -2,9 +2,11 @@ package ctx
 
 import (
 	"compiler/colors"
+	"compiler/internal/config"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +21,6 @@ type Module struct {
 }
 
 type CompilerContext struct {
-	RootDir           string                // Root directory of the project
 	EntryPoint        string                // Entry point file
 	Builtins          *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
 	Modules           map[string]*Module    // key: ModuleKey.String()
@@ -28,6 +29,79 @@ type CompilerContext struct {
 	AliasToModuleName map[string]string // import alias -> file path
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
+	// Track modules that are currently being parsed to prevent infinite recursion
+	ParsingModules map[string]bool
+	// Keep track of the parsing stack to show cycle paths
+	ParsingStack []string
+	// Project configuration
+	ProjectConfig *config.ProjectConfig
+	ProjectRoot   string
+	RemoteConfigs map[string]bool
+}
+
+func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectConfig {
+	if c.RemoteConfigs == nil {
+		return nil
+	}
+	_, exists := c.RemoteConfigs[configFilepath]
+	if !exists {
+		return nil
+	}
+	cacheFile, err := os.ReadFile(configFilepath)
+	if err != nil {
+		return nil
+	}
+	var projectConfig config.ProjectConfig
+	if err := json.Unmarshal(cacheFile, &projectConfig); err != nil {
+		return nil
+	}
+	return &projectConfig
+}
+
+func (c *CompilerContext) SetRemoteConfig(configFilepath string, data []byte) error {
+	if c.RemoteConfigs == nil {
+		c.RemoteConfigs = make(map[string]bool)
+	}
+	c.RemoteConfigs[configFilepath] = true
+	err := os.MkdirAll(filepath.Dir(configFilepath), 0755)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(configFilepath, data, 0644)
+	if err != nil {
+		return err
+	}
+	colors.GREEN.Printf("Cached remote config for %s\n", configFilepath)
+	return nil
+}
+
+func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.ProjectConfig {
+
+	logicalPath = filepath.ToSlash(logicalPath)
+
+	if c.RemoteConfigs == nil {
+		return nil
+	}
+
+	logicalPath = filepath.ToSlash(logicalPath)
+	parts := strings.Split(logicalPath, "/")
+
+	// Start from full path, walk up to github.com/user/repo
+	for i := len(parts); i >= 3; i-- {
+		prefix := strings.Join(parts[:i], "/")
+		if _, exists := c.RemoteConfigs[prefix]; exists {
+			data, err := os.ReadFile(prefix)
+			if err != nil {
+				continue
+			}
+			var cfg config.ProjectConfig
+			if err := json.Unmarshal(data, &cfg); err != nil {
+				continue
+			}
+			return &cfg
+		}
+	}
+	return nil
 }
 
 func (c *CompilerContext) GetModule(key string) *Module {
@@ -59,6 +133,10 @@ func (c *CompilerContext) ModuleCount() int {
 }
 
 func (c *CompilerContext) PrintModules() {
+	if c == nil {
+		colors.YELLOW.Println("No modules in cache (context is nil)")
+		return
+	}
 	modules := c.ModuleNames()
 	if len(modules) == 0 {
 		colors.YELLOW.Println("No modules in cache")
@@ -90,7 +168,7 @@ func (c *CompilerContext) HasModule(moduleName string) bool {
 }
 
 func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
-	colors.GREEN.Printf("Adding module: Key: %s, FilePath: %s\n", moduleName, module.FilePath)
+	colors.GREEN.Printf("Adding module: Key: %s, FilePath: %s\n", moduleName, module.FullPath)
 	if c.Modules == nil {
 		c.Modules = make(map[string]*Module)
 	}
@@ -103,38 +181,106 @@ func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
 	c.Modules[moduleName] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
 }
 
-func NewCompilerContext(entrypointPath string) *CompilerContext {
+// IsModuleParsing checks if a module is currently being parsed
+func (c *CompilerContext) IsModuleParsing(modulePath string) bool {
+	if c.ParsingModules == nil {
+		return false
+	}
+	return c.ParsingModules[modulePath]
+}
+
+// GetCyclePath returns the cycle path if the given module is already being parsed
+// Returns the complete path from the entry point, showing the full import chain
+func (c *CompilerContext) GetCyclePath(modulePath string) ([]string, bool) {
+	if !c.IsModuleParsing(modulePath) {
+		return nil, false
+	}
+
+	// Find the first occurrence of the module that creates the cycle
+	cycleStartIndex := -1
+	for i, stackModule := range c.ParsingStack {
+		if stackModule == modulePath {
+			cycleStartIndex = i
+			break
+		}
+	}
+
+	if cycleStartIndex == -1 {
+		// This shouldn't happen, but handle it gracefully
+		return c.ParsingStack, true
+	}
+
+	// Return the current parsing stack which shows the complete path from entry point
+	// to where the cycle would occur (the unambiguous cycle path)
+	return c.ParsingStack, true
+}
+
+// StartParsing marks a module as currently being parsed
+func (c *CompilerContext) StartParsing(modulePath string) {
+	if c.ParsingModules == nil {
+		c.ParsingModules = make(map[string]bool)
+	}
+	if c.ParsingStack == nil {
+		c.ParsingStack = make([]string, 0)
+	}
+
+	c.ParsingModules[modulePath] = true
+	c.ParsingStack = append(c.ParsingStack, modulePath)
+}
+
+// FinishParsing marks a module as no longer being parsed
+func (c *CompilerContext) FinishParsing(modulePath string) {
+	if c.ParsingModules != nil {
+		delete(c.ParsingModules, modulePath)
+	}
+
+	// Remove from stack (should be the last element)
+	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == modulePath {
+		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
+	}
+}
+
+func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
 	}
 	contextCreated = true
 
-	entrypointPath, err := filepath.Abs(entrypointPath)
+	// Load project configuration
+	root, err := config.FindProjectRoot(entrypointFullpath)
 	if err != nil {
-		panic(fmt.Errorf("failed to get absolute path: %w", err))
+		panic(err)
 	}
-	entrypointPath = filepath.ToSlash(entrypointPath)
 
-	// Set root directory to the parent of the entry point's directory
-	// This ensures imports like "code/maths/symbols/pi" resolve correctly from project root
-	rootDir := filepath.Dir(entrypointPath)
-	rootDir = filepath.ToSlash(rootDir)
-	entryPoint := filepath.Base(entrypointPath)
-	entryPoint = filepath.ToSlash(entryPoint)
+	projectConfig, err := config.LoadProjectConfig(root)
+	if err != nil {
+		panic(fmt.Errorf("failed to load project config: %w", err))
+	}
 
-	colors.ORANGE.Printf("Root dir: %s\n", rootDir)
+	//get the entry point relative to the project root
+	entryPoint, err := filepath.Rel(root, entrypointFullpath)
+	if err != nil {
+		panic(fmt.Errorf("failed to get relative path for entry point: %w", err))
+	}
+	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
+
+	colors.ORANGE.Printf("Project root: %s\n", root)
 	colors.ORANGE.Printf("Entry point: %s\n", entryPoint)
 
-	cachePath := filepath.Join(rootDir, ".ferret", "modules")
+	// Use cache path from project config
+	cachePath := filepath.Join(root, projectConfig.Cache.Path)
+	cachePath = filepath.ToSlash(cachePath)
 	os.MkdirAll(cachePath, 0755)
+
 	return &CompilerContext{
-		RootDir:           rootDir,
 		EntryPoint:        entryPoint,
 		Builtins:          semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
 		Modules:           make(map[string]*Module),
 		Reports:           report.Reports{},
 		AliasToModuleName: make(map[string]string),
 		CachePath:         cachePath,
+		ProjectConfig:     projectConfig,
+		ProjectRoot:       root,
 	}
 }
 
@@ -159,41 +305,75 @@ func (c *CompilerContext) AddDepEdge(importer, imported string) {
 	if c.DepGraph == nil {
 		c.DepGraph = make(map[string][]string)
 	}
+	colors.CYAN.Printf("Adding dependency edge: %s -> %s\n", importer, imported)
 	c.DepGraph[importer] = append(c.DepGraph[importer], imported)
+
+	// Debug: print current dependency graph
+	colors.YELLOW.Println("Current dependency graph:")
+	for from, tos := range c.DepGraph {
+		for _, to := range tos {
+			colors.YELLOW.Printf("  %s -> %s\n", from, to)
+		}
+	}
 }
 
 // DetectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
 func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
-	visited := make(map[string]bool)
-	stack := make([]string, 0)
-	var dfs func(node string) ([]string, bool)
-	dfs = func(node string) ([]string, bool) {
-		if visited[node] {
+	colors.BLUE.Printf("Starting cycle detection from: %s\n", start)
+
+	state := make(map[string]int) // 0 = unvisited, 1 = visiting, 2 = visited
+	var stack []string
+
+	var visit func(string) ([]string, bool)
+
+	visit = func(node string) ([]string, bool) {
+		switch state[node] {
+		case 1:
+			// Cycle found
+			colors.RED.Printf("CYCLE DETECTED! Node %s is already in the recursion stack\n", node)
 			for i, n := range stack {
 				if n == node {
-					return append(stack[i:], node), true
+					cycle := append(stack[i:], node)
+					colors.RED.Printf("Cycle path: %v\n", cycle)
+					return cycle, true
 				}
 			}
+			return []string{node}, true
+
+		case 2:
+			// Already visited
+			colors.GREEN.Printf("Node %s already processed, skipping\n", node)
 			return nil, false
 		}
-		visited[node] = true
+
+		// Mark as visiting
+		state[node] = 1
 		stack = append(stack, node)
+		colors.BLUE.Printf("Visiting node: %s (stack: %v)\n", node, stack)
+
+		// Visit neighbors
 		for _, neighbor := range c.DepGraph[node] {
-			if path, found := dfs(neighbor); found {
-				return path, true
+			if cycle, found := visit(neighbor); found {
+				return cycle, true
 			}
 		}
+
+		// Done processing
 		stack = stack[:len(stack)-1]
-		visited[node] = false
+		state[node] = 2
+		colors.GREEN.Printf("Completed processing node: %s\n", node)
 		return nil, false
 	}
-	return dfs(start)
+
+	cycle, found := visit(start)
+	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, cycle)
+	return cycle, found
 }
 
-func (c *CompilerContext) AbsToModuleName(absPath string) string {
-	relPath, err := filepath.Rel(c.RootDir, absPath)
+func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
+	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
 	if err != nil {
-		return absPath // Fallback to absolute path if relative path cannot be determined
+		return fullPath // Fallback to full path if relative path cannot be determined
 	}
 	relPath = filepath.ToSlash(relPath)
 	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))

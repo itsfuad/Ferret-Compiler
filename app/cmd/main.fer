@@ -6,7 +6,7 @@ Language Core Principles
 3. Safety: The language should prevent common programming errors, such as null pointer dereferences and buffer overflows at compile time.
 */
 
-import "data";
+import "app/data";
 //import "std/fmt";
 //import "std/io";
 //import "std/math";

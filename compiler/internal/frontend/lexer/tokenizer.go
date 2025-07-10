@@ -48,7 +48,7 @@ func createLexer(filePath *string) *Lexer {
 
 	fileText, err := os.ReadFile(*filePath)
 	if err != nil {
-		panic(err)
+		panic("Lexer error: Failed to read file " + *filePath + ": " + err.Error())
 	}
 
 	//create the lexer
