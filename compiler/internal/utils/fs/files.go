@@ -3,12 +3,15 @@ package fs
 import (
 	"compiler/colors"
 	"compiler/ctx"
+	"compiler/internal/config"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const EXT = ".fer"
@@ -90,6 +93,8 @@ func fetchAndCache(url, localPath string, force bool) error {
 // importerLogicalPath: the logical import path of the importer (github.com/... for remote, project-relative for local)
 func ResolveModule(modulePath string, importerPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
 
+	fmt.Printf("Resolving module: %s, importer: %s\n", modulePath, importerPath)
+
 	modulePath = strings.TrimSpace(modulePath)
 
 	if modulePath == "" {
@@ -98,6 +103,11 @@ func ResolveModule(modulePath string, importerPath string, ctxx *ctx.CompilerCon
 
 	// Handle GitHub-style imports (github.com/user/repo/...)
 	if IsRemote(modulePath) {
+		// Check if remote imports are enabled in the current project
+		if ctxx.ProjectConfig != nil && !ctxx.ProjectConfig.Remote.Enabled {
+			return "", "", fmt.Errorf("remote imports are disabled in this project. Set 'remote.enabled' to true in ferret.project.json")
+		}
+
 		colors.BLUE.Printf("Resolving remote module: %s\n", modulePath)
 		return resolveGitHubModule(modulePath, ctxx, force)
 	}
@@ -121,21 +131,22 @@ func IsRemoteLocal(importPath string, ctxx *ctx.CompilerContext) (string, bool) 
 	hasCache := strings.HasPrefix(importPath, filepath.ToSlash(ctxx.CachePath))
 	ok := IsRemote(importPath) || hasCache
 	if ok {
-		return CacheToRemote(importPath, ctxx), true
+		return strings.TrimPrefix(importPath, filepath.ToSlash(ctxx.CachePath+"/")), true
 	}
 	return "", false
 }
 
-func CacheToRemote(importPath string, ctxx *ctx.CompilerContext) string {
-	return strings.TrimPrefix(importPath, filepath.ToSlash(ctxx.CachePath+"/"))
-}
-
 // resolveGitHubModule handles GitHub-style imports (github.com/user/repo/...)
 func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
-
+	fmt.Printf("Remote Import Path: %s\n", filename)
 	url, subpath := GitHubPathToRawURL(filename, "main")
 	if url == "" {
 		return "", "", fmt.Errorf("invalid GitHub import path: %s", filename)
+	}
+
+	// Check if the remote repository allows sharing
+	if err := checkRemoteSharing(filename, ctxx); err != nil {
+		return "", "", err
 	}
 
 	// Always append .fer extension for remote imports
@@ -143,7 +154,7 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 		subpath += EXT
 	}
 
-	cachePath := filepath.Join(ctxx.RootDir, ".ferret", "modules", filepath.FromSlash(filename))
+	cachePath := filepath.Join(ctxx.CachePath, filepath.FromSlash(filename))
 	if !strings.HasSuffix(cachePath, EXT) {
 		cachePath += EXT
 	}
@@ -154,13 +165,127 @@ func resolveGitHubModule(filename string, ctxx *ctx.CompilerContext, force bool)
 	return cachePath, filename, nil
 }
 
+func checkRemoteSharing(importPath string, ctxx *ctx.CompilerContext) error {
+	parts := strings.Split(importPath, "/")
+	if len(parts) < 3 {
+		return fmt.Errorf("invalid remote import path: %s", importPath)
+	}
+
+	user := parts[1]
+	repo := parts[2]
+	subPathParts := parts[3:]
+	repoBase := fmt.Sprintf("%s/%s", user, repo)
+
+	// Build all possible config paths from deepest to root
+	var candidatePaths []string
+	for i := len(subPathParts); i >= 0; i-- {
+		path := strings.Join(subPathParts[:i], "/")
+		candidatePaths = append(candidatePaths, path)
+	}
+
+	type result struct {
+		path   string //path to the ferret.project.json file
+		config config.ProjectConfig
+		data   []byte
+		err    error
+	}
+
+	resultChan := make(chan result, len(candidatePaths))
+	var wg sync.WaitGroup
+	var once sync.Once
+	done := make(chan struct{})
+
+	for _, subpath := range candidatePaths {
+		wg.Add(1)
+		go func(subpath string) {
+			defer wg.Done()
+
+			var url string
+			if subpath == "" {
+				url = fmt.Sprintf("https://raw.githubusercontent.com/%s/main/ferret.project.json", repoBase)
+			} else {
+				url = fmt.Sprintf("https://raw.githubusercontent.com/%s/main/%s/ferret.project.json", repoBase, subpath)
+			}
+
+			req, _ := http.NewRequest("GET", url, nil)
+			req.Header.Set("User-Agent", "Ferret-Compiler/0.1")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				if resp != nil {
+					resp.Body.Close()
+				}
+				select {
+				case resultChan <- result{path: subpath, err: fmt.Errorf("not found at %s", url)}:
+				case <-done:
+				}
+				return
+			}
+			defer resp.Body.Close()
+
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				select {
+				case resultChan <- result{path: subpath, err: err}:
+				case <-done:
+				}
+				return
+			}
+
+			var projectConfig config.ProjectConfig
+			if err := json.Unmarshal(bodyBytes, &projectConfig); err != nil {
+				select {
+				case resultChan <- result{path: subpath, err: err}:
+				case <-done:
+				}
+				return
+			}
+
+			once.Do(func() {
+				close(done)
+				resultChan <- result{
+					path:   subpath,
+					config: projectConfig,
+					data:   bodyBytes,
+					err:    nil,
+				}
+			})
+		}(subpath)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for res := range resultChan {
+		if res.err == nil && res.config != (config.ProjectConfig{}) {
+			if !res.config.Remote.Share {
+				return fmt.Errorf("repository %s does not allow remote imports (remote.share is false in %s)", repoBase, res.path)
+			}
+
+			colors.GREEN.Printf("Found ferret.project.json in %s\n", res.path)
+
+			configPath := filepath.Join("github.com", repoBase, res.path, "ferret.project.json")
+			configPath = filepath.ToSlash(configPath)
+			fmt.Printf("Setting remote config for '%s'\n", configPath)
+			if err := ctxx.SetRemoteConfig(configPath, res.data); err != nil {
+				return fmt.Errorf("failed to store remote config: %w", err)
+			}
+			return nil
+		}
+	}
+
+	return fmt.Errorf("repository %s does not contain a usable ferret.project.json", repoBase)
+}
+
 // resolveProjectRootModule handles project-root relative imports
 func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (string, string, error) {
-	resolved := filepath.Join(ctxx.RootDir, filename+EXT)
+	resolved := filepath.Join(ctxx.ProjectRoot, filename+EXT)
 	resolved = filepath.ToSlash(resolved)
 
 	if IsValidFile(resolved) {
-		rel, err := filepath.Rel(ctxx.RootDir, resolved)
+		rel, err := filepath.Rel(ctxx.ProjectRoot, resolved)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to get relative path: %w", err)
 		}
@@ -172,9 +297,6 @@ func resolveProjectRootModule(filename string, ctxx *ctx.CompilerContext) (strin
 
 // resolveRemoteLocalImport handles local imports within a remote module
 func resolveRemoteLocalImport(remoteFilename string, importerLogicalPath string, ctxx *ctx.CompilerContext, force bool) (string, string, error) {
-	// Extract the remote repository base path from the importer
-	// e.g., "github.com/itsfuad/Ferret-Programming-Language/code/remote/graphics"
-	// becomes "github.com/itsfuad/Ferret-Programming-Language"
 	parts := strings.Split(importerLogicalPath, "/")
 	if len(parts) < 3 {
 		return "", "", fmt.Errorf("invalid remote import path: %s", importerLogicalPath)
@@ -182,14 +304,22 @@ func resolveRemoteLocalImport(remoteFilename string, importerLogicalPath string,
 
 	// Reconstruct the remote repository base path
 	remoteRepo := strings.Join(parts[:3], "/")
-
 	fmt.Printf("Remote Repo: %s\n", remoteRepo)
+	fmt.Printf("Importer Logical Path: %s\n", importerLogicalPath)
+	logicalPath := filepath.Join(remoteRepo, importerLogicalPath) // e.g., github.com/user/repo/code/remote/graphics.fer
+	logicalPath = strings.TrimSuffix(logicalPath, ".fer") // remove extension if needed
+	
+	projectConfig := ctxx.FindNearestRemoteConfig(logicalPath)
+	if projectConfig == nil {
+		return "", "", fmt.Errorf("no remote project config found for: %s", logicalPath)
+	}
 
-	// Create the full remote import path
-	// For imports like "code/remote/audio", we want to import from the remote repo
-	remoteImportPath := filepath.Join(remoteRepo, remoteFilename)
+	fmt.Printf("Project Config: %v\n", projectConfig)
+	fmt.Printf("Project Root: %s\n", projectConfig.ProjectRoot)
+	
+	// Reconstruct full import path
+	remoteImportPath := filepath.Join(projectConfig.ProjectRoot, remoteFilename)
 	remoteImportPath = filepath.ToSlash(remoteImportPath)
-
-	// Resolve as a remote import
+	
 	return resolveGitHubModule(remoteImportPath, ctxx, force)
 }
