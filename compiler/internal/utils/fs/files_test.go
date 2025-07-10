@@ -48,13 +48,13 @@ func TestResolveProjectRootModule(t *testing.T) {
 
 	ctxx := &ctx.CompilerContext{RootDir: tmpDir}
 
-	absPath, logical, err := ResolveModule("module", "", ctxx, false)
+	fullPath, logical, err := ResolveModule("module", "", ctxx, false)
 	if err != nil {
 		t.Fatalf("Expected module to resolve, got error: %v", err)
 	}
 
-	if !strings.HasSuffix(absPath, "module.fer") {
-		t.Errorf("Unexpected resolved path: %s", absPath)
+	if !strings.HasSuffix(fullPath, "module.fer") {
+		t.Errorf("Unexpected resolved path: %s", fullPath)
 	}
 
 	if logical != "module.fer" {

@@ -17,7 +17,7 @@ func parseImport(p *Parser) ast.Node {
 	start := p.consume(lexer.IMPORT_TOKEN, report.EXPECTED_IMPORT_KEYWORD)
 	importPath := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
 
-	canonicalName := importPath.Value
+	importpath := importPath.Value
 
 	// Support: import "path" as Alias;
 	var moduleName string
@@ -27,9 +27,9 @@ func parseImport(p *Parser) ast.Node {
 		moduleName = aliasToken.Value
 	} else {
 		// Default: use last part of path (without extension)
-		parts := strings.Split(canonicalName, "/")
+		parts := strings.Split(importpath, "/")
 		if len(parts) == 0 {
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		sufs := strings.Split(parts[len(parts)-1], ".")
@@ -39,25 +39,28 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importPath.End)
 
-	// Use fs.ResolveModule to get the absolute path
-	moduleAbsPath, _, err := fs.ResolveModule(canonicalName, p.filePathAbs, p.ctx, false)
+	// Use fs.ResolveModule to get the full path
+	moduleFullPath, _, err := fs.ResolveModule(importpath, p.fullPath, p.ctx, false)
 	if err != nil {
-		p.ctx.Reports.Add(p.filePathAbs, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
+		p.ctx.Reports.Add(p.fullPath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return nil
 	}
 
+	isRemote := fs.IsRemote(importpath)
+
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
-			Value:    canonicalName,
+			Value:    importpath,
 			Location: loc,
 		},
 		ModuleName: moduleName,
-		FilePath:   moduleAbsPath,
+		FullPath:   moduleFullPath,
+		IsRemote:   isRemote,
 		Location:   loc,
 	}
 
 	// Add dependency edge and check for cycles,
-	p.ctx.AddDepEdge(p.filePathAbs, moduleAbsPath)
+	p.ctx.AddDepEdge(p.fullPath, moduleFullPath)
 
 	// Always start cycle detection from the entrypoint
 	entryRel := p.ctx.EntryPoint
@@ -68,30 +71,30 @@ func parseImport(p *Parser) ast.Node {
 	if cycle, found := p.ctx.DetectCycle(entryKey); found {
 		cycleStr := strings.Join(cycle, " -> ")
 		msg := "Circular import detected: " + cycleStr
-		p.ctx.Reports.Add(p.filePathAbs, &loc, msg, report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		p.ctx.Reports.Add(p.fullPath, &loc, msg, report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		colors.RED.Println(msg)
 		return stmt
 	}
 
 	// Check if the module is already cached
-	if !p.ctx.HasModule(canonicalName) {
+	if !p.ctx.HasModule(importpath) {
 
-		module := NewParser(moduleAbsPath, p.ctx, p.debug).Parse()
+		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
 
 		if module == nil {
-			p.ctx.Reports.Add(p.filePathAbs, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			p.ctx.Reports.Add(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			return &ast.ImportStmt{Location: loc}
 		}
 
-		p.ctx.AddModule(canonicalName, module)
-		colors.GREEN.Printf("Cached <- Module '%s'\n", canonicalName)
+		p.ctx.AddModule(importpath, module)
+		colors.GREEN.Printf("Cached <- Module '%s'\n", importpath)
 	} else {
-		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", canonicalName)
+		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", importpath)
 	}
 
-	p.ctx.AliasToModuleName[moduleName] = canonicalName
+	p.ctx.AliasToModuleName[moduleName] = importpath
 
-	fmt.Printf("Parsing import: %s -> %s\n", p.ctx.AbsToModuleName(p.filePathAbs), canonicalName)
+	fmt.Printf("Parsing import: %s -> %s\n", p.ctx.FullPathToModuleName(p.fullPath), importpath)
 
 	return stmt
 }
@@ -102,7 +105,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -113,7 +116,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		}, true
 	} else {
 		token := p.peek()
-		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 }
