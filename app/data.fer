@@ -1,5 +1,5 @@
 import "app/maths/math";
-import "app/cmd/main"; // should error because it's a circular dependency
+//import "app/cmd/main"; // should error because it's a circular dependency
 
 let myData = "Fuad";
 
