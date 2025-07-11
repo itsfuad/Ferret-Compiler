@@ -1,4 +1,10 @@
 # Ferret Programming Language
+
+[![CI](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/ci.yml/badge.svg)](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/ci.yml)
+[![Release](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/release.yml/badge.svg)](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/itsfuad/Ferret-Programming-Language)](https://goreportcard.com/report/github.com/itsfuad/Ferret-Programming-Language)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
+
 Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming language designed to bring clarity, simplicity, and expressiveness to developers. With a focus on readability and a clean syntax, Ferret makes it easier to write clear, maintainable code while embracing modern programming principles.
 
 ## Quick Start
@@ -177,7 +183,15 @@ Ferret_Compiler/
 │   ├── cmd/          # Main application files
 │   ├── data/         # Data modules
 │   └── maths/        # Math utility modules
-└── docs/             # Documentation and examples
+├── scripts/           # Build and development scripts
+│   ├── build.*       # Compiler build scripts
+│   ├── test.*        # Test execution scripts
+│   ├── fmt.*         # Code formatting scripts
+│   ├── run.*         # Quick development test scripts
+│   ├── ci-check.*    # Local CI validation scripts
+│   ├── pack.*        # Extension packaging scripts
+│   └── README.md     # Script documentation
+└── .github/workflows/ # CI/CD pipeline definitions
 ```
 
 ## Type Declarations
@@ -231,6 +245,8 @@ type Matrix [][]f32;
 - [ ] Advanced code generation
 - [x] Rich error reporting
 - [ ] Branch analysis
+- [x] Resolver
+- [x] Type checking
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
@@ -261,6 +277,43 @@ To work on the Ferret compiler:
    ./ferret ../app/cmd/main.fer --debug
    ```
 
+5. **Run local CI checks** (recommended before pushing):
+   ```bash
+   # On Linux/macOS/Git Bash
+   ./scripts/ci-check.sh
+   
+   # On Windows Command Prompt/PowerShell
+   .\scripts\ci-check.bat
+   ```
+   This script runs the same checks as the CI pipeline locally.
+
+### Development Scripts
+The project includes several convenience scripts in the `scripts/` directory:
+
+```bash
+# Build the compiler
+./scripts/build.sh        # Linux/macOS/Git Bash
+.\scripts\build.bat        # Windows CMD/PowerShell
+
+# Run tests with formatted output
+./scripts/test.sh          # Linux/macOS/Git Bash
+.\scripts\test.bat         # Windows CMD/PowerShell
+
+# Format all code
+./scripts/fmt.sh           # Linux/macOS/Git Bash
+.\scripts\fmt.bat          # Windows CMD/PowerShell
+
+# Quick test with sample file
+./scripts/run.sh           # Linux/macOS/Git Bash
+.\scripts\run.bat          # Windows CMD/PowerShell
+
+# Full CI validation
+./scripts/ci-check.sh      # Linux/macOS/Git Bash
+.\scripts\ci-check.bat     # Windows CMD/PowerShell
+```
+
+See `scripts/README.md` for detailed script documentation.
+
 ### Testing
 The project includes comprehensive tests for:
 - CLI argument parsing
@@ -275,6 +328,41 @@ Run the test suite before submitting contributions:
 cd compiler
 go test ./...
 ```
+
+### CI/CD Pipeline
+The project uses GitHub Actions for continuous integration and deployment:
+
+#### Automated Workflows
+- **CI Pipeline** (`ci.yml`): Runs on all branches and pull requests
+  - Executes all tests
+  - Checks code formatting with `gofmt`
+  - Runs `go vet` for static analysis
+  - Builds the compiler
+
+- **Pull Request Validation** (`pr.yml`): Additional checks for PRs to main
+  - Comprehensive test suite
+  - Code formatting validation
+  - Security scanning with gosec
+  - CLI functionality testing
+
+- **Release Pipeline** (`release.yml`): Triggers on pushes to main branch
+  - Runs full test suite and formatting checks
+  - Builds cross-platform binaries (Linux, Windows, macOS)
+  - Creates GitHub releases with auto-generated changelog
+  - Uploads compiled binaries as release assets
+
+- **Auto-formatting** (`format.yml`): Manual/scheduled code formatting
+  - Can be triggered manually via GitHub Actions
+  - Automatically formats code using `gofmt`
+  - Commits formatting changes if needed
+
+#### Release Process
+1. Push changes to main branch
+2. All tests must pass
+3. Code must be properly formatted
+4. Automated release created with version tag
+5. Binaries built for multiple platforms
+6. Release notes auto-generated from commits
 
 ## License
 This project is licensed under the Mozilla Public License 2.0 - see the LICENSE file for details.

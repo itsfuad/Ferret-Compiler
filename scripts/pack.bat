@@ -1,4 +1,4 @@
-cd extension
+cd ..\extension
 echo Packing language syntax
 vsce package
-cd ..
+cd ..\scripts

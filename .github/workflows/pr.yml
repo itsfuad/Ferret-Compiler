@@ -1,0 +1,129 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      working-directory: ./compiler
+      run: go mod download
+    
+    - name: Check formatting
+      working-directory: ./compiler
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "❌ The following files are not formatted correctly:"
+          gofmt -s -l .
+          echo ""
+          echo "Please run the following command to fix formatting issues:"
+          echo "cd compiler && gofmt -s -w ."
+          exit 1
+        else
+          echo "✅ All Go files are properly formatted"
+        fi
+    
+    - name: Run go vet
+      working-directory: ./compiler
+      run: |
+        echo "🔍 Running go vet..."
+        go vet ./...
+        echo "✅ go vet passed"
+    
+    - name: Run tests
+      working-directory: ./compiler
+      run: |
+        echo "🧪 Running tests..."
+        go test -v ./...
+        echo "✅ All tests passed"
+    
+    - name: Build compiler
+      working-directory: ./compiler
+      run: |
+        echo "🔨 Building compiler..."
+        go build -v ./cmd
+        echo "✅ Compiler built successfully"
+    
+    - name: Test CLI functionality
+      working-directory: ./compiler
+      run: |
+        echo "🚀 Testing CLI functionality..."
+        go build -o ferret-test ./cmd
+        
+        # Test help message
+        if ! ./ferret-test 2>&1 | grep -q "Usage: ferret"; then
+          echo "❌ CLI help message test failed"
+          exit 1
+        fi
+        
+        # Test init command
+        mkdir -p test-project
+        if ! ./ferret-test init test-project 2>&1 | grep -q "Project configuration initialized"; then
+          echo "❌ CLI init command test failed"
+          exit 1
+        fi
+        
+        # Verify config file was created
+        if [ ! -f "test-project/.ferret.json" ]; then
+          echo "❌ Config file was not created"
+          exit 1
+        fi
+        
+        echo "✅ CLI functionality tests passed"
+        
+        # Cleanup
+        rm -rf test-project ferret-test
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Download dependencies
+      working-directory: ./compiler
+      run: go mod download
+    
+    - name: Install gosec
+      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+    
+    - name: Run Gosec Security Scanner
+      working-directory: ./compiler
+      run: |
+        echo "🔒 Running security scan..."
+        gosec -fmt sarif -out ../gosec.sarif ./... || true
+        echo "✅ Security scan completed"
+    
+    - name: Upload SARIF file
+      if: always()
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: gosec.sarif

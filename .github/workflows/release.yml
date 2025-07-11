@@ -1,0 +1,172 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test-and-format:
+    name: Test and Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      working-directory: ./compiler
+      run: go mod download
+    
+    - name: Check formatting
+      working-directory: ./compiler
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted correctly:"
+          gofmt -s -l .
+          echo "Please run 'gofmt -s -w .' to fix formatting issues."
+          exit 1
+        fi
+    
+    - name: Run go vet
+      working-directory: ./compiler
+      run: go vet ./...
+    
+    - name: Run tests
+      working-directory: ./compiler
+      run: go test -v ./...
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: test-and-format
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Get version from git tag or generate
+      id: version
+      run: |
+        # Check if there's a git tag
+        if git describe --tags --exact-match HEAD 2>/dev/null; then
+          VERSION=$(git describe --tags --exact-match HEAD)
+        else
+          # Generate version based on date and commit
+          VERSION="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Check if release already exists
+      id: check_release
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if gh release view "$VERSION" >/dev/null 2>&1; then
+          echo "Release $VERSION already exists, skipping..."
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build binaries
+      if: steps.check_release.outputs.skip == 'false'
+      working-directory: ./compiler
+      run: |
+        mkdir -p ../releases
+        
+        # Build for different platforms
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../releases/ferret-linux-amd64 ./cmd
+        GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../releases/ferret-windows-amd64.exe ./cmd
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ../releases/ferret-darwin-amd64 ./cmd
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ../releases/ferret-darwin-arm64 ./cmd
+        
+        # Make binaries executable
+        chmod +x ../releases/ferret-*
+    
+    - name: Generate changelog
+      if: steps.check_release.outputs.skip == 'false'
+      id: changelog
+      run: |
+        # Get the last release tag
+        LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -z "$LAST_TAG" ]; then
+          # If no previous tag, get all commits
+          CHANGELOG=$(git log --pretty=format:"- %s" --no-merges)
+        else
+          # Get commits since last tag
+          CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+        fi
+        
+        # Write changelog to file for multiline output
+        echo "$CHANGELOG" > changelog.txt
+        
+        # Prepare release notes
+        cat > release_notes.md << EOF
+        ## What's Changed
+        
+        $CHANGELOG
+        
+        ## Downloads
+        
+        Download the appropriate binary for your platform:
+        - **Linux (x64)**: ferret-linux-amd64
+        - **Windows (x64)**: ferret-windows-amd64.exe
+        - **macOS (Intel)**: ferret-darwin-amd64
+        - **macOS (Apple Silicon)**: ferret-darwin-arm64
+        
+        ## Installation
+        
+        1. Download the binary for your platform
+        2. Rename it to \`ferret\` (or \`ferret.exe\` on Windows)
+        3. Make it executable: \`chmod +x ferret\` (Linux/macOS)
+        4. Move it to a directory in your PATH
+        
+        ## Usage
+        
+        \`\`\`bash
+        # Initialize a new Ferret project
+        ferret init
+        
+        # Compile a Ferret file
+        ferret filename.fer
+        
+        # Compile with debug output
+        ferret filename.fer --debug
+        \`\`\`
+        EOF
+    
+    - name: Create Release
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        gh release create "${{ steps.version.outputs.version }}" \
+          --title "Ferret Compiler ${{ steps.version.outputs.version }}" \
+          --notes-file release_notes.md \
+          releases/ferret-linux-amd64 \
+          releases/ferret-windows-amd64.exe \
+          releases/ferret-darwin-amd64 \
+          releases/ferret-darwin-arm64
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
