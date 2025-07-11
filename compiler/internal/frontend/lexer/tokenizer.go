@@ -1,11 +1,31 @@
 package lexer
 
 import (
-	//Standard packages
-	"compiler/internal/source"
 	"fmt"
 	"os"
 	"regexp"
+
+	"compiler/internal/source"
+)
+
+const (
+	hexDigits = `[0-9a-fA-F]`
+	hexNumber = `0[xX]` + hexDigits + `(?:` + hexDigits + `|_` + hexDigits + `)*`
+
+	octDigits = `[0-7]`
+	octNumber = `0[oO]` + octDigits + `(?:` + octDigits + `|_` + octDigits + `)*`
+
+	binDigits = `[01]`
+	binNumber = `0[bB]` + binDigits + `(?:` + binDigits + `|_` + binDigits + `)*`
+
+	decDigits = `[0-9]`
+	decNumber = decDigits + `(?:` + decDigits + `|_` + decDigits + `)*`
+
+	floatFrac   = `\.` + decDigits + `(?:` + decDigits + `|_` + decDigits + `)*`
+	floatExp    = `[eE][+-]?` + decDigits + `(?:` + decDigits + `|_` + decDigits + `)*`
+	floatNumber = decNumber + `(?:` + floatFrac + `)?(?:` + floatExp + `)?`
+
+	numberPattern = `-?(?:` + hexNumber + `|` + octNumber + `|` + binNumber + `|` + floatNumber + `)`
 )
 
 type regexHandler func(lex *Lexer, regex *regexp.Regexp)
@@ -63,12 +83,12 @@ func createLexer(filePath *string) *Lexer {
 
 		patterns: []regexPattern{
 			//{regexp.MustCompile(`\n`), skipHandler}, // newlines
-			{regexp.MustCompile(`\s+`), skipHandler},              // whitespace
-			{regexp.MustCompile(`\/\/.*`), skipHandler},           // single line comments
-			{regexp.MustCompile(`\/\*[\s\S]*?\*\/`), skipHandler}, // multi line comments
-			{regexp.MustCompile(`"[^"]*"`), stringHandler},        // string literals
-			{regexp.MustCompile(`'[^']'`), byteHandler},           // byte literals
-			{regexp.MustCompile(`-?(?:0[xX][0-9a-fA-F](?:[0-9a-fA-F]|_[0-9a-fA-F])*|0[oO][0-7](?:[0-7]|_[0-7])*|0[bB][01](?:[01]|_[01])*|[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?(?:[eE][+-]?[0-9](?:[0-9]|_[0-9])*)?)`), numberHandler}, // all number formats
+			{regexp.MustCompile(`\s+`), skipHandler},                          // whitespace
+			{regexp.MustCompile(`\/\/.*`), skipHandler},                       // single line comments
+			{regexp.MustCompile(`\/\*[\s\S]*?\*\/`), skipHandler},             // multi line comments
+			{regexp.MustCompile(`"[^"]*"`), stringHandler},                    // string literals
+			{regexp.MustCompile(`'[^']'`), byteHandler},                       // byte literals
+			{regexp.MustCompile(numberPattern), numberHandler},                // numbers (hex, octal, binary, float, integer)
 			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
 			{regexp.MustCompile(`\+\+`), defaultHandler(PLUS_PLUS_TOKEN)},
 			{regexp.MustCompile(`\-\-`), defaultHandler(MINUS_MINUS_TOKEN)},

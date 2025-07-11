@@ -1,6 +1,9 @@
 package resolver
 
 import (
+	"fmt"
+	"os"
+
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
@@ -8,8 +11,6 @@ import (
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/types"
-	"fmt"
-	"os"
 )
 
 type Resolver struct {

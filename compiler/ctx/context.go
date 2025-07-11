@@ -1,16 +1,17 @@
 package ctx
 
 import (
-	"compiler/colors"
-	"compiler/internal/config"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"compiler/colors"
+	"compiler/internal/config"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/report"
+	"compiler/internal/semantic"
 )
 
 var contextCreated = false

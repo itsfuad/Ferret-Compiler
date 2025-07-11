@@ -1,12 +1,13 @@
 package parser
 
 import (
+	"strings"
+
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/utils/numeric"
-	"strings"
 )
 
 func parseNumberLiteral(p *Parser) ast.Expression {

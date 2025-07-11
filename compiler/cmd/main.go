@@ -1,19 +1,20 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	rtdebug "runtime/debug"
+
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/parser"
 
 	//"compiler/internal/semantic"
-	"path/filepath"
 	// "strings"
 
 	"compiler/internal/semantic/resolver"
 	//"compiler/internal/semantic/typecheck"
-	"fmt"
-	"os"
-	rtdebug "runtime/debug"
 )
 
 func Compile(filePath string, debug bool) *ctx.CompilerContext {
@@ -75,8 +76,8 @@ func main() {
 
 	//filename from command line argument
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go <filename>")
-		return
+		fmt.Println("Usage: ferret <filename> [OPTION]")
+		os.Exit(1)
 	}
 
 	debug := false
