@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read        # Required to checkout code
+  pull-requests: write  # Required to comment on PR (if needed)
+
 jobs:
   validate:
     name: Validate PR
