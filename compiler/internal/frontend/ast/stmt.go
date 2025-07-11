@@ -1,6 +1,10 @@
 package ast
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+
 	"compiler/internal/source"
 )
 
@@ -11,6 +15,21 @@ type Program struct {
 	ModulenameToImportpath map[string]string // import alias -> import path
 	Nodes                  []Node
 	source.Location
+}
+
+func (m *Program) SaveAST() error {
+file, err := os.Create(m.FullPath + ".ast.json")
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // pretty-print
+	if err := encoder.Encode(m); err != nil {
+		return fmt.Errorf("failed to encode AST to JSON: %w", err)
+	}
+	return nil
 }
 
 func (m *Program) INode() Node           { return m }

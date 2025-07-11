@@ -20,7 +20,9 @@ import "app/data";
 // - .fer extension is automatically added by the resolver
 // - Remote modules resolve their imports relative to their own repository root
 
-let a = 1;
+let a = 5;
+let b = 10;
+let sum = 1+3;
 
 let name, age : str, i32 = "John", 30;
 

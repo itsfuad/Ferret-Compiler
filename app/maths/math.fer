@@ -1,3 +1,7 @@
 //import "github.com/itsfuad/Ferret-Compiler/code/remote/graphics";
 
 let dummyData = "This is a dummy file for testing purposes.";
+
+let a = 5;
+let b = 10;
+let sum = a + b;

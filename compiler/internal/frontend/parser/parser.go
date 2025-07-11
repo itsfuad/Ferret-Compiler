@@ -298,5 +298,12 @@ func (p *Parser) Parse() *ast.Program {
 	// Add the module to the context
 	p.ctx.AddModule(p.importPath, program)
 
+			//show the ast
+	if p.debug {
+		colors.BLUE.Println("---------- [AST] ----------")
+		program.SaveAST()
+		colors.BLUE.Println("---------- [End of AST] ----------")
+	}
+
 	return program
 }
