@@ -1,14 +1,15 @@
 package parser
 
 import (
+	"fmt"
+	"strings"
+
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/utils/fs"
-	"fmt"
-	"strings"
 )
 
 // parseImport parses an import statement

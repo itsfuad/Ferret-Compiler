@@ -1,5 +1,6 @@
-package test_helpers
+package testutil
 
+// Common error message formats for tests
 const (
 	ErrMsgFmt  = "%s = %v, want %v"
 	ErrNoNodes = "%s: expected nodes, got none"
