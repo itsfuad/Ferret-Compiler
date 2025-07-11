@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
@@ -189,8 +188,6 @@ func declareFunction(p *Parser) *ast.IdentifierExpr {
 }
 
 func parseFunctionDecl(p *Parser) ast.BlockConstruct {
-
-	colors.BLUE.Println("Parsing function declaration")
 
 	// consume the function token
 	start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
