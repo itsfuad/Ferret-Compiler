@@ -1,10 +1,11 @@
 package parser
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/test_helpers"
 	"fmt"
 	"testing"
+
+	"compiler/internal/frontend/ast"
+	"compiler/internal/testutil"
 )
 
 func evaluateTestResult(t *testing.T, r interface{}, nodes []ast.Node, desc string, isValid bool) {
@@ -35,8 +36,8 @@ func evaluateTestResult(t *testing.T, r interface{}, nodes []ast.Node, desc stri
 
 func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) {
 	t.Helper()
-	filePath := test_helpers.CreateTestFileWithContent(t, input)
-	ctx := test_helpers.CreateTestCompilerContext(t, filePath)
+	filePath := testutil.CreateTestFile(t, input)
+	ctx := createTestCompilerContext(t, filePath)
 	defer ctx.Destroy()
 
 	p := NewParser(filePath, ctx, false)

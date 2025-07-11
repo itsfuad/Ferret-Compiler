@@ -1,10 +1,11 @@
 package semantic
 
 import (
+	"fmt"
+
 	"compiler/internal/frontend/ast"
 	"compiler/internal/source"
 	"compiler/internal/types"
-	"fmt"
 )
 
 func getIntType(bitSize uint8) ast.DataType {

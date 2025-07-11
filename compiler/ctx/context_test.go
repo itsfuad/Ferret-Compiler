@@ -1,9 +1,10 @@
 package ctx
 
 import (
-	"compiler/internal/frontend/ast"
 	"reflect"
 	"testing"
+
+	"compiler/internal/frontend/ast"
 )
 
 func TestModuleFunctions(t *testing.T) {

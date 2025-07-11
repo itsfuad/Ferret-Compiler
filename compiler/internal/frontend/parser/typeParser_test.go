@@ -1,11 +1,12 @@
 package parser
 
 import (
+	"testing"
+
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/test_helpers"
+	"compiler/internal/testutil"
 	"compiler/internal/types"
-	"testing"
 )
 
 func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, bitSize uint8, unsigned bool) {
@@ -15,13 +16,13 @@ func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, 
 		t.Fatalf("expected *ast.IntType, got %T", result)
 	}
 	if intType.TypeName != expected {
-		t.Errorf(test_helpers.ErrMsgFmt, "TypeName", intType.TypeName, expected)
+		t.Errorf(testutil.ErrMsgFmt, "TypeName", intType.TypeName, expected)
 	}
 	if intType.BitSize != bitSize {
-		t.Errorf(test_helpers.ErrMsgFmt, "BitSize", intType.BitSize, bitSize)
+		t.Errorf(testutil.ErrMsgFmt, "BitSize", intType.BitSize, bitSize)
 	}
 	if intType.IsUnsigned != unsigned {
-		t.Errorf(test_helpers.ErrMsgFmt, "Unsigned", intType.IsUnsigned, unsigned)
+		t.Errorf(testutil.ErrMsgFmt, "Unsigned", intType.IsUnsigned, unsigned)
 	}
 }
 
@@ -32,10 +33,10 @@ func assertFloatType(t *testing.T, result ast.DataType, expected types.TYPE_NAME
 		t.Fatalf("expected *ast.FloatType, got %T", result)
 	}
 	if floatType.TypeName != expected {
-		t.Errorf(test_helpers.ErrMsgFmt, "TypeName", floatType.TypeName, expected)
+		t.Errorf(testutil.ErrMsgFmt, "TypeName", floatType.TypeName, expected)
 	}
 	if floatType.BitSize != bitSize {
-		t.Errorf(test_helpers.ErrMsgFmt, "BitSize", floatType.BitSize, bitSize)
+		t.Errorf(testutil.ErrMsgFmt, "BitSize", floatType.BitSize, bitSize)
 	}
 }
 
@@ -45,7 +46,7 @@ func assertType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, inp
 		t.Fatalf("parseType() returned nil for input %s", input)
 	}
 	if result.Type() != expected {
-		t.Errorf(test_helpers.ErrMsgFmt, "Type()", result.Type(), expected)
+		t.Errorf(testutil.ErrMsgFmt, "Type()", result.Type(), expected)
 	}
 }
 
@@ -69,7 +70,7 @@ func TestParseIntegerType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
+			filePath := testutil.CreateTestFile(t, tt.input)
 			p := &Parser{
 				tokens:   lexer.Tokenize(filePath, false),
 				tokenNo:  0,
@@ -102,7 +103,7 @@ func TestParseFloatType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
+			filePath := testutil.CreateTestFile(t, tt.input)
 			p := &Parser{
 				tokens:   lexer.Tokenize(filePath, false),
 				tokenNo:  0,
@@ -210,7 +211,7 @@ func TestParseType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			filePath := test_helpers.CreateTestFileWithContent(t, tt.input)
+			filePath := testutil.CreateTestFile(t, tt.input)
 			p := &Parser{
 				tokens:   lexer.Tokenize(filePath, false),
 				tokenNo:  0,
