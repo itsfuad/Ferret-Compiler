@@ -18,7 +18,7 @@ type Program struct {
 }
 
 func (m *Program) SaveAST() error {
-file, err := os.Create(m.FullPath + ".ast.json")
+	file, err := os.Create(m.FullPath + ".ast.json")
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

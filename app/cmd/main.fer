@@ -58,3 +58,6 @@ let scientific : f64 = 1.23e4; // 1.23 * 10^4
 // }
 
 let cxx : data::MyType = data::kk;
+
+//let someValue = laterDeclaredValue;
+let laterDeclaredValue = "This value is declared later in the code.";
