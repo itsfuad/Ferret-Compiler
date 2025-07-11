@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	rtdebug "runtime/debug"
+	"runtime/debug"
 
 	"compiler/colors"
 	"compiler/ctx"
@@ -14,11 +14,12 @@ import (
 	//"compiler/internal/semantic"
 	// "strings"
 
+	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/resolver"
 	//"compiler/internal/semantic/typecheck"
 )
 
-func Compile(filePath string, debug bool) *ctx.CompilerContext {
+func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 	fullPath, err := filepath.Abs(filePath)
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
@@ -33,7 +34,7 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 		if r := recover(); r != nil {
 			colors.ORANGE.Println("PANIC occurred:", r)
 			fmt.Println("Stack trace:")
-			rtdebug.PrintStack()
+			debug.PrintStack()
 		}
 	}()
 
@@ -45,19 +46,19 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 		return context
 	}
 
-	if debug {
+	if isDebugEnabled {
 		colors.BLUE.Printf("---------- [Parsing done] ----------\n")
 	}
 
 	// Run resolver
-	res := resolver.NewResolver(program, context, debug)
-	res.ResolveProgram()
+	anz := analyzer.NewAnalyzerNode(program, context, isDebugEnabled)
+	resolver.ResolveProgram(anz)
 
 	if context.Reports.HasErrors() {
 		panic("Compilation stopped due to errors")
 	}
 
-	if debug {
+	if isDebugEnabled {
 		colors.GREEN.Println("---------- [Resolver done] ----------")
 	}
 
