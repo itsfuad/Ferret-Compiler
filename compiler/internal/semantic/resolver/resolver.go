@@ -156,6 +156,9 @@ func resolveExpressionStmt(r *analyzer.AnalyzerNode, stmt *ast.ExpressionStmt) {
 }
 
 func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression) {
+	if expr == nil {
+		panic("resolveExpr called with nil expression")
+	}
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
 		resolveIdentifierExpr(r, e)
@@ -200,7 +203,19 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression) {
 }
 
 func resolveIdentifierExpr(r *analyzer.AnalyzerNode, iden *ast.IdentifierExpr) {
-	if _, found := r.Ctx.Modules[r.Program.FullPath].SymbolTable.Lookup(iden.Name); !found {
+
+	module, moduleExists := r.Ctx.Modules[r.Program.ImportPath]
+	if !moduleExists {
+		fmt.Printf("[Resolver] Module not found for path: %s\n", r.Program.FullPath)
+		return
+	}
+
+	if module.SymbolTable == nil {
+		fmt.Printf("[Resolver] SymbolTable is nil for module: %s\n", r.Program.FullPath)
+		return
+	}
+
+	if _, found := module.SymbolTable.Lookup(iden.Name); !found {
 		r.Ctx.Reports.Add(r.Program.FullPath, iden.Loc(), "undeclared variable: "+iden.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 	}
 }
