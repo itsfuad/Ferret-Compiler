@@ -25,7 +25,6 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	fullPath = filepath.ToSlash(fullPath) // Ensure forward slashes for consistency
 
 	context := ctx.NewCompilerContext(fullPath)
-	fmt.Printf("Program full path: %s\n", fullPath)
 
 	defer func() {
 		context.Reports.DisplayAll()
@@ -36,32 +35,29 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 		}
 	}()
 
-	fmt.Printf("Passing file '%s' to parser...\n", fullPath)
-
 	p := parser.NewParser(fullPath, context, true)
-	fmt.Println("DEBUG: Parser created, starting parse...")
 	program := p.Parse()
-	fmt.Println("DEBUG: Parse completed")
 
 	if program == nil {
 		colors.RED.Println("Failed to parse the program.")
 		return context
 	}
 
-	fmt.Println("DEBUG: Starting resolver...")
+	if debug {
+		colors.BLUE.Printf("---------- [Parsing done] ----------\n")
+	}
+
 	// Run resolver
 	res := resolver.NewResolver(program, context, debug)
-	fmt.Println("DEBUG: Resolver created, starting resolution...")
 	res.ResolveProgram()
-	fmt.Println("DEBUG: Resolution completed")
 
 	if context.Reports.HasErrors() {
-		fmt.Println("DEBUG: Errors found, stopping compilation...")
 		panic("Compilation stopped due to errors")
 	}
 
-	colors.GREEN.Println("Resolver done!")
-	fmt.Println("DEBUG: Compile function completing...")
+	if debug {
+		colors.GREEN.Println("---------- [Resolver done] ----------")
+	}
 
 	// // --- Type Checking ---
 	// // Pass resolver's symbol tables and alias map to typechecker
@@ -72,7 +68,6 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	// 	return context
 	// }
 
-	fmt.Println("DEBUG: Returning context from Compile function")
 	return context
 }
 

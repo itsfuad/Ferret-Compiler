@@ -14,11 +14,11 @@ import (
 )
 
 type Parser struct {
-	tokens                 	[]lexer.Token
-	tokenNo                	int
-	fullPath               	string
-	importPath             	string
-	modulename			  	string // module name derived from full path
+	tokens                 []lexer.Token
+	tokenNo                int
+	fullPath               string
+	importPath             string
+	modulename             string            // module name derived from full path
 	modulenameToImportpath map[string]string // import alias -> full path
 	ctx                    *ctx.CompilerContext
 	debug                  bool // debug mode for additional logging
@@ -34,8 +34,6 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 	}
 
 	filePath = filepath.ToSlash(filePath) // Ensure forward slashes for consistency
-	fmt.Printf("Project root: %s\n", ctxx.ProjectRoot)
-	fmt.Printf("File path: %s\n", filePath)
 
 	if !fs.IsValidFile(filePath) {
 		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
@@ -44,8 +42,6 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 	//relative path to the file
 	importPath := ctxx.FullPathToImportPath(filePath)
 	modulename := ctxx.FullPathToModuleName(filePath)
-
-	colors.ORANGE.Printf("New Parser: %s -> %s\n", filePath, importPath)
 
 	tokens := lexer.Tokenize(filePath, false)
 
@@ -282,22 +278,24 @@ func (p *Parser) Parse() *ast.Program {
 		return &ast.Program{}
 	}
 
-	fmt.Printf("Saving import path mapping: %s -> %s\n", p.importPath, p.fullPath)
-
 	// Finish tracking the entry point parsing
 	p.ctx.FinishParsing(p.fullPath)
 
+	if p.debug {
+		colors.BLUE.Printf("Parsed '%s'\n", p.fullPath)
+	}
+
 	program := &ast.Program{
-		Nodes:      nodes,
-		FullPath:   p.fullPath,
-		ImportPath: p.importPath,
-		Modulename: p.modulename,
+		Nodes:                  nodes,
+		FullPath:               p.fullPath,
+		ImportPath:             p.importPath,
+		Modulename:             p.modulename,
 		ModulenameToImportpath: p.modulenameToImportpath,
-		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
+		Location:               *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 
 	// Add the module to the context
 	p.ctx.AddModule(p.importPath, program)
-	
+
 	return program
 }
