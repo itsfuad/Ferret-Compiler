@@ -35,7 +35,7 @@ func TestInitCommand(t *testing.T) {
 
 	// Check that config file was created
 	configPath := filepath.Join(tempDir, ".ferret.json")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.FromSlash(configPath)); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}
 
