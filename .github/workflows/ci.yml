@@ -41,8 +41,10 @@ jobs:
       run: go test -v ./...
     
     - name: Build compiler
-      working-directory: ./compiler
-      run: go build -v ./cmd
+      working-directory: ./compiler/cmd
+      run: |
+        mkdir -p ../../bin
+        go build -o ../../bin/ferret -ldflags "-s -w" -trimpath -v
   
   format:
     name: Format Check
