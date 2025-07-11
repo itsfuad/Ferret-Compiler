@@ -67,24 +67,28 @@ jobs:
       working-directory: ./compiler
       run: |
         echo "🔨 Building compiler..."
-        go build -v ./cmd
+        mkdir -p ../bin
+        cd cmd
+        go build -o ../../bin/ferret -ldflags "-s -w" -trimpath -v
         echo "✅ Compiler built successfully"
     
     - name: Test CLI functionality
       working-directory: ./compiler
       run: |
         echo "🚀 Testing CLI functionality..."
-        go build -o ferret-test ./cmd
+        
+        # Use the binary built in the previous step
+        FERRET_BIN="../bin/ferret"
         
         # Test help message
-        if ! ./ferret-test 2>&1 | grep -q "Usage: ferret"; then
+        if ! $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
           echo "❌ CLI help message test failed"
           exit 1
         fi
         
         # Test init command
         mkdir -p test-project
-        if ! ./ferret-test init test-project 2>&1 | grep -q "Project configuration initialized"; then
+        if ! $FERRET_BIN init test-project 2>&1 | grep -q "Project configuration initialized"; then
           echo "❌ CLI init command test failed"
           exit 1
         fi
@@ -98,7 +102,7 @@ jobs:
         echo "✅ CLI functionality tests passed"
         
         # Cleanup
-        rm -rf test-project ferret-test
+        rm -rf test-project
 
   security:
     name: Security Scan

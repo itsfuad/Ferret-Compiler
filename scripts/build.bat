@@ -1,4 +1,4 @@
 @echo off
 cd ..\compiler\cmd
 
-go build -o ../bin/ferret.exe -ldflags "-s -w" -trimpath -v
+go build -o ../../bin/ferret.exe -ldflags "-s -w" -trimpath -v
