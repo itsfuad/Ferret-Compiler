@@ -1,8 +1,7 @@
 # Ferret Programming Language
 
-[![CI](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/ci.yml/badge.svg)](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/ci.yml)
-[![Release](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/release.yml/badge.svg)](https://github.com/itsfuad/Ferret-Programming-Language/actions/workflows/release.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/itsfuad/Ferret-Programming-Language)](https://goreportcard.com/report/github.com/itsfuad/Ferret-Programming-Language)
+[![CI](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/ci.yml)
+[![Release](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/release.yml/badge.svg)](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/release.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
 Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming language designed to bring clarity, simplicity, and expressiveness to developers. With a focus on readability and a clean syntax, Ferret makes it easier to write clear, maintainable code while embracing modern programming principles.
