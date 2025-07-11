@@ -9,7 +9,7 @@ import (
 
 const CONFIG_FILE = ".ferret.json"
 
-// ProjectConfig represents the structure of ferret.project.json
+// ProjectConfig represents the structure
 type ProjectConfig struct {
 	Compiler     CompilerConfig   `json:"compiler"`
 	Cache        CacheConfig      `json:"cache"`
