@@ -18,7 +18,7 @@ func IsRemote(importPath string) bool {
 
 // Check if file exists and is a regular file
 func IsValidFile(filename string) bool {
-	fileInfo, err := os.Stat(filename)
+	fileInfo, err := os.Stat(filepath.FromSlash(filename))
 	return err == nil && fileInfo.Mode().IsRegular()
 }
 
@@ -44,20 +44,32 @@ func GitHubPathToRawURL(importPath, defaultBranch string) (string, string) {
 }
 
 func FirstPart(path string) string {
-	// Normalize all separators to OS-specific
-	clean := filepath.ToSlash(path) // Use ToSlash for uniform splitting
-	parts := strings.Split(clean, "/")
-	if len(parts) > 0 {
+	if path == "" {
+		return ""
+	}
+
+	// Handle both forward slashes and backslashes explicitly
+	// Replace all backslashes with forward slashes for uniform processing
+	normalized := strings.ReplaceAll(path, "\\", "/")
+	parts := strings.Split(normalized, "/")
+
+	if len(parts) > 0 && parts[0] != "" {
 		return parts[0]
 	}
 	return ""
 }
 
 func LastPart(path string) string {
-	// Normalize all separators to OS-specific
-	clean := filepath.ToSlash(path) // Use ToSlash for uniform splitting
-	parts := strings.Split(clean, "/")
-	if len(parts) > 0 {
+	if path == "" {
+		return ""
+	}
+
+	// Handle both forward slashes and backslashes explicitly
+	// Replace all backslashes with forward slashes for uniform processing
+	normalized := strings.ReplaceAll(path, "\\", "/")
+	parts := strings.Split(normalized, "/")
+
+	if len(parts) > 0 && parts[len(parts)-1] != "" {
 		return parts[len(parts)-1]
 	}
 	return ""

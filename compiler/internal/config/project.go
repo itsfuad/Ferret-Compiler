@@ -72,13 +72,13 @@ func CreateDefaultProjectConfig(projectRoot string) error {
 // IsProjectRoot checks if the given directory contains a .json file
 func IsProjectRoot(dir string) bool {
 	configPath := filepath.Join(dir, CONFIG_FILE)
-	_, err := os.Stat(configPath)
+	_, err := os.Stat(filepath.FromSlash(configPath))
 	return err == nil
 }
 
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	configPath := filepath.Join(projectRoot, CONFIG_FILE)
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(filepath.FromSlash(configPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -96,7 +96,7 @@ func FindProjectRoot(entryFile string) (string, error) {
 	dir := filepath.Dir(entryFile)
 	for {
 		configPath := filepath.Join(dir, CONFIG_FILE)
-		if _, err := os.Stat(configPath); err == nil {
+		if _, err := os.Stat(filepath.FromSlash(configPath)); err == nil {
 			return filepath.ToSlash(dir), nil
 		}
 		parent := filepath.Dir(dir)
