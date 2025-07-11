@@ -9,10 +9,11 @@ import (
 	"path/filepath"
 	// "strings"
 
-	//"compiler/internal/semantic/resolver"
+	"compiler/internal/semantic/resolver"
 	//"compiler/internal/semantic/typecheck"
 	"fmt"
 	"os"
+	rtdebug "runtime/debug"
 )
 
 func Compile(filePath string, debug bool) *ctx.CompilerContext {
@@ -29,37 +30,38 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	defer func() {
 		context.Reports.DisplayAll()
 		if r := recover(); r != nil {
-			colors.ORANGE.Println(r)
+			colors.ORANGE.Println("PANIC occurred:", r)
+			fmt.Println("Stack trace:")
+			rtdebug.PrintStack()
 		}
 	}()
 
 	fmt.Printf("Passing file '%s' to parser...\n", fullPath)
 
-	// Start tracking the entry point parsing
-	context.StartParsing(fullPath)
-
 	p := parser.NewParser(fullPath, context, true)
+	fmt.Println("DEBUG: Parser created, starting parse...")
 	program := p.Parse()
-
-	// Finish tracking the entry point parsing
-	context.FinishParsing(fullPath)
+	fmt.Println("DEBUG: Parse completed")
 
 	if program == nil {
 		colors.RED.Println("Failed to parse the program.")
 		return context
 	}
 
-	// context.AddModule(moduleName, program)
-
+	fmt.Println("DEBUG: Starting resolver...")
 	// Run resolver
-	// res := resolver.NewResolver(program, context, debug)
-	// res.ResolveProgram()
+	res := resolver.NewResolver(program, context, debug)
+	fmt.Println("DEBUG: Resolver created, starting resolution...")
+	res.ResolveProgram()
+	fmt.Println("DEBUG: Resolution completed")
 
-	// if context.Reports.HasErrors() {
-	// 	panic("")
-	// }
+	if context.Reports.HasErrors() {
+		fmt.Println("DEBUG: Errors found, stopping compilation...")
+		panic("Compilation stopped due to errors")
+	}
 
-	// colors.GREEN.Println("Resolver done!")
+	colors.GREEN.Println("Resolver done!")
+	fmt.Println("DEBUG: Compile function completing...")
 
 	// // --- Type Checking ---
 	// // Pass resolver's symbol tables and alias map to typechecker
@@ -70,6 +72,7 @@ func Compile(filePath string, debug bool) *ctx.CompilerContext {
 	// 	return context
 	// }
 
+	fmt.Println("DEBUG: Returning context from Compile function")
 	return context
 }
 
