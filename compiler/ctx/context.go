@@ -23,10 +23,9 @@ type Module struct {
 type CompilerContext struct {
 	EntryPoint        string                // Entry point file
 	Builtins          *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules           map[string]*Module    // key: ModuleKey.String()
+	Modules           map[string]*Module    // key: import path
 	Reports           report.Reports
 	CachePath         string
-	AliasToModuleName map[string]string // import alias -> file path
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 	// Track modules that are currently being parsed to prevent infinite recursion
@@ -104,25 +103,25 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 	return nil
 }
 
-func (c *CompilerContext) GetModule(key string) *Module {
+func (c *CompilerContext) GetModule(importPath string) *Module {
 	if c.Modules == nil {
 		return nil
 	}
-	module, exists := c.Modules[key]
+	module, exists := c.Modules[importPath]
 	if !exists {
 		return nil
 	}
 	return module
 }
 
-func (c *CompilerContext) RemoveModule(key string) {
+func (c *CompilerContext) RemoveModule(importPath string) {
 	if c.Modules == nil {
 		return
 	}
-	if _, exists := c.Modules[key]; !exists {
+	if _, exists := c.Modules[importPath]; !exists {
 		return
 	}
-	delete(c.Modules, key)
+	delete(c.Modules, importPath)
 }
 
 func (c *CompilerContext) ModuleCount() int {
@@ -159,47 +158,47 @@ func (c *CompilerContext) ModuleNames() []string {
 	return names
 }
 
-func (c *CompilerContext) HasModule(moduleName string) bool {
+func (c *CompilerContext) HasModule(importPath string) bool {
 	if c.Modules == nil {
 		return false
 	}
-	_, exists := c.Modules[moduleName]
+	_, exists := c.Modules[importPath]
 	return exists
 }
 
-func (c *CompilerContext) AddModule(moduleName string, module *ast.Program) {
-	colors.GREEN.Printf("Adding module: Key: %s, FilePath: %s\n", moduleName, module.FullPath)
+func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
+	colors.BRIGHT_BROWN.Printf("Adding module: Key: %s, FilePath: %s\n", importPath, module.FullPath)
 	if c.Modules == nil {
 		c.Modules = make(map[string]*Module)
 	}
-	if _, exists := c.Modules[moduleName]; exists {
+	if _, exists := c.Modules[importPath]; exists {
 		return
 	}
 	if module == nil {
-		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", moduleName))
+		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
-	c.Modules[moduleName] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
+	c.Modules[importPath] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
 }
 
 // IsModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) IsModuleParsing(modulePath string) bool {
+func (c *CompilerContext) IsModuleParsing(importPath string) bool {
 	if c.ParsingModules == nil {
 		return false
 	}
-	return c.ParsingModules[modulePath]
+	return c.ParsingModules[importPath]
 }
 
 // GetCyclePath returns the cycle path if the given module is already being parsed
 // Returns the complete path from the entry point, showing the full import chain
-func (c *CompilerContext) GetCyclePath(modulePath string) ([]string, bool) {
-	if !c.IsModuleParsing(modulePath) {
+func (c *CompilerContext) GetCyclePath(importPath string) ([]string, bool) {
+	if !c.IsModuleParsing(importPath) {
 		return nil, false
 	}
 
 	// Find the first occurrence of the module that creates the cycle
 	cycleStartIndex := -1
 	for i, stackModule := range c.ParsingStack {
-		if stackModule == modulePath {
+		if stackModule == importPath {
 			cycleStartIndex = i
 			break
 		}
@@ -216,7 +215,7 @@ func (c *CompilerContext) GetCyclePath(modulePath string) ([]string, bool) {
 }
 
 // StartParsing marks a module as currently being parsed
-func (c *CompilerContext) StartParsing(modulePath string) {
+func (c *CompilerContext) StartParsing(importPath string) {
 	if c.ParsingModules == nil {
 		c.ParsingModules = make(map[string]bool)
 	}
@@ -224,18 +223,18 @@ func (c *CompilerContext) StartParsing(modulePath string) {
 		c.ParsingStack = make([]string, 0)
 	}
 
-	c.ParsingModules[modulePath] = true
-	c.ParsingStack = append(c.ParsingStack, modulePath)
+	c.ParsingModules[importPath] = true
+	c.ParsingStack = append(c.ParsingStack, importPath)
 }
 
 // FinishParsing marks a module as no longer being parsed
-func (c *CompilerContext) FinishParsing(modulePath string) {
+func (c *CompilerContext) FinishParsing(importPath string) {
 	if c.ParsingModules != nil {
-		delete(c.ParsingModules, modulePath)
+		delete(c.ParsingModules, importPath)
 	}
 
 	// Remove from stack (should be the last element)
-	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == modulePath {
+	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == importPath {
 		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
 	}
 }
@@ -277,7 +276,6 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 		Builtins:          semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
 		Modules:           make(map[string]*Module),
 		Reports:           report.Reports{},
-		AliasToModuleName: make(map[string]string),
 		CachePath:         cachePath,
 		ProjectConfig:     projectConfig,
 		ProjectRoot:       root,
@@ -370,12 +368,23 @@ func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
 	return cycle, found
 }
 
-func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
+func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil {
-		return fullPath // Fallback to full path if relative path cannot be determined
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return ""
 	}
 	relPath = filepath.ToSlash(relPath)
 	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-	return moduleName
+	rootName := filepath.Base(c.ProjectRoot)
+	return rootName + "/" + moduleName
+}
+
+
+func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
+	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return ""
+	}
+	filename := filepath.Base(fullPath)
+	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }

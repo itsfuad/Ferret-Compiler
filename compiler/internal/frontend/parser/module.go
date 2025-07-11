@@ -40,12 +40,6 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importToken.End)
 
-	// moduleFullPath, err := fs.ResolveModule(importpath, p.fullPath, p.ctx)
-	// if err != nil {
-	// 	p.ctx.Reports.Add(p.fullPath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
-	// 	return nil
-	// }
-
 	moduleFullPath, err := fs.ResolveModule(importpath, p.fullPath, p.ctx)
 	if err != nil {
 		p.ctx.Reports.Add(p.fullPath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
@@ -97,28 +91,17 @@ func parseImport(p *Parser) ast.Node {
 
 	// Check if the module is already cached
 	if !p.ctx.HasModule(importpath) {
-		// Mark this module as being parsed to prevent infinite recursion
-		p.ctx.StartParsing(moduleFullPath)
-
 		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
-
-		// Mark parsing as finished
-		p.ctx.FinishParsing(moduleFullPath)
-
 		if module == nil {
 			p.ctx.Reports.Add(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			return &ast.ImportStmt{Location: loc}
 		}
-
-		p.ctx.AddModule(importpath, module)
-		colors.GREEN.Printf("Cached <- Module '%s'\n", importpath)
-	} else {
-		colors.ORANGE.Printf("Skipping module '%s' : Already cached\n", importpath)
 	}
 
-	p.ctx.AliasToModuleName[moduleName] = importpath
+	p.modulenameToImportpath[moduleName] = importpath
 
-	fmt.Printf("Parsing import: %s -> %s\n", p.ctx.FullPathToModuleName(p.fullPath), importpath)
+	colors.YELLOW.Println("Parsing import")
+	fmt.Printf("Full path: %s, Module name: %s, Import path: %s\n", moduleFullPath, moduleName, importpath)
 
 	return stmt
 }

@@ -40,7 +40,7 @@ func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
 	for _, node := range prog.Nodes {
 		if imp, ok := node.(*ast.ImportStmt); ok {
 			if imp.ModuleName != "" && imp.FullPath != "" {
-				tc.ctx.AliasToModuleName[imp.ModuleName] = imp.FullPath
+				tc.program.ModulenameToImportpath[imp.ModuleName] = imp.FullPath
 				if tc.Debug {
 					fmt.Printf("[TypeChecker] Import alias: %s -> %s\n", imp.ModuleName, imp.FullPath)
 				}
@@ -105,14 +105,14 @@ func (tc *TypeChecker) CheckImport(n *ast.ImportStmt) {
 	if tc.CheckedMods[alias] {
 		return
 	}
-	modAST := tc.ctx.GetModule(tc.ctx.AliasToModuleName[alias]).AST
+	modAST := tc.ctx.GetModule(tc.program.ModulenameToImportpath[alias]).AST
 	if modAST == nil {
-		modAST = tc.ctx.GetModule(tc.ctx.AliasToModuleName[alias]).AST
+		modAST = tc.ctx.GetModule(tc.program.ModulenameToImportpath[alias]).AST
 	}
 	if modAST == nil {
-		tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("module not found for alias '%s' (file: %s)", alias, tc.ctx.AliasToModuleName[alias]), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("module not found for alias '%s' (file: %s)", alias, tc.program.ModulenameToImportpath[alias]), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		if tc.Debug {
-			fmt.Printf("[TypeChecker] Module file '%s' not found for alias '%s'\n", tc.ctx.AliasToModuleName[alias], alias)
+			fmt.Printf("[TypeChecker] Module file '%s' not found for alias '%s'\n", tc.program.ModulenameToImportpath[alias], alias)
 		}
 		return
 	}
