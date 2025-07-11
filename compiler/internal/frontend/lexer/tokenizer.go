@@ -1,11 +1,11 @@
 package lexer
 
 import (
-	//Standard packages
-	"compiler/internal/source"
 	"fmt"
 	"os"
 	"regexp"
+
+	"compiler/internal/source"
 )
 
 type regexHandler func(lex *Lexer, regex *regexp.Regexp)

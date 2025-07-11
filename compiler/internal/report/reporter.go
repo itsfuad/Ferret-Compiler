@@ -1,14 +1,14 @@
 package report
 
 import (
-	"compiler/colors"
-	"compiler/internal/source"
-
-	//"compiler/internal/symboltable"
-	_strings "compiler/internal/utils/strings"
 	"fmt"
 	"os"
 	"strings"
+
+	"compiler/colors"
+	"compiler/internal/source"
+	//"compiler/internal/symboltable"
+	_strings "compiler/internal/utils/strings"
 )
 
 type REPORT_TYPE string

@@ -1,10 +1,11 @@
 package fs
 
 import (
-	"compiler/ctx"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"compiler/ctx"
 )
 
 func TestIsRemote(t *testing.T) {
