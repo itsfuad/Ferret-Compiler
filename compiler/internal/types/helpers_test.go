@@ -1,8 +1,9 @@
 package types
 
 import (
-	"compiler/internal/utils/numeric"
 	"testing"
+
+	"compiler/internal/utils/numeric"
 )
 
 func TestIsInteger(t *testing.T) {

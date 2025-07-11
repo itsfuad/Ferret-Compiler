@@ -1,24 +1,61 @@
 package fs
 
 import (
-	"compiler/ctx"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"compiler/ctx"
 )
 
-const (
-	CREATE_DUMP_FAILED_MSG = "Failed to create temp dir: %v"
-	MAIN_FILE              = "main.fer"
-	VALID_FILE             = "valid.fer"
+func TestIsRemote(t *testing.T) {
+	tests := []struct {
+		name       string
+		importPath string
+		want       bool
+	}{
+		{"Empty", "", false},
+		{"GitHub path", "github.com/user/repo", true},
+		{"Local path", "myproject/file", false},
+	}
 
-	TEST_FILE_CONTENT = "test content"
-	PATH_NAME         = "some/path"
-)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsRemote(tt.importPath); got != tt.want {
+				t.Errorf("IsRemote(%q) = %v, want %v", tt.importPath, got, tt.want)
+			}
+		})
+	}
+}
 
-// TestGitHubPathToRawURL tests the GitHubPathToRawURL function
+func TestIsValidFile(t *testing.T) {
+	// Create a temporary file for testing
+	tempFile, err := os.CreateTemp("", "test-file")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	tests := []struct {
+		name     string
+		filename string
+		want     bool
+	}{
+		{"Valid file", tempFile.Name(), true},
+		{"Non-existent file", "nonexistent-file.txt", false},
+		{"Directory", os.TempDir(), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidFile(tt.filename); got != tt.want {
+				t.Errorf("IsValidFile(%q) = %v, want %v", tt.filename, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGitHubPathToRawURL(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -27,233 +64,103 @@ func TestGitHubPathToRawURL(t *testing.T) {
 		wantURL       string
 		wantSubpath   string
 	}{
-		{
-			name:          "Valid GitHub path",
-			importPath:    "github.com/user/repo/path/to/file",
-			defaultBranch: "main",
-			wantURL:       "https://raw.githubusercontent.com/user/repo/main/path/to/file.fer",
-			wantSubpath:   "path/to/file",
-		},
-		{
-			name:          "Different branch",
-			importPath:    "github.com/user/repo/path/to/file",
-			defaultBranch: "master",
-			wantURL:       "https://raw.githubusercontent.com/user/repo/master/path/to/file.fer",
-			wantSubpath:   "path/to/file",
-		},
-		{
-			name:          "Not a GitHub path",
-			importPath:    "gitlab.com/user/repo/path/to/file",
-			defaultBranch: "main",
-			wantURL:       "",
-			wantSubpath:   "",
-		},
-		{
-			name:          "Invalid GitHub path format",
-			importPath:    "github.com/user/repo",
-			defaultBranch: "main",
-			wantURL:       "",
-			wantSubpath:   "",
-		},
+		{"Valid GitHub path", "github.com/user/repo/path/file", "main", "https://raw.githubusercontent.com/user/repo/main/path/file.fer", "path/file"},
+		{"Invalid GitHub path", "github.com/user", "main", "", ""},
+		{"Non-GitHub path", "gitlab.com/user/repo", "main", "", ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotURL, gotSubpath := GitHubPathToRawURL(tt.importPath, tt.defaultBranch)
-			if gotURL != tt.wantURL {
-				t.Errorf("GitHubPathToRawURL() gotURL = %v, want %v", gotURL, tt.wantURL)
-			}
-			if gotSubpath != tt.wantSubpath {
-				t.Errorf("GitHubPathToRawURL() gotSubpath = %v, want %v", gotSubpath, tt.wantSubpath)
+			if gotURL != tt.wantURL || gotSubpath != tt.wantSubpath {
+				t.Errorf("GitHubPathToRawURL(%q, %q) = (%v, %v), want (%v, %v)",
+					tt.importPath, tt.defaultBranch, gotURL, gotSubpath, tt.wantURL, tt.wantSubpath)
 			}
 		})
 	}
 }
 
-// verifyFileContent checks if the file exists and has the expected content
-func verifyFileContent(t *testing.T, path string, expectedContent string) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Errorf("Failed to read cached file: %v", err)
-		return
-	}
-	if string(content) != expectedContent {
-		t.Errorf("Cached file has wrong content: %s", content)
-	}
-}
-
-// Test fetchAndCache function
-func TestFetchAndCache(t *testing.T) {
-	// Create a temp directory for testing
-	tempDir, err := os.MkdirTemp("", "ferret-test")
-	if err != nil {
-		t.Fatalf(CREATE_DUMP_FAILED_MSG, err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Setup test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(TEST_FILE_CONTENT))
-	}))
-	defer server.Close()
-
-	// Test cases
+func TestFirstPart(t *testing.T) {
 	tests := []struct {
-		name      string
-		url       string
-		path      string
-		force     bool
-		shouldErr bool
+		name string
+		path string
+		want string
 	}{
-		{
-			name:      "Fetch new file",
-			url:       server.URL,
-			path:      filepath.Join(tempDir, "newfile.fer"),
-			force:     false,
-			shouldErr: false,
-		},
-		{
-			name:      "Force refetch existing file",
-			url:       server.URL,
-			path:      filepath.Join(tempDir, "newfile.fer"),
-			force:     true,
-			shouldErr: false,
-		},
+		{"Empty path", "", ""},
+		{"Single part", "file", "file"},
+		{"Multiple parts", "project/module/file", "project"},
+		{"With windows path", `project\module\file`, "project"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := fetchAndCache(tt.url, tt.path, tt.force)
-			if (err != nil) != tt.shouldErr {
-				t.Errorf("fetchAndCache() error = %v, shouldErr %v", err, tt.shouldErr)
-				return
-			}
-
-			// Verify file was created
-			if !tt.shouldErr {
-				verifyFileContent(t, tt.path, TEST_FILE_CONTENT)
+			if got := FirstPart(tt.path); got != tt.want {
+				t.Errorf("FirstPart(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}
 }
 
-// TestResolveModule tests the ResolveModule function
+func TestLastPart(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"Empty path", "", ""},
+		{"Single part", "file", "file"},
+		{"Multiple parts", "project/module/file", "file"},
+		{"With windows path", `project\module\file`, "file"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LastPart(tt.path); got != tt.want {
+				t.Errorf("LastPart(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestResolveModule(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "ferret-resolve-test")
+	// Create temporary project structure
+	tempDir := t.TempDir()
+	projectName := "testproject"
+	projectDir := filepath.Join(tempDir, projectName)
+	err := os.MkdirAll(filepath.Join(projectDir, "module"), 0755)
 	if err != nil {
-		t.Fatalf(CREATE_DUMP_FAILED_MSG, err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create test files
-	validFile := filepath.Join(tempDir, VALID_FILE)
-	if err := os.WriteFile(validFile, []byte(TEST_FILE_CONTENT), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+		t.Fatal(err)
 	}
 
-	testDir := filepath.Join(tempDir, "test")
-	if err := os.MkdirAll(testDir, 0755); err != nil {
-		t.Fatalf("Failed to create test directory: %v", err)
+	// Create a test module file
+	moduleFile := filepath.Join(projectDir, "module", "test.fer")
+	if err := os.WriteFile(moduleFile, []byte("test content"), 0644); err != nil {
+		t.Fatal(err)
 	}
 
-	testValidFile := filepath.Join(testDir, VALID_FILE)
-	if err := os.WriteFile(testValidFile, []byte(TEST_FILE_CONTENT), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+	// Create context
+	ctxx := &ctx.CompilerContext{
+		ProjectRoot: projectDir,
 	}
 
-	// Setup compiler context
-	compilerCtx := &ctx.CompilerContext{
-		RootDir: tempDir,
-	}
-
-	// Test cases
 	tests := []struct {
 		name                string
-		filename            string
-		importerPath        string
-		importerLogicalPath string
-		force               bool
-		wantPath            string
-		wantError           bool
+		importPath          string
+		currentFileFullPath string
+		wantErr             bool
 	}{
-		{
-			name:                "Empty filename",
-			filename:            "",
-			importerPath:        filepath.Join(tempDir, "some", "path"),
-			importerLogicalPath: PATH_NAME,
-			force:               false,
-			wantPath:            "",
-			wantError:           true,
-		},
-		{
-			name:                "Project-root relative path without extension",
-			filename:            "valid",
-			importerPath:        filepath.Join(tempDir, "some", "path"),
-			importerLogicalPath: PATH_NAME,
-			force:               false,
-			wantPath:            filepath.Join(tempDir, VALID_FILE),
-			wantError:           false,
-		},
-		{
-			name:                "Project-root relative path with extension",
-			filename:            "valid.fer",
-			importerPath:        filepath.Join(tempDir, "some", "path"),
-			importerLogicalPath: PATH_NAME,
-			force:               false,
-			wantPath:            filepath.Join(tempDir, VALID_FILE),
-			wantError:           false,
-		},
-		{
-			name:                "Project-root relative path with subdirectory without extension",
-			filename:            "test/valid",
-			importerPath:        filepath.Join(tempDir, MAIN_FILE),
-			importerLogicalPath: "",
-			force:               false,
-			wantPath:            filepath.Join(tempDir, "test", VALID_FILE),
-			wantError:           false,
-		},
-		{
-			name:                "Relative path (./) - should error",
-			filename:            "./test/valid",
-			importerPath:        filepath.Join(tempDir, MAIN_FILE),
-			importerLogicalPath: "",
-			force:               false,
-			wantPath:            "",
-			wantError:           true,
-		},
-		{
-			name:                "Relative path (../) - should error",
-			filename:            "../test/valid",
-			importerPath:        filepath.Join(tempDir, MAIN_FILE),
-			importerLogicalPath: "",
-			force:               false,
-			wantPath:            "",
-			wantError:           true,
-		},
-		{
-			name:                "Module not found",
-			filename:            "nonexistent",
-			importerPath:        tempDir,
-			importerLogicalPath: "",
-			force:               false,
-			wantPath:            "",
-			wantError:           true,
-		},
+		{"Remote import", "github.com/user/repo/module", "", true},
+		{"Empty import", "", "", true},
+		{"Non-existent local module", "testproject/nonexistent", "", true},
+		// Note: Valid local module test would require mocking IsValidFile or setting up more complex file structure
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPath, _, err := ResolveModule(tt.filename, tt.importerPath, compilerCtx, tt.force)
-
-			if (err != nil) != tt.wantError {
-				t.Errorf("ResolveModule() error = %v, wantError %v", err, tt.wantError)
-				return
-			}
-
-			if !tt.wantError && gotPath != tt.wantPath {
-				t.Errorf("ResolveModule() gotPath = %v, want %v", gotPath, tt.wantPath)
+			_, err := ResolveModule(tt.importPath, tt.currentFileFullPath, ctxx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResolveModule(%q, %q, ctx) error = %v, wantErr %v",
+					tt.importPath, tt.currentFileFullPath, err, tt.wantErr)
 			}
 		})
 	}

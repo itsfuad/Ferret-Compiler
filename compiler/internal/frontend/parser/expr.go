@@ -20,9 +20,9 @@ func parseLogicalOr(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseLogicalAnd(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -38,9 +38,9 @@ func parseLogicalAnd(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseEquality(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -56,9 +56,9 @@ func parseEquality(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseComparison(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -74,9 +74,9 @@ func parseComparison(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseAdditive(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -92,9 +92,9 @@ func parseAdditive(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseMultiplicative(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -110,9 +110,9 @@ func parseMultiplicative(p *Parser) ast.Expression {
 		operator := p.advance()
 		right := parseUnary(p)
 		expr = &ast.BinaryExpr{
-			Left:     expr,
+			Left:     &expr,
 			Operator: operator,
-			Right:    right,
+			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -127,7 +127,7 @@ func parseUnary(p *Parser) ast.Expression {
 		right := parseUnary(p)
 		return &ast.UnaryExpr{
 			Operator: operator,
-			Operand:  right,
+			Operand:  &right,
 			Location: *source.NewLocation(&operator.Start, right.Loc().End),
 		}
 	}
@@ -141,7 +141,7 @@ func parseUnary(p *Parser) ast.Expression {
 			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
 				errMsg = report.INVALID_CONSECUTIVE_DECREMENT
 			}
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		operand := parseUnary(p)
@@ -150,19 +150,19 @@ func parseUnary(p *Parser) ast.Expression {
 			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
 				errMsg = report.INVALID_DECREMENT_OPERAND
 			}
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
 		// Check if operand already has a postfix operator
 		if _, ok := operand.(*ast.PostfixExpr); ok {
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
 		return &ast.PrefixExpr{
 			Operator: operator,
-			Operand:  operand,
+			Operand:  &operand,
 			Location: *source.NewLocation(&operator.Start, operand.Loc().End),
 		}
 	}
@@ -178,14 +178,14 @@ func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	index := parseExpression(p)
 	if index == nil {
 		token := p.peek()
-		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), report.MISSING_INDEX_EXPRESSION, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), report.MISSING_INDEX_EXPRESSION, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
 	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
 	return &ast.IndexableExpr{
-		Indexable: expr,
-		Index:     index,
+		Indexable: &expr,
+		Index:     &index,
 		Location:  *source.NewLocation(start, &end.End),
 	}, true
 }
@@ -198,11 +198,11 @@ func parseIncDec(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
 			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
 		}
-		p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.Add(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 	return &ast.PostfixExpr{
-		Operand:  expr,
+		Operand:  &expr,
 		Operator: operator,
 		Location: *source.NewLocation(expr.Loc().Start, &operator.End),
 	}, true
@@ -213,7 +213,7 @@ func handlePostfixOperator(p *Parser, expr ast.Expression) (ast.Expression, bool
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
 		if _, ok := expr.(*ast.PrefixExpr); ok {
 			current := p.peek()
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&current.Start, &current.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&current.Start, &current.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		return parseIncDec(p, expr)
@@ -278,7 +278,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		arg := parseExpression(p)
 		if arg == nil {
 			token := p.peek()
-			p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&token.Start, &token.End), "Expected function argument", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected function argument", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		arguments = append(arguments, arg)
@@ -288,7 +288,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.Add(p.filePathAbs, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				p.ctx.Reports.Add(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -297,7 +297,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 	end := p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
 
 	return &ast.FunctionCallExpr{
-		Caller:    caller,
+		Caller:    &caller,
 		Arguments: arguments,
 		Location:  *source.NewLocation(start, &end.End),
 	}, true

@@ -1,14 +1,16 @@
 package report
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"compiler/colors"
 	"compiler/internal/source"
 
 	//"compiler/internal/symboltable"
 	_strings "compiler/internal/utils/strings"
-	"fmt"
-	"os"
-	"strings"
 )
 
 type REPORT_TYPE string
@@ -143,7 +145,7 @@ func printReport(r *Report) {
 // indicating the location of the diagnostic. It returns the snippet, underline,
 // and a padding value.
 func makeParts(r *Report) (snippet, underline string) {
-	fileData, err := os.ReadFile(r.FilePath)
+	fileData, err := os.ReadFile(filepath.FromSlash(r.FilePath))
 
 	if os.IsNotExist(err) {
 		panic(fmt.Sprintf("file '%s' not found", r.FilePath))

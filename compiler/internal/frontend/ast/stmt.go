@@ -5,8 +5,11 @@ import (
 )
 
 type Program struct {
-	FilePath string
-	Nodes    []Node
+	FullPath               string            // the physical full path to the file
+	ImportPath             string            // the logical path to the module
+	Modulename             string            // the module name derived from the full path
+	ModulenameToImportpath map[string]string // import alias -> import path
+	Nodes                  []Node
 	source.Location
 }
 
@@ -32,8 +35,8 @@ type VariableToDeclare struct {
 }
 
 type AssignmentStmt struct {
-	Left  ExpressionList
-	Right ExpressionList
+	Left  *ExpressionList
+	Right *ExpressionList
 	source.Location
 }
 
@@ -54,7 +57,7 @@ func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
-	Values ExpressionList
+	Values *ExpressionList
 	source.Location
 }
 
@@ -64,9 +67,11 @@ func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 
 // ImportStmt represents an import statement
 type ImportStmt struct {
-	ImportPath *StringLiteral // The import path as written in source (e.g., "code/data")
-	ModuleName string         // The alias or last part of the import path (e.g., "data")
-	FilePath   string         // The fully resolved, normalized file path (always with .fer)
+	ImportPath   *StringLiteral // The import path as written in source (e.g., "code/data")
+	ModuleName   string         // The alias or last part of the import path (e.g., "data")
+	FullPath     string         // The fully resolved, normalized file path (always with .fer)
+	OriginalPath string         // The original path as written in source (e.g., "code/data")
+	IsRemote     bool           // Whether this is a remote import
 	source.Location
 }
 

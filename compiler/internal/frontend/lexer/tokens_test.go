@@ -1,8 +1,9 @@
 package lexer
 
 import (
-	"compiler/internal/source"
 	"testing"
+
+	"compiler/internal/source"
 )
 
 func TestIsKeyword(t *testing.T) {
