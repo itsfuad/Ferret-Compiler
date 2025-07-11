@@ -79,10 +79,7 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 		return "", fmt.Errorf("invalid project root: %s", ctxx.ProjectRoot)
 	}
 
-	fmt.Printf("Import root: %s, Project root: %s\n", importRoot, projectRoot)
-
 	if importRoot == projectRoot {
-		fmt.Printf("Local project import detected: %s\n", importPath)
 		resolvedPath := filepath.Join(strings.TrimSuffix(ctxx.ProjectRoot, projectRoot), importPath+EXT)
 		if IsValidFile(resolvedPath) {
 			return resolvedPath, nil
