@@ -1,9 +1,7 @@
 @echo off
 
-:: Check if the current directory is not "compiler", then change to it
-for %%I in ("%CD%") do if /I not "%%~nxI"=="compiler" (
-    cd compiler
-)
+:: Change to compiler directory (we're in scripts, so go up one level then into compiler)
+cd ..\compiler
 
 :: Clear the screen
 cls

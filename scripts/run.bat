@@ -1,4 +1,4 @@
 @echo off
 cls
-cd compiler/cmd
+cd ..\compiler\cmd
 go run . "./../../app/cmd/main.fer" --debug

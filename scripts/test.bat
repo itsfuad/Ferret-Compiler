@@ -1,5 +1,5 @@
 @echo off
-cd compiler
+cd ..\compiler
 setlocal EnableDelayedExpansion
 
 set "passed=0"
