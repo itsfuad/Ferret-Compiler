@@ -11,6 +11,11 @@ import (
 	"compiler/internal/source"
 )
 
+const (
+	EXPECTED_ERROR   = "Expected error but got none"
+	UNEXPECTED_ERROR = "Expected no error but got: %v"
+)
+
 // createTestAnalyzer creates a minimal analyzer for unit testing
 func createTestAnalyzer(t *testing.T) (*analyzer.AnalyzerNode, *ctx.CompilerContext) {
 	t.Helper()
@@ -105,10 +110,10 @@ func TestResolveIdentifierExpr(t *testing.T) {
 			// Check results
 			hasError := compilerCtx.Reports.HasErrors()
 			if tt.expectError && !hasError {
-				t.Errorf("Expected error but got none")
+				t.Error(EXPECTED_ERROR)
 			}
 			if !tt.expectError && hasError {
-				t.Errorf("Expected no error but got: %v", compilerCtx.Reports)
+				t.Errorf(UNEXPECTED_ERROR, compilerCtx.Reports)
 			}
 		})
 	}
@@ -186,10 +191,10 @@ func TestResolveBinaryExpr(t *testing.T) {
 			// Check results
 			hasError := compilerCtx.Reports.HasErrors()
 			if tt.expectError && !hasError {
-				t.Errorf("Expected error but got none")
+				t.Error(EXPECTED_ERROR)
 			}
 			if !tt.expectError && hasError {
-				t.Errorf("Expected no error but got: %v", compilerCtx.Reports)
+				t.Errorf(UNEXPECTED_ERROR, compilerCtx.Reports)
 			}
 		})
 	}
@@ -246,84 +251,69 @@ func TestResolveExprWithNil(t *testing.T) {
 	})
 }
 
+// createVarDeclStmt creates a variable declaration statement for testing
+func createVarDeclStmt(name string, isConst bool) *ast.VarDeclStmt {
+	return &ast.VarDeclStmt{
+		Variables: []*ast.VariableToDeclare{
+			{
+				Identifier: &ast.IdentifierExpr{
+					Name: name,
+					Location: source.Location{
+						Start: &source.Position{Line: 1, Column: 1},
+						End:   &source.Position{Line: 1, Column: len(name) + 1},
+					},
+				},
+			},
+		},
+		IsConst: isConst,
+	}
+}
+
+// verifySymbolDeclaration checks if a symbol was correctly declared with expected properties
+func verifySymbolDeclaration(t *testing.T, symbolTable *semantic.SymbolTable, name string, isConst bool) {
+	t.Helper()
+	sym, found := symbolTable.Lookup(name)
+	if !found {
+		t.Errorf("Expected symbol %s to be declared", name)
+		return
+	}
+
+	expectedKind := semantic.SymbolVar
+	if isConst {
+		expectedKind = semantic.SymbolConst
+	}
+
+	if sym.Kind != expectedKind {
+		t.Errorf("Expected symbol kind %v, got %v", expectedKind, sym.Kind)
+	}
+}
+
 func TestResolveVarDecl(t *testing.T) {
 	tests := []struct {
 		name           string
-		stmt           *ast.VarDeclStmt
-		setupSymbols   func(*semantic.SymbolTable)
+		varName        string
+		isConst        bool
+		preDeclareName string // if non-empty, pre-declare this variable
 		expectError    bool
-		expectedSymbol string
 	}{
 		{
-			name: "Valid variable declaration",
-			stmt: &ast.VarDeclStmt{
-				Variables: []*ast.VariableToDeclare{
-					{
-						Identifier: &ast.IdentifierExpr{
-							Name: "x",
-							Location: source.Location{
-								Start: &source.Position{Line: 1, Column: 1},
-								End:   &source.Position{Line: 1, Column: 2},
-							},
-						},
-					},
-				},
-				IsConst: false,
-			},
-			setupSymbols: func(st *semantic.SymbolTable) {
-				// No existing symbols needed for this test
-			},
-			expectError:    false,
-			expectedSymbol: "x",
+			name:        "Valid variable declaration",
+			varName:     "x",
+			isConst:     false,
+			expectError: false,
 		},
 		{
-			name: "Valid constant declaration",
-			stmt: &ast.VarDeclStmt{
-				Variables: []*ast.VariableToDeclare{
-					{
-						Identifier: &ast.IdentifierExpr{
-							Name: "PI",
-							Location: source.Location{
-								Start: &source.Position{Line: 1, Column: 1},
-								End:   &source.Position{Line: 1, Column: 3},
-							},
-						},
-					},
-				},
-				IsConst: true,
-			},
-			setupSymbols: func(st *semantic.SymbolTable) {
-				// No existing symbols needed for this test
-			},
-			expectError:    false,
-			expectedSymbol: "PI",
+			name:        "Valid constant declaration",
+			varName:     "PI",
+			isConst:     true,
+			expectError: false,
 		},
 		{
-			name: "Variable redeclaration should fail",
-			stmt: &ast.VarDeclStmt{
-				Variables: []*ast.VariableToDeclare{
-					{
-						Identifier: &ast.IdentifierExpr{
-							Name: "a",
-							Location: source.Location{
-								Start: &source.Position{Line: 1, Column: 1},
-								End:   &source.Position{Line: 1, Column: 2},
-							},
-						},
-					},
-				},
-				IsConst: false,
-			},
-			setupSymbols: func(st *semantic.SymbolTable) {
-				// Pre-declare 'a' to test redeclaration error
-				st.Declare("a", &semantic.Symbol{
-					Name: "a",
-					Kind: semantic.SymbolVar,
-					Type: nil,
-				})
-			},
+			name:           "Variable redeclaration should fail",
+			varName:        "a",
+			isConst:        false,
+			preDeclareName: "a",
 			expectError:    true,
-			expectedSymbol: "",
 		},
 	}
 
@@ -331,124 +321,100 @@ func TestResolveVarDecl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r, ctx := createTestAnalyzer(t)
 
-			// Setup symbols for this test
+			// Setup pre-declared symbol if needed
 			module := ctx.GetModule(r.Program.ImportPath)
-			if module != nil {
-				tt.setupSymbols(module.SymbolTable)
+			if tt.preDeclareName != "" {
+				module.SymbolTable.Declare(tt.preDeclareName, &semantic.Symbol{
+					Name: tt.preDeclareName,
+					Kind: semantic.SymbolVar,
+					Type: nil,
+				})
 			}
 
-			resolveVarDecl(r, tt.stmt)
+			// Create and resolve the statement
+			stmt := createVarDeclStmt(tt.varName, tt.isConst)
+			resolveVarDecl(r, stmt)
 
-			if tt.expectError {
-				// Check that an error was reported
-				if r.Ctx.Reports.HasErrors() == false {
-					t.Errorf("Expected error to be reported for %s", tt.name)
-				}
-			} else {
-				// Check that symbol was declared
-				if tt.expectedSymbol != "" {
-					module := r.Ctx.GetModule(r.Program.ImportPath)
-					if module == nil {
-						t.Fatalf("Module not found")
-					}
-					sym, found := module.SymbolTable.Lookup(tt.expectedSymbol)
-					if !found {
-						t.Errorf("Expected symbol %s to be declared", tt.expectedSymbol)
-					} else {
-						expectedKind := semantic.SymbolVar
-						if tt.stmt.IsConst {
-							expectedKind = semantic.SymbolConst
-						}
-						if sym.Kind != expectedKind {
-							t.Errorf("Expected symbol kind %v, got %v", expectedKind, sym.Kind)
-						}
-					}
-				}
+			// Verify the results
+			hasErrors := ctx.Reports.HasErrors()
+			if tt.expectError && !hasErrors {
+				t.Error(EXPECTED_ERROR)
+			} else if !tt.expectError && hasErrors {
+				t.Errorf(UNEXPECTED_ERROR, ctx.Reports)
+			}
+
+			// Check symbol declaration if no error was expected
+			if !tt.expectError {
+				verifySymbolDeclaration(t, module.SymbolTable, tt.varName, tt.isConst)
 			}
 		})
 	}
 }
 
+// createAssignmentStmt creates an assignment statement for testing
+func createAssignmentStmt(varName string, value interface{}) *ast.AssignmentStmt {
+	var rightExpr ast.Expression
+	switch v := value.(type) {
+	case int64:
+		rightExpr = &ast.IntLiteral{Value: v}
+	default:
+		rightExpr = &ast.IntLiteral{Value: 42}
+	}
+
+	return &ast.AssignmentStmt{
+		Left: &ast.ExpressionList{
+			&ast.IdentifierExpr{
+				Name: varName,
+				Location: source.Location{
+					Start: &source.Position{Line: 1, Column: 1},
+					End:   &source.Position{Line: 1, Column: len(varName) + 1},
+				},
+			},
+		},
+		Right: &ast.ExpressionList{rightExpr},
+	}
+}
+
+// setupDeclaredVariable declares a variable in the symbol table
+func setupDeclaredVariable(st *semantic.SymbolTable, name string) {
+	st.Declare(name, &semantic.Symbol{
+		Name: name,
+		Kind: semantic.SymbolVar,
+		Type: nil,
+	})
+}
+
+// runAssignmentTest runs a single assignment test case
+func runAssignmentTest(t *testing.T, name string, varName string, declareVar bool, expectError bool) {
+	t.Helper()
+	r, ctx := createTestAnalyzer(t)
+
+	module := ctx.GetModule(r.Program.ImportPath)
+	if module != nil && declareVar {
+		setupDeclaredVariable(module.SymbolTable, varName)
+	}
+
+	stmt := createAssignmentStmt(varName, 42)
+	resolveAssignment(r, stmt)
+
+	hasError := r.Ctx.Reports.HasErrors()
+	if expectError != hasError {
+		if expectError {
+			t.Errorf("Expected error to be reported for %s", name)
+		} else {
+			t.Errorf("Unexpected error reported for %s", name)
+		}
+	}
+}
+
 func TestResolveAssignment(t *testing.T) {
-	tests := []struct {
-		name         string
-		stmt         *ast.AssignmentStmt
-		setupSymbols func(*semantic.SymbolTable)
-		expectError  bool
-	}{
-		{
-			name: "Valid assignment to declared variable",
-			stmt: &ast.AssignmentStmt{
-				Left: &ast.ExpressionList{
-					&ast.IdentifierExpr{
-						Name: "a",
-						Location: source.Location{
-							Start: &source.Position{Line: 1, Column: 1},
-							End:   &source.Position{Line: 1, Column: 2},
-						},
-					},
-				},
-				Right: &ast.ExpressionList{
-					&ast.IntLiteral{Value: 42},
-				},
-			},
-			setupSymbols: func(st *semantic.SymbolTable) {
-				// Declare 'a' variable
-				st.Declare("a", &semantic.Symbol{
-					Name: "a",
-					Kind: semantic.SymbolVar,
-					Type: nil,
-				})
-			},
-			expectError: false,
-		},
-		{
-			name: "Assignment to undeclared variable should fail",
-			stmt: &ast.AssignmentStmt{
-				Left: &ast.ExpressionList{
-					&ast.IdentifierExpr{
-						Name: "undeclared",
-						Location: source.Location{
-							Start: &source.Position{Line: 1, Column: 1},
-							End:   &source.Position{Line: 1, Column: 10},
-						},
-					},
-				},
-				Right: &ast.ExpressionList{
-					&ast.IntLiteral{Value: 42},
-				},
-			},
-			setupSymbols: func(st *semantic.SymbolTable) {
-				// No symbols setup - testing undeclared variable
-			},
-			expectError: true,
-		},
-	}
+	t.Run("Valid assignment to declared variable", func(t *testing.T) {
+		runAssignmentTest(t, "Valid assignment", "a", true, false)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r, ctx := createTestAnalyzer(t)
-
-			// Setup symbols for this test
-			module := ctx.GetModule(r.Program.ImportPath)
-			if module != nil {
-				tt.setupSymbols(module.SymbolTable)
-			}
-
-			resolveAssignment(r, tt.stmt)
-
-			if tt.expectError {
-				if r.Ctx.Reports.HasErrors() == false {
-					t.Errorf("Expected error to be reported for %s", tt.name)
-				}
-			} else {
-				// Check for unexpected errors
-				if r.Ctx.Reports.HasErrors() {
-					t.Errorf("Unexpected error reported for %s", tt.name)
-				}
-			}
-		})
-	}
+	t.Run("Assignment to undeclared variable should fail", func(t *testing.T) {
+		runAssignmentTest(t, "Undeclared assignment", "undeclared", false, true)
+	})
 }
 
 // Benchmark core resolver functions
