@@ -31,6 +31,10 @@ func CreateTestFile(t *testing.T, content string) string {
 
 // CreateTestFileInDir creates a test file in a specific directory
 func CreateTestFileInDir(t *testing.T, dir, filename, content string) string {
+	// Ensure the target directory exists
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
 	filePath := filepath.Join(dir, filename)
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
