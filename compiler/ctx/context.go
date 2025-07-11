@@ -21,11 +21,11 @@ type Module struct {
 }
 
 type CompilerContext struct {
-	EntryPoint        string                // Entry point file
-	Builtins          *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules           map[string]*Module    // key: import path
-	Reports           report.Reports
-	CachePath         string
+	EntryPoint string                // Entry point file
+	Builtins   *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules    map[string]*Module    // key: import path
+	Reports    report.Reports
+	CachePath  string
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 	// Track modules that are currently being parsed to prevent infinite recursion
@@ -143,7 +143,7 @@ func (c *CompilerContext) PrintModules() {
 	}
 	colors.BLUE.Println("Modules in cache:")
 	for _, name := range modules {
-		colors.GREEN.Printf("- %s\n", name)
+		colors.PURPLE.Printf("- %s\n", name)
 	}
 }
 
@@ -167,7 +167,6 @@ func (c *CompilerContext) HasModule(importPath string) bool {
 }
 
 func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
-	colors.BRIGHT_BROWN.Printf("Adding module: Key: %s, FilePath: %s\n", importPath, module.FullPath)
 	if c.Modules == nil {
 		c.Modules = make(map[string]*Module)
 	}
@@ -263,22 +262,19 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	}
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
-	colors.ORANGE.Printf("Project root: %s\n", root)
-	colors.ORANGE.Printf("Entry point: %s\n", entryPoint)
-
 	// Use cache path from project config
 	cachePath := filepath.Join(root, projectConfig.Cache.Path)
 	cachePath = filepath.ToSlash(cachePath)
 	os.MkdirAll(cachePath, 0755)
 
 	return &CompilerContext{
-		EntryPoint:        entryPoint,
-		Builtins:          semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:           make(map[string]*Module),
-		Reports:           report.Reports{},
-		CachePath:         cachePath,
-		ProjectConfig:     projectConfig,
-		ProjectRoot:       root,
+		EntryPoint:    entryPoint,
+		Builtins:      semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:       make(map[string]*Module),
+		Reports:       report.Reports{},
+		CachePath:     cachePath,
+		ProjectConfig: projectConfig,
+		ProjectRoot:   root,
 	}
 }
 
@@ -378,7 +374,6 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	rootName := filepath.Base(c.ProjectRoot)
 	return rootName + "/" + moduleName
 }
-
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
 	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)

@@ -19,7 +19,6 @@ func parseImport(p *Parser) ast.Node {
 
 	importpath := importToken.Value
 
-	fmt.Printf("Parsing import statement in %s -> %s\n", p.fullPath, importpath)
 	// Support: import "path" as Alias;
 	var moduleName string
 	if p.match(lexer.AS_TOKEN) {
@@ -48,11 +47,6 @@ func parseImport(p *Parser) ast.Node {
 	}
 
 	isRemote := fs.IsRemote(importpath)
-	if isRemote {
-		fmt.Printf("Remote import detected: %s\n", importpath)
-	} else {
-		fmt.Printf("Local import detected: %s\n", importpath)
-	}
 
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
@@ -86,9 +80,6 @@ func parseImport(p *Parser) ast.Node {
 	}
 	p.ctx.DepGraph[p.fullPath] = append(p.ctx.DepGraph[p.fullPath], moduleFullPath)
 
-	// If no cycle detected, we can proceed
-	colors.CYAN.Printf("Dependency edge added: %s -> %s\n", p.fullPath, moduleFullPath)
-
 	// Check if the module is already cached
 	if !p.ctx.HasModule(importpath) {
 		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
@@ -99,9 +90,6 @@ func parseImport(p *Parser) ast.Node {
 	}
 
 	p.modulenameToImportpath[moduleName] = importpath
-
-	colors.YELLOW.Println("Parsing import")
-	fmt.Printf("Full path: %s, Module name: %s, Import path: %s\n", moduleFullPath, moduleName, importpath)
 
 	return stmt
 }
