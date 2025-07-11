@@ -3,6 +3,7 @@ package lexer
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"compiler/internal/source"
@@ -66,7 +67,7 @@ func (lex *Lexer) atEOF() bool {
 
 func createLexer(filePath *string) *Lexer {
 
-	fileText, err := os.ReadFile(*filePath)
+	fileText, err := os.ReadFile(filepath.FromSlash(*filePath))
 	if err != nil {
 		panic("Lexer error: Failed to read file " + *filePath + ": " + err.Error())
 	}

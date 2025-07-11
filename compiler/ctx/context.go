@@ -47,7 +47,7 @@ func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectCo
 	if !exists {
 		return nil
 	}
-	cacheFile, err := os.ReadFile(configFilepath)
+	cacheFile, err := os.ReadFile(filepath.FromSlash(configFilepath))
 	if err != nil {
 		return nil
 	}
@@ -90,7 +90,7 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 	for i := len(parts); i >= 3; i-- {
 		prefix := strings.Join(parts[:i], "/")
 		if _, exists := c.RemoteConfigs[prefix]; exists {
-			data, err := os.ReadFile(prefix)
+			data, err := os.ReadFile(filepath.FromSlash(prefix))
 			if err != nil {
 				continue
 			}
