@@ -133,6 +133,30 @@ func TestCycleDetection(t *testing.T) {
 	}
 }
 
+func TestFullPathToImportPath(t *testing.T) {
+	ctx := &CompilerContext{
+		ProjectRoot: "/project/root",
+	}
+
+	tests := []struct {
+		fullPath string
+		expected string
+	}{
+		{"/project/root/src/module.fr", "root/src/module"},
+		{"/project/root/main.fr", "root/main"},
+		{"/project/root/pkg/sub/file.fr", "root/pkg/sub/file"},
+		{"/different/path/file.fr", ""}, // Outside project root
+	}
+
+	for _, test := range tests {
+		result := ctx.FullPathToImportPath(test.fullPath)
+		if result != test.expected {
+			t.Errorf("FullPathToModuleName(%s): expected %s, got %s",
+				test.fullPath, test.expected, result)
+		}
+	}
+}
+
 func TestFullPathToModuleName(t *testing.T) {
 	ctx := &CompilerContext{
 		ProjectRoot: "/project/root",
@@ -142,10 +166,10 @@ func TestFullPathToModuleName(t *testing.T) {
 		fullPath string
 		expected string
 	}{
-		{"/project/root/src/module.fr", "src/module"},
+		{"/project/root/src/module.fr", "module"},
 		{"/project/root/main.fr", "main"},
-		{"/project/root/pkg/sub/file.fr", "pkg/sub/file"},
-		{"/different/path/file.fr", "../../different/path/file"}, // Outside project root
+		{"/project/root/pkg/sub/file.fr", "file"},
+		{"/different/path/file.fr", ""}, // Outside project root
 	}
 
 	for _, test := range tests {

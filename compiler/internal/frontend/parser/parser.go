@@ -11,21 +11,22 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 type Parser struct {
-	tokens     []lexer.Token
-	tokenNo    int
-	fullPath   string
-	importPath string
-	ctx        *ctx.CompilerContext
-	debug      bool // debug mode for additional logging
+	tokens                 	[]lexer.Token
+	tokenNo                	int
+	fullPath               	string
+	importPath             	string
+	modulename			  	string // module name derived from full path
+	modulenameToImportpath map[string]string // import alias -> full path
+	ctx                    *ctx.CompilerContext
+	debug                  bool // debug mode for additional logging
 }
 
-func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
+func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 
-	if ctx == nil {
+	if ctxx == nil {
 		panic("Cannot create parser: Compiler context is nil")
 	}
 	if filePath == "" {
@@ -33,7 +34,7 @@ func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
 	}
 
 	filePath = filepath.ToSlash(filePath) // Ensure forward slashes for consistency
-	fmt.Printf("Project root: %s\n", ctx.ProjectRoot)
+	fmt.Printf("Project root: %s\n", ctxx.ProjectRoot)
 	fmt.Printf("File path: %s\n", filePath)
 
 	if !fs.IsValidFile(filePath) {
@@ -41,26 +42,22 @@ func NewParser(filePath string, ctx *ctx.CompilerContext, debug bool) *Parser {
 	}
 
 	//relative path to the file
-	importPath, err := filepath.Rel(ctx.ProjectRoot, filePath)
-	if err != nil {
-		panic("Cannot create parser: Failed to get relative path: " + err.Error())
-	}
-	// Ensure forward slashes for consistency
-	importPath = filepath.ToSlash(importPath)
-
-	importPath = strings.TrimSuffix(importPath, filepath.Ext(importPath))
+	importPath := ctxx.FullPathToImportPath(filePath)
+	modulename := ctxx.FullPathToModuleName(filePath)
 
 	colors.ORANGE.Printf("New Parser: %s -> %s\n", filePath, importPath)
 
 	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
-		tokens:     tokens,
-		tokenNo:    0,
-		ctx:        ctx,
-		fullPath:   filePath,
-		importPath: importPath,
-		debug:      debug,
+		tokens:                 tokens,
+		tokenNo:                0,
+		ctx:                    ctxx,
+		fullPath:               filePath,
+		importPath:             importPath,
+		modulename:             modulename,
+		modulenameToImportpath: make(map[string]string), // Initialize alias map
+		debug:                  debug,
 	}
 }
 
@@ -267,6 +264,9 @@ func parseNode(p *Parser) ast.Node {
 func (p *Parser) Parse() *ast.Program {
 	var nodes []ast.Node
 
+	// Start tracking the entry point parsing
+	p.ctx.StartParsing(p.fullPath)
+
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
@@ -282,10 +282,22 @@ func (p *Parser) Parse() *ast.Program {
 		return &ast.Program{}
 	}
 
-	return &ast.Program{
+	fmt.Printf("Saving import path mapping: %s -> %s\n", p.importPath, p.fullPath)
+
+	// Finish tracking the entry point parsing
+	p.ctx.FinishParsing(p.fullPath)
+
+	program := &ast.Program{
 		Nodes:      nodes,
 		FullPath:   p.fullPath,
 		ImportPath: p.importPath,
+		Modulename: p.modulename,
+		ModulenameToImportpath: p.modulenameToImportpath,
 		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
+
+	// Add the module to the context
+	p.ctx.AddModule(p.importPath, program)
+	
+	return program
 }

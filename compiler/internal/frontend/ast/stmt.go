@@ -7,6 +7,8 @@ import (
 type Program struct {
 	FullPath   string // the physical full path to the file
 	ImportPath string // the logical path to the module
+	Modulename string // the module name derived from the full path
+	ModulenameToImportpath    map[string]string // import alias -> import path
 	Nodes      []Node
 	source.Location
 }
