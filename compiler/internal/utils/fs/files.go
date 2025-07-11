@@ -1,11 +1,12 @@
 package fs
 
 import (
-	"compiler/ctx"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"compiler/ctx"
 )
 
 const EXT = ".fer"

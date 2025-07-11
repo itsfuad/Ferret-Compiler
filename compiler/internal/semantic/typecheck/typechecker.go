@@ -1,13 +1,14 @@
 package typecheck
 
 import (
+	"fmt"
+	"os"
+	"reflect"
+
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/types"
-	"fmt"
-	"os"
-	"reflect"
 )
 
 type TypeChecker struct {
