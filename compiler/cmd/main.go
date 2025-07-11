@@ -77,7 +77,7 @@ func main() {
 	//filename from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: ferret <filename> [OPTION]")
-		return
+		os.Exit(1)
 	}
 
 	debug := false
