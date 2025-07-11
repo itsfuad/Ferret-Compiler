@@ -1,6 +1,10 @@
 package parser
 
 import (
+	"fmt"
+	"path/filepath"
+	"slices"
+
 	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
@@ -8,9 +12,6 @@ import (
 	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/utils/fs"
-	"fmt"
-	"path/filepath"
-	"slices"
 )
 
 type Parser struct {
