@@ -88,3 +88,7 @@ let myCar = @Car {
 
 myCar.make = "Honda"; // Update the make of the car
 //notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
+
+//array 
+let numbers = [1, 2, 3, 4, 5]; // Array of integers
+let mixedArray = [1, "two", 3.0]; // Array

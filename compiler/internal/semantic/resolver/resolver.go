@@ -24,9 +24,9 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 }
 
 func resolveNode(r *analyzer.AnalyzerNode, node ast.Node) {
-	currentModule := r.Ctx.GetModule(r.Program.ImportPath)
-	if currentModule == nil {
-		r.Ctx.Reports.Add(r.Program.FullPath, r.Program.Loc(), "module not found for node: "+r.Program.ImportPath+"\n"+r.Program.FullPath, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
+		r.Ctx.Reports.Add(r.Program.FullPath, r.Program.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 	switch n := node.(type) {
@@ -67,9 +67,9 @@ func resolveTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
 		return
 	}
 	//declare the type in the current module
-	currentModule := r.Ctx.GetModule(r.Program.ImportPath)
-	if currentModule == nil {
-		r.Ctx.Reports.Add(r.Program.FullPath, stmt.Alias.Loc(), "<type decl> current module not found for type declaration: "+r.Program.ImportPath, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
+		r.Ctx.Reports.Add(r.Program.FullPath, stmt.Alias.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 
@@ -81,15 +81,15 @@ func resolveTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
 
 func resolveImport(r *analyzer.AnalyzerNode, currentModule *ctx.Module, importStmt *ast.ImportStmt) {
 	if importStmt.ModuleName != "" && importStmt.FullPath != "" {
-		importModule := r.Ctx.GetModule(importStmt.ImportPath.Value)
-		if importModule != nil {
+		importModule, err := r.Ctx.GetModule(importStmt.ImportPath.Value)
+		if err == nil {
 			importModuleAST := importModule.AST
 			//semantic.AddPreludeSymbols(importModule.SymbolTable)
 			anz := analyzer.NewAnalyzerNode(importModuleAST, r.Ctx, r.Debug)
 			ResolveProgram(anz)
 			currentModule.SymbolTable.Imports[importStmt.ModuleName] = importModule.SymbolTable
 		} else {
-			r.Ctx.Reports.Add(r.Program.FullPath, importStmt.Loc(), "<import resolver> module not found: "+importStmt.ModuleName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.Ctx.Reports.Add(r.Program.FullPath, importStmt.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		}
 	}
 }
@@ -103,9 +103,9 @@ func resolveVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
 			kind = semantic.SymbolConst
 		}
 		// Type checking: ensure explicit type exists if provided
-		currentModule := r.Ctx.GetModule(currentModuleImportpath)
-		if currentModule == nil {
-			r.Ctx.Reports.Add(r.Program.FullPath, v.Identifier.Loc(), "<var decl resolver> module not found: "+currentModuleImportpath, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		currentModule, err := r.Ctx.GetModule(currentModuleImportpath)
+		if err != nil {
+			r.Ctx.Reports.Add(r.Program.FullPath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 			return
 		}
 
@@ -121,7 +121,7 @@ func resolveVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
 
 		sym := semantic.NewSymbolWithLocation(name, kind, semanticType, v.Identifier.Loc())
 
-		err := currentModule.SymbolTable.Declare(name, sym)
+		err = currentModule.SymbolTable.Declare(name, sym)
 		if err != nil {
 			// Redeclaration error
 			r.Ctx.Reports.Add(r.Program.FullPath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
@@ -273,9 +273,9 @@ func resolveTypeScopeResolution(r *analyzer.AnalyzerNode, expr *ast.TypeScopeRes
 	}
 
 	// Get the imported module's symbol table
-	importModule := r.Ctx.GetModule(importModuleName)
-	if importModule == nil {
-		r.Ctx.Reports.Add(r.Program.FullPath, expr.Module.Loc(), "<type scope> imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+	importModule, err := r.Ctx.GetModule(importModuleName)
+	if err != nil {
+		r.Ctx.Reports.Add(r.Program.FullPath, expr.Module.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 
@@ -312,9 +312,9 @@ func resolveVarScopeResolution(r *analyzer.AnalyzerNode, expr ast.VarScopeResolu
 	}
 
 	// Get the imported module's symbol table
-	importModule := r.Ctx.GetModule(importModuleName)
-	if importModule == nil {
-		r.Ctx.Reports.Add(r.Program.FullPath, expr.Module.Loc(), "<var scope> imported module not found: "+importModuleName, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+	importModule, err := r.Ctx.GetModule(importModuleName)
+	if err != nil {
+		r.Ctx.Reports.Add(r.Program.FullPath, expr.Module.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 
