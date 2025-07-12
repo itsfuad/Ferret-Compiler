@@ -23,6 +23,9 @@ func resolveTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
 		return
 	}
 
+	// Resolve the base type first
+	resolveType(r, stmt.BaseType)
+
 	// Convert AST type to semantic type
 	semanticType := semantic.ASTToSemanticType(stmt.BaseType)
 	sym := semantic.NewSymbolWithLocation(typeName, semantic.SymbolType, semanticType, stmt.Alias.Loc())

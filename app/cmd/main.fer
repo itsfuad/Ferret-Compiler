@@ -95,6 +95,9 @@ let myOtherCar: Car = @Car {
     model: "Mustang",
     year: 2021
 };
-//array 
+
+let nulltype: null = null; // Explicit null type
+
+//array
 let numbers = [1, 2, 3, 4, 5]; // Array of integers
 // let mixedArray = [1, "two", 3.0]; // Array

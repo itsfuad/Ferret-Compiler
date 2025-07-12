@@ -5,15 +5,15 @@ import (
 )
 
 // SymbolKind represents the kind of symbol (variable, constant, function, type, etc.)
-type SymbolKind int
+type SymbolKind string
 
 const (
-	SymbolVar SymbolKind = iota
-	SymbolConst
-	SymbolType   // For built-in and user-defined types
-	SymbolFunc   // For functions
-	SymbolStruct // For struct types
-	SymbolField  // For struct fields
+	SymbolVar SymbolKind = "variable"
+	SymbolConst SymbolKind = "constant"
+	SymbolType   SymbolKind = "type" // For primitive and user-defined types
+	SymbolFunc   SymbolKind = "function"
+	SymbolStruct SymbolKind = "struct" // For struct types
+	SymbolField  SymbolKind = "field"  // For struct fields
 )
 
 // Symbol represents a named entity in the program (variable, constant, type, etc.)

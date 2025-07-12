@@ -23,7 +23,7 @@ func resolveVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
 		}
 
 		if v.ExplicitType != nil {
-			resolveNode(r, v.ExplicitType)
+			resolveType(r, v.ExplicitType)
 		}
 
 		// Convert AST type to semantic type
