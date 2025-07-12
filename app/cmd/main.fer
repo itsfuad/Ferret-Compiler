@@ -61,3 +61,18 @@ let cxx : data::MyType = data::kk;
 
 //let someValue = laterDeclaredValue;
 let laterDeclaredValue = "This value is declared later in the code.";
+
+type Car struct {
+    make: str,
+    model: str,
+    year: i32
+};
+
+let myCar = @Car {
+    make: "Toyota",
+    model: "Corolla",
+    year: 2020
+};
+
+myCar.make = "Honda"; // Update the make of the car
+notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
