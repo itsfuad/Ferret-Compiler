@@ -8,8 +8,8 @@ import (
 type SymbolKind string
 
 const (
-	SymbolVar SymbolKind = "variable"
-	SymbolConst SymbolKind = "constant"
+	SymbolVar    SymbolKind = "variable"
+	SymbolConst  SymbolKind = "constant"
 	SymbolType   SymbolKind = "type" // For primitive and user-defined types
 	SymbolFunc   SymbolKind = "function"
 	SymbolStruct SymbolKind = "struct" // For struct types

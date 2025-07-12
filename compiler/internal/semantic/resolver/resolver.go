@@ -75,9 +75,8 @@ func resolveType(r *analyzer.AnalyzerNode, dataType ast.DataType) {
 	}
 }
 
-
 func resolveUserDefinedType(r *analyzer.AnalyzerNode, t *ast.UserDefinedType) {
-	
+
 	// Check if this is a built-in type first
 	typeName := string(t.TypeName)
 	if types.IsPrimitiveType(typeName) {
