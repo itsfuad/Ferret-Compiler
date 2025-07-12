@@ -15,7 +15,7 @@ func TestModuleFunctions(t *testing.T) {
 	ctx := &CompilerContext{}
 
 	// Test GetModule
-	if ctx.GetModule("test") != nil {
+	if module, _ := ctx.GetModule("test"); module != nil {
 		t.Error("GetModule should return nil for non-existent module")
 	}
 
@@ -39,7 +39,7 @@ func TestModuleFunctions(t *testing.T) {
 	ctx.AddModule("test", mockAST)
 
 	// Test GetModule after adding
-	if ctx.GetModule("test") == nil {
+	if module, _ := ctx.GetModule("test"); module == nil {
 		t.Error("GetModule should return module after adding")
 	}
 
