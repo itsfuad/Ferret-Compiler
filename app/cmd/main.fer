@@ -69,7 +69,7 @@ let scientific : f64 = 1.23e4; // 1.23 * 10^4
 //     };
 // }
 
-let cxx : data::MyType = data::kk;
+
 
 //let someValue = laterDeclaredValue;
 let laterDeclaredValue = "This value is declared later in the code.";
@@ -89,6 +89,12 @@ let myCar = @Car {
 myCar.make = "Honda"; // Update the make of the car
 //notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
 
+let cxx : data::MyType = data::kk;
+let myOtherCar: Car = @Car {
+    make: "Ford",
+    model: "Mustang",
+    year: 2021
+};
 //array 
 let numbers = [1, 2, 3, 4, 5]; // Array of integers
 // let mixedArray = [1, "two", 3.0]; // Array

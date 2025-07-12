@@ -7,8 +7,6 @@ import (
 	"compiler/internal/semantic/analyzer"
 )
 
-
-
 func resolveVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
 	currentModuleImportpath := r.Program.ImportPath
 	for i, v := range stmt.Variables {

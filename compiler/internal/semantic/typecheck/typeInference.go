@@ -2,12 +2,12 @@ package typecheck
 
 import (
 	"compiler/colors"
+	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/types"
-	"compiler/ctx"
 )
 
 // inferExpressionType infers the type of an expression
@@ -67,7 +67,6 @@ func inferIdentifierType(currentModule *ctx.Module, e *ast.IdentifierExpr) seman
 	return nil
 }
 
-
 // inferFieldAccessType infers the type of a field access expression
 func inferFieldAccessType(r *analyzer.AnalyzerNode, e *ast.FieldAccessExpr) semantic.Type {
 	objectType := inferExpressionType(r, *e.Object)
@@ -85,7 +84,6 @@ func inferFieldAccessType(r *analyzer.AnalyzerNode, e *ast.FieldAccessExpr) sema
 	}
 	return nil
 }
-
 
 // inferBinaryExprType infers the type of a binary expression
 func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr) semantic.Type {

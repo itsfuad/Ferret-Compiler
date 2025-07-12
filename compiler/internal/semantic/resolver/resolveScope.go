@@ -1,13 +1,12 @@
 package resolver
 
 import (
-	"fmt"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
+	"fmt"
 )
-
 
 func resolveTypeScopeResolution(r *analyzer.AnalyzerNode, expr *ast.TypeScopeResolution) {
 

@@ -7,7 +7,6 @@ import (
 	"compiler/internal/semantic/analyzer"
 )
 
-
 func resolveImport(r *analyzer.AnalyzerNode, currentModule *ctx.Module, importStmt *ast.ImportStmt) {
 	if importStmt.ModuleName != "" && importStmt.FullPath != "" {
 		importModule, err := r.Ctx.GetModule(importStmt.ImportPath.Value)

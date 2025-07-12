@@ -55,7 +55,6 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression) {
 	}
 }
 
-
 func resolveIdentifierExpr(r *analyzer.AnalyzerNode, iden *ast.IdentifierExpr) {
 
 	module, moduleExists := r.Ctx.Modules[r.Program.ImportPath]

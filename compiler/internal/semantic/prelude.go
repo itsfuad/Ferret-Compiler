@@ -19,5 +19,11 @@ func AddPreludeSymbols(table *SymbolTable) *SymbolTable {
 	table.Declare("str", NewSymbol("str", SymbolType, CreatePrimitiveType(types.STRING)))
 	table.Declare("bool", NewSymbol("bool", SymbolType, CreatePrimitiveType(types.BOOL)))
 	table.Declare("byte", NewSymbol("byte", SymbolType, CreatePrimitiveType(types.BYTE)))
+
+	// Add built-in constant variables
+	table.Declare("true", NewSymbol("true", SymbolConst, CreatePrimitiveType(types.BOOL)))
+	table.Declare("false", NewSymbol("false", SymbolConst, CreatePrimitiveType(types.BOOL)))
+	table.Declare("null", NewSymbol("null", SymbolConst, CreatePrimitiveType(types.NULL)))
+
 	return table
 }

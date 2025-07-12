@@ -1,0 +1,8 @@
+//Test built-in variables: true, false, null
+
+let isReady = true;    // Should be bool
+let isFinished = false; // Should be bool
+let emptyValue = null; // Should be null
+
+let logicalResult = true && false; // Should be bool
+let boolVar: bool = true; // Should be valid assignment

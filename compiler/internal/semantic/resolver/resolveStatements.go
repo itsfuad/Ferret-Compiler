@@ -7,7 +7,6 @@ import (
 	"compiler/internal/semantic/analyzer"
 )
 
-
 func resolveAssignment(r *analyzer.AnalyzerNode, stmt *ast.AssignmentStmt) { // Check that all left-hand side variables are declared
 	for _, lhs := range *stmt.Left {
 		if id, ok := lhs.(*ast.IdentifierExpr); ok {

@@ -5,7 +5,6 @@ import (
 	"compiler/internal/semantic/analyzer"
 )
 
-
 // resolveTypeAlias resolves a type alias to its underlying type
 func resolveTypeAlias(r *analyzer.AnalyzerNode, t semantic.Type) semantic.Type {
 	userType, ok := t.(*semantic.UserType)
