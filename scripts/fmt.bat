@@ -5,6 +5,11 @@ cd ..\compiler
 
 :: Clear the screen
 cls
+
+echo Cleaning up imports...
+:: Remove unused imports
+go mod tidy
+
 echo Formatting code...
 :: Format the code
 go fmt ./...

@@ -1,213 +1,605 @@
 package typecheck
 
 import (
-	"fmt"
-	"os"
-	"reflect"
-
+	"compiler/colors"
 	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
+	"compiler/internal/semantic/analyzer"
 	"compiler/internal/types"
 )
 
-type TypeChecker struct {
-	program     *ast.Program
-	Debug       bool
-	ctx         *ctx.CompilerContext
-	CheckedMods map[string]bool // file path -> checked
-	CurrentFile string          // current file being typechecked
-}
-
-func NewTypeChecker(program *ast.Program, ctx *ctx.CompilerContext, debug bool) *TypeChecker {
-	return &TypeChecker{
-		program:     program,
-		ctx:         ctx,
-		Debug:       debug,
-		CheckedMods: make(map[string]bool),
+// CheckProgram performs type checking on the entire program
+func CheckProgram(r *analyzer.AnalyzerNode) {
+	for _, node := range r.Program.Nodes {
+		checkNode(r, node)
+	}
+	if r.Debug {
+		colors.GREEN.Printf("Type checked '%s'\n", r.Program.FullPath)
 	}
 }
 
-func (tc *TypeChecker) CheckProgram(prog *ast.Program) {
-	tc.CurrentFile = prog.FullPath
-	if tc.CurrentFile == "" {
-		fmt.Println("[TypeChecker] Current file is empty. Skipping type checking.")
-		return
-	}
-	if tc.Debug {
-		fmt.Printf("[TypeChecker] Starting type checking for %s\n", tc.CurrentFile)
-	}
-	// Build import alias map: alias -> file path (for error reporting only)
-	for _, node := range prog.Nodes {
-		if imp, ok := node.(*ast.ImportStmt); ok {
-			if imp.ModuleName != "" && imp.FullPath != "" {
-				tc.program.ModulenameToImportpath[imp.ModuleName] = imp.FullPath
-				if tc.Debug {
-					fmt.Printf("[TypeChecker] Import alias: %s -> %s\n", imp.ModuleName, imp.FullPath)
-				}
-			}
-		}
-	}
-	for _, node := range prog.Nodes {
-		tc.checkNode(node)
-	}
-	if tc.Debug {
-		fmt.Printf("[TypeChecker] Finished type checking for %s\n", tc.CurrentFile)
-	}
-}
-
-func checkExpressions(n *ast.ExpressionStmt, tc *TypeChecker) {
-	if n.Expressions != nil {
-		for _, expr := range *n.Expressions {
-			tc.checkExpr(&expr)
-		}
-	}
-}
-
-func checkBlock(n *ast.Block, tc *TypeChecker) {
-	for _, sub := range n.Nodes {
-		tc.checkNode(sub)
-	}
-}
-
-func (tc *TypeChecker) checkNode(node ast.Node) {
+// checkNode performs type checking on a single AST node
+func checkNode(r *analyzer.AnalyzerNode, node ast.Node) {
 	switch n := node.(type) {
-	case *ast.VarDeclStmt:
-		tc.checkVarDecl(n)
-	case *ast.AssignmentStmt:
-		tc.checkAssignment(n)
-	case *ast.ExpressionStmt:
-		checkExpressions(n, tc)
-	case *ast.Block:
-		checkBlock(n, tc)
 	case *ast.ImportStmt:
-		tc.CheckImport(n)
+		checkImportStmt(r, n)
+	case *ast.VarDeclStmt:
+		checkVarDecl(r, n)
+	case *ast.AssignmentStmt:
+		checkAssignment(r, n)
+	case *ast.ExpressionStmt:
+		checkExpressionStmt(r, n)
+	case *ast.TypeDeclStmt:
+		checkTypeDecl(r, n)
+	// Add more cases as needed
 	default:
-		fmt.Printf("[TypeChecker] type checking for %s is not implemented yet.\n", reflect.TypeOf(node))
-		os.Exit(0)
+		// Skip nodes that don't need type checking
 	}
 }
 
-func (tc *TypeChecker) CheckImport(n *ast.ImportStmt) {
-	if tc.ctx == nil {
-		fmt.Println("[TypeChecker] CompilerContext is not set for import type checking.")
-		os.Exit(1)
-	}
-	alias := n.ModuleName
-	_, ok := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Imports[alias]
-	if !ok {
-		tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("unknown module: %s", alias), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		if tc.Debug {
-			fmt.Printf("[TypeChecker] Import alias '%s' not found in Imports map.\n", alias)
+// checkTypeCompatibility validates that an initializer type is compatible with the variable type
+func checkTypeCompatibility(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initType semantic.Type) {
+	if initType != nil {
+		// Resolve type aliases for both target and source types
+		targetType := resolveTypeAlias(r, sym.Type)
+		sourceType := resolveTypeAlias(r, initType)
+
+		if !semantic.IsAssignableFrom(targetType, sourceType) {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				v.Identifier.Loc(),
+				"type mismatch: cannot assign "+initType.String()+" to "+sym.Type.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
 		}
-		return
 	}
-	// Only typecheck the imported module if not already checked
-	if tc.CheckedMods[alias] {
-		return
-	}
-	modAST := tc.ctx.GetModule(tc.program.ModulenameToImportpath[alias]).AST
-	if modAST == nil {
-		modAST = tc.ctx.GetModule(tc.program.ModulenameToImportpath[alias]).AST
-	}
-	if modAST == nil {
-		tc.ctx.Reports.Add(tc.CurrentFile, n.Loc(), fmt.Sprintf("module not found for alias '%s' (file: %s)", alias, tc.program.ModulenameToImportpath[alias]), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		if tc.Debug {
-			fmt.Printf("[TypeChecker] Module file '%s' not found for alias '%s'\n", tc.program.ModulenameToImportpath[alias], alias)
-		}
-		return
-	}
-	checker := NewTypeChecker(modAST, tc.ctx, tc.Debug)
-	checker.CheckedMods = tc.CheckedMods
-	checker.CheckProgram(modAST)
-	tc.CheckedMods[alias] = true
 }
 
-func (tc *TypeChecker) checkVarDecl(stmt *ast.VarDeclStmt) {
-	for i, v := range stmt.Variables {
-		if v.ExplicitType != nil && i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			initializer := stmt.Initializers[i]
-			initType := tc.checkExpr(&initializer)
-			declType := v.ExplicitType.Type()
-			if initType != declType {
-				tc.ctx.Reports.Add(tc.CurrentFile, v.Identifier.Loc(), fmt.Sprintf("type mismatch: expected %s, got %s", declType, initType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-				if tc.Debug {
-					fmt.Printf("[TypeChecker] : %s -> VarDecl type mismatch: expected %s, got %s\n", tc.CurrentFile, declType, initType)
-				}
+// performTypeInference infers the type of a variable from its initializer
+func performTypeInference(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initType semantic.Type) {
+	if initType != nil {
+		// Update the symbol's type with the inferred type
+		sym.Type = initType
+	} else {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			v.Identifier.Loc(),
+			"cannot infer type: initializer expression is invalid",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+	}
+}
+
+// checkAssignment performs type checking on assignments
+func checkAssignment(r *analyzer.AnalyzerNode, stmt *ast.AssignmentStmt) {
+	// Check each assignment pair
+	leftExprs := *stmt.Left
+	rightExprs := *stmt.Right
+
+	for i, leftExpr := range leftExprs {
+		if i >= len(rightExprs) {
+			break // Mismatched assignment count - should be caught elsewhere
+		}
+
+		leftType := inferExpressionType(r, leftExpr)
+		rightType := inferExpressionType(r, rightExprs[i])
+
+		if leftType != nil && rightType != nil {
+			if !semantic.IsAssignableFrom(leftType, rightType) {
+				r.Ctx.Reports.Add(
+					r.Program.FullPath,
+					leftExpr.Loc(),
+					"type mismatch: cannot assign "+rightType.String()+" to "+leftType.String(),
+					report.TYPECHECK_PHASE,
+				).SetLevel(report.SEMANTIC_ERROR)
 			}
 		}
 	}
 }
 
-func (tc *TypeChecker) checkAssignment(stmt *ast.AssignmentStmt) {
-	for i, lhs := range *stmt.Left {
-		lhsType := tc.checkExpr(&lhs)
-		if i < len(*stmt.Right) {
-			rightElem := (*stmt.Right)[i]
-			rhsType := tc.checkExpr(&rightElem)
-			if lhsType != rhsType {
-				tc.ctx.Reports.Add(tc.CurrentFile, lhs.Loc(), fmt.Sprintf("type mismatch in assignment: %s = %s", lhsType, rhsType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-				if tc.Debug {
-					fmt.Printf("[TypeChecker] Assignment type mismatch: %s = %s\n", lhsType, rhsType)
-				}
+// checkExpressionStmt performs type checking on expression statements
+func checkExpressionStmt(r *analyzer.AnalyzerNode, stmt *ast.ExpressionStmt) {
+	if stmt.Expressions != nil {
+		for _, expr := range *stmt.Expressions {
+			inferExpressionType(r, expr) // This will catch type errors in expressions
+		}
+	}
+}
+
+// checkTypeDecl performs type checking on type declarations
+func checkTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
+	// Basic validation - more sophisticated checks can be added here
+	if stmt.BaseType != nil {
+		checkTypeValidity(r, stmt.BaseType)
+	}
+}
+
+// checkTypeValidity checks if a type is valid (exists and is well-formed)
+func checkTypeValidity(r *analyzer.AnalyzerNode, dataType ast.DataType) bool {
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
+		return false
+	}
+
+	switch t := dataType.(type) {
+	case *ast.UserDefinedType:
+		// Check if the user-defined type exists
+		_, found := currentModule.SymbolTable.Lookup(string(t.TypeName))
+		if !found {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				t.Loc(),
+				"undefined type: "+string(t.TypeName),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+			return false
+		}
+		return true
+	case *ast.ArrayType:
+		return checkTypeValidity(r, t.ElementType)
+	case *ast.StructType:
+		// Check all field types
+		for _, field := range t.Fields {
+			if field.FieldType != nil && !checkTypeValidity(r, field.FieldType) {
+				return false
 			}
 		}
+		return true
+	default:
+		// Primitive types are always valid
+		return true
 	}
 }
 
-func checkBinaryExpr(e *ast.BinaryExpr, tc *TypeChecker) types.TYPE_NAME {
-	leftType := tc.checkExpr(e.Left)
-	rightType := tc.checkExpr(e.Right)
-	if leftType != rightType {
-		tc.ctx.Reports.Add(tc.CurrentFile, e.Loc(), fmt.Sprintf("type mismatch in binary expr: %s %s %s", leftType, e.Operator.Value, rightType), report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		if tc.Debug {
-			fmt.Printf("[TypeChecker] BinaryExpr type mismatch: %s %s %s\n", leftType, e.Operator.Value, rightType)
-		}
+// inferExpressionType infers the type of an expression
+func inferExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression) semantic.Type {
+	if expr == nil {
+		return nil
 	}
-	return leftType
-}
 
-func checkIdentifierExpr(e *ast.IdentifierExpr, tc *TypeChecker) types.TYPE_NAME {
-	sym, found := tc.ctx.Modules[tc.CurrentFile].SymbolTable.Lookup(e.Name)
-	if found && sym.Type != nil {
-		return sym.Type.Type()
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
+		return nil
 	}
-	return ""
-}
 
-func (tc *TypeChecker) checkExpr(expr *ast.Expression) types.TYPE_NAME {
-	switch e := (*expr).(type) {
-	case *ast.IntLiteral:
-		return types.INT32
-	case *ast.FloatLiteral:
-		return types.FLOAT64
-	case *ast.StringLiteral:
-		return types.STRING
-	case *ast.BoolLiteral:
-		return types.BOOL
-	case *ast.ByteLiteral:
-		return types.BYTE
+	var resultType semantic.Type
+
+	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
-		return checkIdentifierExpr(e, tc)
-	case *ast.BinaryExpr:
-		return checkBinaryExpr(e, tc)
-	case *ast.UnaryExpr:
-		return tc.checkExpr(e.Operand)
-	case *ast.PrefixExpr:
-		return tc.checkExpr(e.Operand)
-	case *ast.PostfixExpr:
-		return tc.checkExpr(e.Operand)
-	case *ast.FunctionCallExpr:
-		fmt.Println("[TypeChecker] type checking for FunctionCallExpr is not implemented yet.")
-		os.Exit(0)
-		return types.VOID
+		resultType = inferIdentifierType(currentModule, e)
+	case *ast.StringLiteral:
+		resultType = semantic.CreatePrimitiveType(types.STRING)
+	case *ast.IntLiteral:
+		resultType = semantic.CreatePrimitiveType(types.INT32)
+	case *ast.FloatLiteral:
+		resultType = semantic.CreatePrimitiveType(types.FLOAT64)
+	case *ast.BoolLiteral:
+		resultType = semantic.CreatePrimitiveType(types.BOOL)
+	case *ast.ByteLiteral:
+		resultType = semantic.CreatePrimitiveType(types.BYTE)
 	case *ast.FieldAccessExpr:
-		fmt.Println("[TypeChecker] type checking for FieldAccessExpr is not implemented yet.")
-		os.Exit(0)
-		return ""
+		resultType = inferFieldAccessType(r, e)
+	case *ast.BinaryExpr:
+		resultType = inferBinaryExprType(r, e)
+	case *ast.VarScopeResolution:
+		resultType = inferVarScopeResolutionType(r, e)
+	case *ast.StructLiteralExpr:
+		resultType = inferStructLiteralType(r, currentModule, e)
+	case *ast.ArrayLiteralExpr:
+		resultType = inferArrayLiteralType(r, e)
+	case *ast.IndexableExpr:
+		resultType = inferIndexableType(r, e)
+	case *ast.TypeScopeResolution:
+		resultType = inferTypeScopeResolutionType(r, e)
 	default:
-		fmt.Printf("[TypeChecker] type checking for <%s> is not implemented yet.\n", reflect.TypeOf(expr))
-		os.Exit(0)
-		return ""
+		resultType = nil
+	}
+
+	logInferredType(r, expr, resultType)
+	return resultType
+}
+
+// inferBinaryOperationType infers the result type of a binary operation
+func inferBinaryOperationType(operator string, leftType, rightType semantic.Type) semantic.Type {
+	switch operator {
+	case "+", "-", "*", "/", "%":
+		return inferArithmeticOperationType(operator, leftType, rightType)
+	case "==", "!=", "<", "<=", ">", ">=":
+		return inferComparisonOperationType(leftType, rightType)
+	case "&&", "||":
+		return inferLogicalOperationType(leftType, rightType)
+	case "&", "|", "^", "<<", ">>":
+		return inferBitwiseOperationType(leftType, rightType)
+	default:
+		return nil
+	}
+}
+
+// inferArithmeticOperationType handles arithmetic operations
+func inferArithmeticOperationType(operator string, leftType, rightType semantic.Type) semantic.Type {
+	// Arithmetic operations - return common numeric type
+	commonType := semantic.GetCommonType(leftType, rightType)
+	if commonType != nil {
+		return commonType
+	}
+
+	// String concatenation with + (only str + str)
+	if operator == "+" {
+		leftPrim, leftOk := leftType.(*semantic.PrimitiveType)
+		rightPrim, rightOk := rightType.(*semantic.PrimitiveType)
+
+		if leftOk && rightOk &&
+			leftPrim.Name == types.STRING && rightPrim.Name == types.STRING {
+			return semantic.CreatePrimitiveType(types.STRING)
+		}
+	}
+
+	// If we reach here, the operation is invalid
+	return nil
+}
+
+// inferComparisonOperationType handles comparison operations
+func inferComparisonOperationType(leftType, rightType semantic.Type) semantic.Type {
+	// Check if types are comparable
+	if semantic.IsAssignableFrom(leftType, rightType) ||
+		semantic.IsAssignableFrom(rightType, leftType) ||
+		semantic.GetCommonType(leftType, rightType) != nil {
+		return semantic.CreatePrimitiveType(types.BOOL)
+	}
+	return nil
+}
+
+// inferLogicalOperationType handles logical operations
+func inferLogicalOperationType(leftType, rightType semantic.Type) semantic.Type {
+	leftPrim, leftOk := leftType.(*semantic.PrimitiveType)
+	rightPrim, rightOk := rightType.(*semantic.PrimitiveType)
+
+	if leftOk && rightOk &&
+		leftPrim.Name == types.BOOL && rightPrim.Name == types.BOOL {
+		return semantic.CreatePrimitiveType(types.BOOL)
+	}
+	return nil
+}
+
+// inferBitwiseOperationType handles bitwise operations
+func inferBitwiseOperationType(leftType, rightType semantic.Type) semantic.Type {
+	leftPrim, leftOk := leftType.(*semantic.PrimitiveType)
+	rightPrim, rightOk := rightType.(*semantic.PrimitiveType)
+
+	if leftOk && rightOk && isIntegerType(leftPrim.Name) && isIntegerType(rightPrim.Name) {
+		commonType := semantic.GetCommonType(leftType, rightType)
+		if commonType != nil {
+			return commonType
+		}
+	}
+	return nil
+}
+
+// isIntegerType checks if a type is an integer type
+func isIntegerType(typeName types.TYPE_NAME) bool {
+	switch typeName {
+	case types.INT8, types.INT16, types.INT32, types.INT64,
+		types.UINT8, types.UINT16, types.UINT32, types.UINT64, types.BYTE:
+		return true
+	default:
+		return false
+	}
+}
+
+// resolveTypeAlias resolves a type alias to its underlying type
+func resolveTypeAlias(r *analyzer.AnalyzerNode, t semantic.Type) semantic.Type {
+	userType, ok := t.(*semantic.UserType)
+	if !ok {
+		return t
+	}
+
+	// Try to find the type in current module first
+	if resolvedType := resolveTypeInCurrentModule(r, userType); resolvedType != nil {
+		return resolvedType
+	}
+
+	// If not found locally, check imported modules
+	if resolvedType := resolveTypeInImportedModules(r, userType); resolvedType != nil {
+		return resolvedType
+	}
+
+	// If not found, return the original type
+	return t
+}
+
+// resolveTypeInCurrentModule tries to resolve a type in the current module
+func resolveTypeInCurrentModule(r *analyzer.AnalyzerNode, userType *semantic.UserType) semantic.Type {
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
+		return nil
+	}
+
+	sym, found := currentModule.SymbolTable.Lookup(string(userType.Name))
+	if found && sym.Kind == semantic.SymbolType && sym.Type != nil {
+		return sym.Type
+	}
+	return nil
+}
+
+// resolveTypeInImportedModules tries to resolve a type in imported modules
+func resolveTypeInImportedModules(r *analyzer.AnalyzerNode, userType *semantic.UserType) semantic.Type {
+	typeName := string(userType.Name)
+
+	for _, moduleName := range r.Ctx.ModuleNames() {
+		module, err := r.Ctx.GetModule(moduleName)
+		if err != nil {
+			continue
+		}
+
+		sym, found := module.SymbolTable.Lookup(typeName)
+		if found && sym.Kind == semantic.SymbolType && sym.Type != nil {
+			return sym.Type
+		}
+	}
+	return nil
+}
+
+// Helper functions for inferExpressionType to reduce cognitive complexity
+
+// inferIdentifierType infers the type of an identifier expression
+func inferIdentifierType(currentModule *ctx.Module, e *ast.IdentifierExpr) semantic.Type {
+	sym, found := currentModule.SymbolTable.Lookup(e.Name)
+	if found {
+		return sym.Type
+	}
+	return nil
+}
+
+// inferFieldAccessType infers the type of a field access expression
+func inferFieldAccessType(r *analyzer.AnalyzerNode, e *ast.FieldAccessExpr) semantic.Type {
+	objectType := inferExpressionType(r, *e.Object)
+	if structType, ok := objectType.(*semantic.StructType); ok {
+		fieldType := structType.GetFieldType(e.Field.Name)
+		if fieldType == nil {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				e.Field.Loc(),
+				"field '"+e.Field.Name+"' not found in "+structType.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+		}
+		return fieldType
+	}
+	return nil
+}
+
+// inferBinaryExprType infers the type of a binary expression
+func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr) semantic.Type {
+	leftType := inferExpressionType(r, *e.Left)
+	rightType := inferExpressionType(r, *e.Right)
+
+	if leftType == nil || rightType == nil {
+		return nil
+	}
+
+	resultType := inferBinaryOperationType(e.Operator.Value, leftType, rightType)
+	if resultType == nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"invalid binary operation: "+leftType.String()+" "+e.Operator.Value+" "+rightType.String(),
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+	}
+	return resultType
+}
+
+// inferVarScopeResolutionType infers the type of a variable scope resolution expression
+func inferVarScopeResolutionType(r *analyzer.AnalyzerNode, e *ast.VarScopeResolution) semantic.Type {
+	moduleName := e.Module.Name
+	varName := e.Var.Name
+
+	importModuleName, ok := r.Program.ModulenameToImportpath[moduleName]
+	if !ok {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"module not found: "+moduleName,
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	importedModule, err := r.Ctx.GetModule(importModuleName)
+	if err != nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			err.Error(),
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	sym, found := importedModule.SymbolTable.Lookup(varName)
+	if !found {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"variable '"+varName+"' not found in module '"+moduleName+"'",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+	return sym.Type
+}
+
+// inferStructLiteralType infers the type of a struct literal expression
+func inferStructLiteralType(r *analyzer.AnalyzerNode, currentModule *ctx.Module, e *ast.StructLiteralExpr) semantic.Type {
+	if e.IsAnonymous {
+		panic("Anonymous struct literals are not yet supported")
+	}
+
+	if e.StructName == nil {
+		return nil
+	}
+
+	structTypeName := e.StructName.Name
+	sym, found := currentModule.SymbolTable.Lookup(structTypeName)
+	if !found {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"struct type '"+structTypeName+"' not found",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+	if !validateStructLiteralFields(r, e, sym.Type) {
+		return nil
+	}
+	return sym.Type
+}
+
+// inferArrayLiteralType infers the type of an array literal expression
+func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr) semantic.Type {
+	if len(e.Elements) == 0 {
+		// Empty array - cannot infer type
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"cannot infer array type from empty array literal",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	// Infer type from first element
+	firstElementType := inferExpressionType(r, e.Elements[0])
+	if firstElementType == nil {
+		return nil
+	}
+
+	// Check that all elements have compatible types
+	commonType := firstElementType
+	for _, element := range e.Elements {
+		elementType := inferExpressionType(r, element)
+		if elementType == nil {
+			continue
+		}
+
+		// Try to find a common type
+		newCommonType := semantic.GetCommonType(commonType, elementType)
+		if newCommonType == nil {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				element.Loc(),
+				"array element type mismatch: cannot use "+elementType.String()+" in array of "+commonType.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+			return nil
+		}
+		commonType = newCommonType
+	}
+
+	// Create array type with the common element type
+	return semantic.CreateArrayType(commonType)
+}
+
+// inferIndexableType infers the type of an array/map indexing expression
+func inferIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr) semantic.Type {
+	// Get the type of the indexable expression
+	indexableType := inferExpressionType(r, *e.Indexable)
+	if indexableType == nil {
+		return nil
+	}
+
+	// Check if it's an array type
+	if arrayType, ok := indexableType.(*semantic.ArrayType); ok {
+		// Verify the index is an integer type
+		indexType := inferExpressionType(r, *e.Index)
+		if indexType == nil {
+			return nil
+		}
+
+		// Check if index type is an integer
+		if !isIntegerTypeForIndexing(indexType) {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				(*e.Index).Loc(),
+				"array index must be an integer type, got "+indexType.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+			return nil
+		}
+
+		// Return the element type of the array
+		return arrayType.ElementType
+	}
+
+	// If not an array, report error
+	r.Ctx.Reports.Add(
+		r.Program.FullPath,
+		(*e.Indexable).Loc(),
+		"cannot index non-array type "+indexableType.String(),
+		report.TYPECHECK_PHASE,
+	).SetLevel(report.SEMANTIC_ERROR)
+	return nil
+}
+
+// isIntegerTypeForIndexing checks if a type can be used as an array index
+func isIntegerTypeForIndexing(t semantic.Type) bool {
+	if primType, ok := t.(*semantic.PrimitiveType); ok {
+		return isIntegerType(primType.Name)
+	}
+	return false
+}
+
+// inferTypeScopeResolutionType infers the type of a type scope resolution expression
+func inferTypeScopeResolutionType(r *analyzer.AnalyzerNode, e *ast.TypeScopeResolution) semantic.Type {
+	moduleName := e.Module.Name
+	typeName := string(e.Type())
+
+	importModuleName, ok := r.Program.ModulenameToImportpath[moduleName]
+	if !ok {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"module not found: "+moduleName,
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	importedModule, err := r.Ctx.GetModule(importModuleName)
+	if err != nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			err.Error(),
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	sym, found := importedModule.SymbolTable.Lookup(typeName)
+	if !found {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"type '"+typeName+"' not found in module '"+moduleName+"'",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+	// For TypeScopeResolution, we return the actual type, not the symbol's type
+	return sym.Type
+}
+
+// logInferredType logs the inferred type for debugging
+func logInferredType(r *analyzer.AnalyzerNode, expr ast.Expression, resultType semantic.Type) {
+	if r.Debug {
+		if resultType == nil {
+			colors.YELLOW.Printf("Inferred type for expression '%v': <nil>\n", expr)
+		} else {
+			colors.YELLOW.Printf("Inferred type for expression '%v': %s\n", expr, resultType.String())
+		}
 	}
 }

@@ -19,8 +19,9 @@ func parseLogicalOr(p *Parser) ast.Expression {
 	for p.match(lexer.OR_TOKEN) {
 		operator := p.advance()
 		right := parseLogicalAnd(p)
+		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &expr,
+			Left:     &left,
 			Operator: operator,
 			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
@@ -37,8 +38,9 @@ func parseLogicalAnd(p *Parser) ast.Expression {
 	for p.match(lexer.AND_TOKEN) {
 		operator := p.advance()
 		right := parseEquality(p)
+		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &expr,
+			Left:     &left,
 			Operator: operator,
 			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
@@ -55,8 +57,9 @@ func parseEquality(p *Parser) ast.Expression {
 	for p.match(lexer.DOUBLE_EQUAL_TOKEN, lexer.NOT_EQUAL_TOKEN) {
 		operator := p.advance()
 		right := parseComparison(p)
+		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &expr,
+			Left:     &left,
 			Operator: operator,
 			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
@@ -73,8 +76,9 @@ func parseComparison(p *Parser) ast.Expression {
 	for p.match(lexer.LESS_TOKEN, lexer.GREATER_TOKEN, lexer.LESS_EQUAL_TOKEN, lexer.GREATER_EQUAL_TOKEN) {
 		operator := p.advance()
 		right := parseAdditive(p)
+		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &expr,
+			Left:     &left,
 			Operator: operator,
 			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
@@ -91,8 +95,9 @@ func parseAdditive(p *Parser) ast.Expression {
 	for p.match(lexer.PLUS_TOKEN, lexer.MINUS_TOKEN) {
 		operator := p.advance()
 		right := parseMultiplicative(p)
+		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &expr,
+			Left:     &left,
 			Operator: operator,
 			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
@@ -109,8 +114,9 @@ func parseMultiplicative(p *Parser) ast.Expression {
 	for p.match(lexer.MUL_TOKEN, lexer.DIV_TOKEN, lexer.MOD_TOKEN) {
 		operator := p.advance()
 		right := parseUnary(p)
+		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &expr,
+			Left:     &left,
 			Operator: operator,
 			Right:    &right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),

@@ -60,6 +60,27 @@ Formats all Go code in the project.
   ./scripts/fmt.sh
   ```
 
+#### `pr-check.bat` / `pr-check.sh`
+Simulates the GitHub Actions PR workflow locally.
+- **Purpose**: Test all PR validation steps before pushing
+- **Features**: 
+  - Code formatting validation
+  - Static analysis (go vet)
+  - Complete test suite
+  - Compiler build verification
+  - CLI functionality testing
+  - Security scanning with gosec
+- **Output**: Creates `gosec.sarif` file with security scan results
+- **Usage**:
+  ```bash
+  # Windows Command Prompt/PowerShell
+  .\scripts\pr-check.bat
+  
+  # Linux/macOS/Git Bash
+  ./scripts/pr-check.sh
+  ```
+- **Note**: Automatically installs gosec if not present
+
 ### Quality Assurance Scripts
 
 #### `ci-check.bat` / `ci-check.sh`
