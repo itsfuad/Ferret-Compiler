@@ -30,7 +30,7 @@ let str2: str = "World";
 let greeting: str = str1 + str2; // str + str should work
 
 // This should cause an error (str + non-str)
-let invalid: str = str1 + x;
+// let invalid: str = str1 + x;
 
 let a = 5;
 let b = 10;
