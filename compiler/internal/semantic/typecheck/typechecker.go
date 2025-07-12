@@ -22,6 +22,8 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 // checkNode performs type checking on a single AST node
 func checkNode(r *analyzer.AnalyzerNode, node ast.Node) {
 	switch n := node.(type) {
+	case *ast.ImportStmt:
+		checkImportStmt(r, n)
 	case *ast.VarDeclStmt:
 		checkVarDecl(r, n)
 	case *ast.AssignmentStmt:
@@ -34,6 +36,35 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node) {
 	default:
 		// Skip nodes that don't need type checking
 	}
+}
+
+// checkImportStmt performs type checking on import statements
+func checkImportStmt(r *analyzer.AnalyzerNode, stmt *ast.ImportStmt) {
+	//check the imported module
+	importModule := r.Ctx.GetModule(stmt.ImportPath.Value)
+	if importModule == nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			stmt.Loc(),
+			"imported module not found: "+stmt.ImportPath.Value,
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return
+	}
+
+	if importModule.AST == nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			stmt.Loc(),
+			"imported module has no AST: "+stmt.ImportPath.Value,
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return
+	}
+
+	//typecheck it
+	anz := analyzer.NewAnalyzerNode(importModule.AST, r.Ctx, r.Debug)
+	CheckProgram(anz)
 }
 
 // checkVarDecl performs type checking on variable declarations

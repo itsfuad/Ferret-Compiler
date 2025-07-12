@@ -66,6 +66,7 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 	}
 
 	// --- Type Checking ---
+	// Type check the entry point program (which will handle imports internally)
 	typecheck.CheckProgram(anz)
 
 	if context.Reports.HasErrors() {

@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"compiler/internal/types"
@@ -70,8 +71,17 @@ func (s *StructType) String() string {
 		return fmt.Sprintf("struct %s {}", s.Name)
 	}
 
+	// Collect field names and sort them for consistent output
+	var fieldNames []string
+	for fieldName := range s.Fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	// Build field strings in alphabetical order
 	var fieldStrs []string
-	for fieldName, fieldType := range s.Fields {
+	for _, fieldName := range fieldNames {
+		fieldType := s.Fields[fieldName]
 		fieldStrs = append(fieldStrs, fmt.Sprintf("%s: %s", fieldName, fieldType.String()))
 	}
 	return fmt.Sprintf("struct %s { %s }", s.Name, strings.Join(fieldStrs, ", "))
