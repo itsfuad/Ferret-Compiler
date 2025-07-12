@@ -91,4 +91,4 @@ myCar.make = "Honda"; // Update the make of the car
 
 //array 
 let numbers = [1, 2, 3, 4, 5]; // Array of integers
-let mixedArray = [1, "two", 3.0]; // Array
+// let mixedArray = [1, "two", 3.0]; // Array
