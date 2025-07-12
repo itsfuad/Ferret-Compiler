@@ -215,7 +215,7 @@ func inferExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression) semantic
 			return nil
 		}
 
-		resultType := inferBinaryOperationType(r, e.Operator.Value, leftType, rightType)
+		resultType := inferBinaryOperationType(e.Operator.Value, leftType, rightType)
 
 		// Report error if binary operation is invalid
 		if resultType == nil {
@@ -236,7 +236,7 @@ func inferExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression) semantic
 }
 
 // inferBinaryOperationType infers the result type of a binary operation
-func inferBinaryOperationType(r *analyzer.AnalyzerNode, operator string, leftType, rightType semantic.Type) semantic.Type {
+func inferBinaryOperationType(operator string, leftType, rightType semantic.Type) semantic.Type {
 	switch operator {
 	case "+", "-", "*", "/", "%":
 		return inferArithmeticOperationType(operator, leftType, rightType)
