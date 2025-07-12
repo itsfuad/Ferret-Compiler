@@ -18,7 +18,19 @@ import "app/data";
 // - Standard library imports use "std/" prefix
 // - External libraries use "github.com/user/repo/path" format
 // - .fer extension is automatically added by the resolver
-// - Remote modules resolve their imports relative to their own repository root
+
+// Test numeric operations (should return largest type)
+let x: i32 = 42;
+let y: i64 = 100;
+let z: i64 = x + y; // i32 + i64 should result in i64
+
+// Test string concatenation (should only work with str + str)
+let str1: str = "Hello ";
+let str2: str = "World";
+let greeting: str = str1 + str2; // str + str should work
+
+// This should cause an error (str + non-str)
+let invalid: str = str1 + x;
 
 let a = 5;
 let b = 10;
@@ -75,4 +87,4 @@ let myCar = @Car {
 };
 
 myCar.make = "Honda"; // Update the make of the car
-notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
+//notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
