@@ -1,0 +1,46 @@
+// Test struct field validation
+
+type Person struct {
+    name: str,
+    age: i32,
+    email: str
+};
+
+// Valid struct literal
+let validPerson = @Person {
+    name: "Alice",
+    age: 25,
+    email: "alice@example.com"
+};
+
+// Test cases that should cause errors:
+
+// Missing field
+// let invalidPerson1 = @Person {
+//     name: "Bob",
+//     age: 30
+//     // missing email field
+// };
+
+// Extra field
+// let invalidPerson2 = @Person {
+//     name: "Charlie",
+//     age: 35,
+//     email: "charlie@example.com",
+//     address: "123 Main St"  // field doesn't exist
+// };
+
+// Wrong type
+// let invalidPerson3 = @Person {
+//     name: "Dave",
+//     age: "thirty",  // should be i32, not str
+//     email: "dave@example.com"
+// };
+
+// Duplicate field
+// let invalidPerson4 = @Person {
+//     name: "Eve",
+//     age: 28,
+//     age: 29,  // duplicate field
+//     email: "eve@example.com"
+// };

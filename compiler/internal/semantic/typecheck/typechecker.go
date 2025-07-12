@@ -39,67 +39,6 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node) {
 	}
 }
 
-// checkImportStmt performs type checking on import statements
-func checkImportStmt(r *analyzer.AnalyzerNode, stmt *ast.ImportStmt) {
-	//check the imported module
-	importModule, err := r.Ctx.GetModule(stmt.ImportPath.Value)
-	if err != nil {
-		r.Ctx.Reports.Add(
-			r.Program.FullPath,
-			stmt.Loc(),
-			err.Error(),
-			report.TYPECHECK_PHASE,
-		).SetLevel(report.SEMANTIC_ERROR)
-		return
-	}
-
-	if importModule.AST == nil {
-		r.Ctx.Reports.Add(
-			r.Program.FullPath,
-			stmt.Loc(),
-			"imported module has no AST: "+stmt.ImportPath.Value,
-			report.TYPECHECK_PHASE,
-		).SetLevel(report.SEMANTIC_ERROR)
-		return
-	}
-
-	//typecheck it
-	anz := analyzer.NewAnalyzerNode(importModule.AST, r.Ctx, r.Debug)
-	CheckProgram(anz)
-}
-
-// checkVarDecl performs type checking on variable declarations
-func checkVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
-	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
-	if err != nil {
-		return
-	}
-
-	for i, v := range stmt.Variables {
-		sym, found := currentModule.SymbolTable.Lookup(v.Identifier.Name)
-		if !found {
-			continue // Error should have been reported by resolver
-		}
-
-		if i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			checkVariableInitializer(r, v, sym, stmt.Initializers[i])
-		}
-	}
-}
-
-// checkVariableInitializer checks the type compatibility of a variable initializer
-func checkVariableInitializer(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initializer ast.Expression) {
-	initType := inferExpressionType(r, initializer)
-
-	if sym.Type != nil {
-		// Explicit type provided - check compatibility
-		checkTypeCompatibility(r, v, sym, initType)
-	} else {
-		// No explicit type provided - perform type inference
-		performTypeInference(r, v, sym, initType)
-	}
-}
-
 // checkTypeCompatibility validates that an initializer type is compatible with the variable type
 func checkTypeCompatibility(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initType semantic.Type) {
 	if initType != nil {
@@ -496,7 +435,6 @@ func inferVarScopeResolutionType(r *analyzer.AnalyzerNode, e *ast.VarScopeResolu
 func inferStructLiteralType(r *analyzer.AnalyzerNode, currentModule *ctx.Module, e *ast.StructLiteralExpr) semantic.Type {
 	if e.IsAnonymous {
 		panic("Anonymous struct literals are not yet supported")
-		return nil
 	}
 
 	if e.StructName == nil {
@@ -514,7 +452,9 @@ func inferStructLiteralType(r *analyzer.AnalyzerNode, currentModule *ctx.Module,
 		).SetLevel(report.SEMANTIC_ERROR)
 		return nil
 	}
-	// TODO: Validate that the fields match the struct definition
+	if !validateStructLiteralFields(r, e, sym.Type) {
+		return nil
+	}
 	return sym.Type
 }
 
