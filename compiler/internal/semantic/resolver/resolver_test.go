@@ -322,7 +322,7 @@ func TestResolveVarDecl(t *testing.T) {
 			r, ctx := createTestAnalyzer(t)
 
 			// Setup pre-declared symbol if needed
-			module := ctx.GetModule(r.Program.ImportPath)
+			module, _ := ctx.GetModule(r.Program.ImportPath)
 			if tt.preDeclareName != "" {
 				module.SymbolTable.Declare(tt.preDeclareName, &semantic.Symbol{
 					Name: tt.preDeclareName,
@@ -389,7 +389,7 @@ func runAssignmentTest(t *testing.T, name string, varName string, declareVar boo
 	t.Helper()
 	r, ctx := createTestAnalyzer(t)
 
-	module := ctx.GetModule(r.Program.ImportPath)
+	module, _ := ctx.GetModule(r.Program.ImportPath)
 	if module != nil && declareVar {
 		setupDeclaredVariable(module.SymbolTable, varName)
 	}

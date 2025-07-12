@@ -2,6 +2,7 @@ package typecheck
 
 import (
 	"compiler/colors"
+	"compiler/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
@@ -41,12 +42,12 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node) {
 // checkImportStmt performs type checking on import statements
 func checkImportStmt(r *analyzer.AnalyzerNode, stmt *ast.ImportStmt) {
 	//check the imported module
-	importModule := r.Ctx.GetModule(stmt.ImportPath.Value)
-	if importModule == nil {
+	importModule, err := r.Ctx.GetModule(stmt.ImportPath.Value)
+	if err != nil {
 		r.Ctx.Reports.Add(
 			r.Program.FullPath,
 			stmt.Loc(),
-			"imported module not found: "+stmt.ImportPath.Value,
+			err.Error(),
 			report.TYPECHECK_PHASE,
 		).SetLevel(report.SEMANTIC_ERROR)
 		return
@@ -69,44 +70,71 @@ func checkImportStmt(r *analyzer.AnalyzerNode, stmt *ast.ImportStmt) {
 
 // checkVarDecl performs type checking on variable declarations
 func checkVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
-	currentModule := r.Ctx.GetModule(r.Program.ImportPath)
-	if currentModule == nil {
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
 		return
 	}
 
 	for i, v := range stmt.Variables {
-		// Get the symbol from the symbol table (should have been added by resolver)
 		sym, found := currentModule.SymbolTable.Lookup(v.Identifier.Name)
 		if !found {
 			continue // Error should have been reported by resolver
 		}
 
-		// Type check initializer if present
 		if i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			initType := inferExpressionType(r, stmt.Initializers[i])
-
-			// If explicit type is provided, check compatibility
-			if sym.Type != nil {
-				if initType != nil && !semantic.IsAssignableFrom(sym.Type, initType) {
-					r.Ctx.Reports.Add(
-						r.Program.FullPath,
-						v.Identifier.Loc(),
-						"type mismatch: cannot assign "+initType.String()+" to "+sym.Type.String(),
-						report.TYPECHECK_PHASE,
-					).SetLevel(report.SEMANTIC_ERROR)
-				}
-			}
+			checkVariableInitializer(r, v, sym, stmt.Initializers[i])
 		}
+	}
+}
+
+// checkVariableInitializer checks the type compatibility of a variable initializer
+func checkVariableInitializer(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initializer ast.Expression) {
+	initType := inferExpressionType(r, initializer)
+
+	if sym.Type != nil {
+		// Explicit type provided - check compatibility
+		checkTypeCompatibility(r, v, sym, initType)
+	} else {
+		// No explicit type provided - perform type inference
+		performTypeInference(r, v, sym, initType)
+	}
+}
+
+// checkTypeCompatibility validates that an initializer type is compatible with the variable type
+func checkTypeCompatibility(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initType semantic.Type) {
+	if initType != nil {
+		// Resolve type aliases for both target and source types
+		targetType := resolveTypeAlias(r, sym.Type)
+		sourceType := resolveTypeAlias(r, initType)
+
+		if !semantic.IsAssignableFrom(targetType, sourceType) {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				v.Identifier.Loc(),
+				"type mismatch: cannot assign "+initType.String()+" to "+sym.Type.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+		}
+	}
+}
+
+// performTypeInference infers the type of a variable from its initializer
+func performTypeInference(r *analyzer.AnalyzerNode, v *ast.VariableToDeclare, sym *semantic.Symbol, initType semantic.Type) {
+	if initType != nil {
+		// Update the symbol's type with the inferred type
+		sym.Type = initType
+	} else {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			v.Identifier.Loc(),
+			"cannot infer type: initializer expression is invalid",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
 	}
 }
 
 // checkAssignment performs type checking on assignments
 func checkAssignment(r *analyzer.AnalyzerNode, stmt *ast.AssignmentStmt) {
-	currentModule := r.Ctx.GetModule(r.Program.ImportPath)
-	if currentModule == nil {
-		return
-	}
-
 	// Check each assignment pair
 	leftExprs := *stmt.Left
 	rightExprs := *stmt.Right
@@ -151,8 +179,8 @@ func checkTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
 
 // checkTypeValidity checks if a type is valid (exists and is well-formed)
 func checkTypeValidity(r *analyzer.AnalyzerNode, dataType ast.DataType) bool {
-	currentModule := r.Ctx.GetModule(r.Program.ImportPath)
-	if currentModule == nil {
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
 		return false
 	}
 
@@ -192,78 +220,42 @@ func inferExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression) semantic
 		return nil
 	}
 
-	currentModule := r.Ctx.GetModule(r.Program.ImportPath)
-	if currentModule == nil {
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
 		return nil
 	}
+
+	var resultType semantic.Type
 
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
-		sym, found := currentModule.SymbolTable.Lookup(e.Name)
-		if found {
-			return sym.Type
-		}
-		return nil
-
+		resultType = inferIdentifierType(currentModule, e)
 	case *ast.StringLiteral:
-		return semantic.CreatePrimitiveType(types.STRING)
-
+		resultType = semantic.CreatePrimitiveType(types.STRING)
 	case *ast.IntLiteral:
-		return semantic.CreatePrimitiveType(types.INT32) // Default integer type
-
+		resultType = semantic.CreatePrimitiveType(types.INT32)
 	case *ast.FloatLiteral:
-		return semantic.CreatePrimitiveType(types.FLOAT64) // Default float type
-
+		resultType = semantic.CreatePrimitiveType(types.FLOAT64)
 	case *ast.BoolLiteral:
-		return semantic.CreatePrimitiveType(types.BOOL)
-
+		resultType = semantic.CreatePrimitiveType(types.BOOL)
 	case *ast.ByteLiteral:
-		return semantic.CreatePrimitiveType(types.BYTE)
-
+		resultType = semantic.CreatePrimitiveType(types.BYTE)
 	case *ast.FieldAccessExpr:
-		// Get the type of the object
-		objectType := inferExpressionType(r, *e.Object)
-		if structType, ok := objectType.(*semantic.StructType); ok {
-			fieldType := structType.GetFieldType(e.Field.Name)
-			if fieldType == nil {
-				r.Ctx.Reports.Add(
-					r.Program.FullPath,
-					e.Field.Loc(),
-					"field '"+e.Field.Name+"' not found in struct '"+structType.String()+"'",
-					report.TYPECHECK_PHASE,
-				).SetLevel(report.SEMANTIC_ERROR)
-			}
-			return fieldType
-		}
-		return nil
-
+		resultType = inferFieldAccessType(r, e)
 	case *ast.BinaryExpr:
-		// Implement proper binary operation type rules
-		leftType := inferExpressionType(r, *e.Left)
-		rightType := inferExpressionType(r, *e.Right)
-
-		if leftType == nil || rightType == nil {
-			return nil
-		}
-
-		resultType := inferBinaryOperationType(e.Operator.Value, leftType, rightType)
-
-		// Report error if binary operation is invalid
-		if resultType == nil {
-			r.Ctx.Reports.Add(
-				r.Program.FullPath,
-				e.Loc(),
-				"invalid binary operation: "+leftType.String()+" "+e.Operator.Value+" "+rightType.String(),
-				report.TYPECHECK_PHASE,
-			).SetLevel(report.SEMANTIC_ERROR)
-		}
-
-		return resultType
-
-	// Add more expression types as needed
+		resultType = inferBinaryExprType(r, e)
+	case *ast.VarScopeResolution:
+		resultType = inferVarScopeResolutionType(r, e)
+	case *ast.StructLiteralExpr:
+		resultType = inferStructLiteralType(r, currentModule, e)
+	case *ast.TypeScopeResolution:
+		resultType = inferTypeScopeResolutionType(r, e)
 	default:
-		return nil
+		resultType = nil
 	}
+
+	logInferredType(r, expr, resultType)
+	return resultType
 }
 
 // inferBinaryOperationType infers the result type of a binary operation
@@ -350,5 +342,226 @@ func isIntegerType(typeName types.TYPE_NAME) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// resolveTypeAlias resolves a type alias to its underlying type
+func resolveTypeAlias(r *analyzer.AnalyzerNode, t semantic.Type) semantic.Type {
+	userType, ok := t.(*semantic.UserType)
+	if !ok {
+		return t
+	}
+
+	// Try to find the type in current module first
+	if resolvedType := resolveTypeInCurrentModule(r, userType); resolvedType != nil {
+		return resolvedType
+	}
+
+	// If not found locally, check imported modules
+	if resolvedType := resolveTypeInImportedModules(r, userType); resolvedType != nil {
+		return resolvedType
+	}
+
+	// If not found, return the original type
+	return t
+}
+
+// resolveTypeInCurrentModule tries to resolve a type in the current module
+func resolveTypeInCurrentModule(r *analyzer.AnalyzerNode, userType *semantic.UserType) semantic.Type {
+	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	if err != nil {
+		return nil
+	}
+
+	sym, found := currentModule.SymbolTable.Lookup(string(userType.Name))
+	if found && sym.Kind == semantic.SymbolType && sym.Type != nil {
+		return sym.Type
+	}
+	return nil
+}
+
+// resolveTypeInImportedModules tries to resolve a type in imported modules
+func resolveTypeInImportedModules(r *analyzer.AnalyzerNode, userType *semantic.UserType) semantic.Type {
+	typeName := string(userType.Name)
+
+	for _, moduleName := range r.Ctx.ModuleNames() {
+		module, err := r.Ctx.GetModule(moduleName)
+		if err != nil {
+			continue
+		}
+
+		sym, found := module.SymbolTable.Lookup(typeName)
+		if found && sym.Kind == semantic.SymbolType && sym.Type != nil {
+			return sym.Type
+		}
+	}
+	return nil
+}
+
+// Helper functions for inferExpressionType to reduce cognitive complexity
+
+// inferIdentifierType infers the type of an identifier expression
+func inferIdentifierType(currentModule *ctx.Module, e *ast.IdentifierExpr) semantic.Type {
+	sym, found := currentModule.SymbolTable.Lookup(e.Name)
+	if found {
+		return sym.Type
+	}
+	return nil
+}
+
+// inferFieldAccessType infers the type of a field access expression
+func inferFieldAccessType(r *analyzer.AnalyzerNode, e *ast.FieldAccessExpr) semantic.Type {
+	objectType := inferExpressionType(r, *e.Object)
+	if structType, ok := objectType.(*semantic.StructType); ok {
+		fieldType := structType.GetFieldType(e.Field.Name)
+		if fieldType == nil {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				e.Field.Loc(),
+				"field '"+e.Field.Name+"' not found in "+structType.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+		}
+		return fieldType
+	}
+	return nil
+}
+
+// inferBinaryExprType infers the type of a binary expression
+func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr) semantic.Type {
+	leftType := inferExpressionType(r, *e.Left)
+	rightType := inferExpressionType(r, *e.Right)
+
+	if leftType == nil || rightType == nil {
+		return nil
+	}
+
+	resultType := inferBinaryOperationType(e.Operator.Value, leftType, rightType)
+	if resultType == nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"invalid binary operation: "+leftType.String()+" "+e.Operator.Value+" "+rightType.String(),
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+	}
+	return resultType
+}
+
+// inferVarScopeResolutionType infers the type of a variable scope resolution expression
+func inferVarScopeResolutionType(r *analyzer.AnalyzerNode, e *ast.VarScopeResolution) semantic.Type {
+	moduleName := e.Module.Name
+	varName := e.Var.Name
+
+	importModuleName, ok := r.Program.ModulenameToImportpath[moduleName]
+	if !ok {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"module not found: "+moduleName,
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	importedModule, err := r.Ctx.GetModule(importModuleName)
+	if err != nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			err.Error(),
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	sym, found := importedModule.SymbolTable.Lookup(varName)
+	if !found {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"variable '"+varName+"' not found in module '"+moduleName+"'",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+	return sym.Type
+}
+
+// inferStructLiteralType infers the type of a struct literal expression
+func inferStructLiteralType(r *analyzer.AnalyzerNode, currentModule *ctx.Module, e *ast.StructLiteralExpr) semantic.Type {
+	if e.IsAnonymous {
+		// TODO: Handle anonymous struct literals
+		return nil
+	}
+
+	if e.StructName == nil {
+		return nil
+	}
+
+	structTypeName := e.StructName.Name
+	sym, found := currentModule.SymbolTable.Lookup(structTypeName)
+	if !found {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"struct type '"+structTypeName+"' not found",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+	// TODO: Validate that the fields match the struct definition
+	return sym.Type
+}
+
+// inferTypeScopeResolutionType infers the type of a type scope resolution expression
+func inferTypeScopeResolutionType(r *analyzer.AnalyzerNode, e *ast.TypeScopeResolution) semantic.Type {
+	moduleName := e.Module.Name
+	typeName := string(e.Type())
+
+	importModuleName, ok := r.Program.ModulenameToImportpath[moduleName]
+	if !ok {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"module not found: "+moduleName,
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	importedModule, err := r.Ctx.GetModule(importModuleName)
+	if err != nil {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			err.Error(),
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	sym, found := importedModule.SymbolTable.Lookup(typeName)
+	if !found {
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"type '"+typeName+"' not found in module '"+moduleName+"'",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+	// For TypeScopeResolution, we return the actual type, not the symbol's type
+	return sym.Type
+}
+
+// logInferredType logs the inferred type for debugging
+func logInferredType(r *analyzer.AnalyzerNode, expr ast.Expression, resultType semantic.Type) {
+	if r.Debug {
+		if resultType == nil {
+			colors.YELLOW.Printf("Inferred type for expression '%v': <nil>\n", expr)
+		} else {
+			colors.YELLOW.Printf("Inferred type for expression '%v': %s\n", expr, resultType.String())
+		}
 	}
 }

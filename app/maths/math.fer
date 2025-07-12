@@ -3,5 +3,6 @@
 let dummyData = "This is a dummy file for testing purposes.";
 
 let a = 5;
-let b = "hi";
+let b = 23.9;
+let greeting = "hi";
 let sum = a + b;

@@ -104,15 +104,15 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 	return nil
 }
 
-func (c *CompilerContext) GetModule(importPath string) *Module {
+func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
 	if c.Modules == nil {
-		return nil
+		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return nil
+		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
-	return module
+	return module, nil
 }
 
 func (c *CompilerContext) RemoveModule(importPath string) {

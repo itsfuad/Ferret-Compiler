@@ -68,7 +68,7 @@ func (s *StructType) TypeName() types.TYPE_NAME {
 
 func (s *StructType) String() string {
 	if len(s.Fields) == 0 {
-		return fmt.Sprintf("struct %s {}", s.Name)
+		return fmt.Sprintf("%s {}", s.Name)
 	}
 
 	// Collect field names and sort them for consistent output
@@ -84,7 +84,7 @@ func (s *StructType) String() string {
 		fieldType := s.Fields[fieldName]
 		fieldStrs = append(fieldStrs, fmt.Sprintf("%s: %s", fieldName, fieldType.String()))
 	}
-	return fmt.Sprintf("struct %s { %s }", s.Name, strings.Join(fieldStrs, ", "))
+	return fmt.Sprintf("%s { %s }", s.Name, strings.Join(fieldStrs, ", "))
 }
 
 func (s *StructType) Equals(other Type) bool {
