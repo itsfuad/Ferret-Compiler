@@ -301,7 +301,6 @@ func (p *Parser) Parse() *ast.Program {
 	//show the ast
 	if p.debug {
 		program.SaveAST()
-		colors.BLUE.Printf("<--------- AST Saved for '%s'----------->\n", p.fullPath)
 	}
 
 	return program
