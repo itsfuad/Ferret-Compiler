@@ -54,7 +54,7 @@ func inferExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression) semantic
 		resultType = nil
 	}
 
-	logInferredType(r, expr, resultType)
+	//logInferredType(r, expr, resultType)
 	return resultType
 }
 
