@@ -248,6 +248,10 @@ func inferExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression) semantic
 		resultType = inferVarScopeResolutionType(r, e)
 	case *ast.StructLiteralExpr:
 		resultType = inferStructLiteralType(r, currentModule, e)
+	case *ast.ArrayLiteralExpr:
+		resultType = inferArrayLiteralType(r, e)
+	case *ast.IndexableExpr:
+		resultType = inferIndexableType(r, e)
 	case *ast.TypeScopeResolution:
 		resultType = inferTypeScopeResolutionType(r, e)
 	default:
@@ -491,7 +495,7 @@ func inferVarScopeResolutionType(r *analyzer.AnalyzerNode, e *ast.VarScopeResolu
 // inferStructLiteralType infers the type of a struct literal expression
 func inferStructLiteralType(r *analyzer.AnalyzerNode, currentModule *ctx.Module, e *ast.StructLiteralExpr) semantic.Type {
 	if e.IsAnonymous {
-		// TODO: Handle anonymous struct literals
+		panic("Anonymous struct literals are not yet supported")
 		return nil
 	}
 
@@ -512,6 +516,100 @@ func inferStructLiteralType(r *analyzer.AnalyzerNode, currentModule *ctx.Module,
 	}
 	// TODO: Validate that the fields match the struct definition
 	return sym.Type
+}
+
+// inferArrayLiteralType infers the type of an array literal expression
+func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr) semantic.Type {
+	if len(e.Elements) == 0 {
+		// Empty array - cannot infer type
+		r.Ctx.Reports.Add(
+			r.Program.FullPath,
+			e.Loc(),
+			"cannot infer array type from empty array literal",
+			report.TYPECHECK_PHASE,
+		).SetLevel(report.SEMANTIC_ERROR)
+		return nil
+	}
+
+	// Infer type from first element
+	firstElementType := inferExpressionType(r, e.Elements[0])
+	if firstElementType == nil {
+		return nil
+	}
+
+	// Check that all elements have compatible types
+	commonType := firstElementType
+	for _, element := range e.Elements {
+		elementType := inferExpressionType(r, element)
+		if elementType == nil {
+			continue
+		}
+
+		// Try to find a common type
+		newCommonType := semantic.GetCommonType(commonType, elementType)
+		if newCommonType == nil {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				element.Loc(),
+				"array element type mismatch: cannot use "+elementType.String()+" in array of "+commonType.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+			return nil
+		}
+		commonType = newCommonType
+	}
+
+	// Create array type with the common element type
+	return semantic.CreateArrayType(commonType)
+}
+
+// inferIndexableType infers the type of an array/map indexing expression
+func inferIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr) semantic.Type {
+	// Get the type of the indexable expression
+	indexableType := inferExpressionType(r, *e.Indexable)
+	if indexableType == nil {
+		return nil
+	}
+
+	// Check if it's an array type
+	if arrayType, ok := indexableType.(*semantic.ArrayType); ok {
+		// Verify the index is an integer type
+		indexType := inferExpressionType(r, *e.Index)
+		if indexType == nil {
+			return nil
+		}
+
+		// Check if index type is an integer
+		if !isIntegerTypeForIndexing(indexType) {
+			r.Ctx.Reports.Add(
+				r.Program.FullPath,
+				(*e.Index).Loc(),
+				"array index must be an integer type, got "+indexType.String(),
+				report.TYPECHECK_PHASE,
+			).SetLevel(report.SEMANTIC_ERROR)
+			return nil
+		}
+
+		// Return the element type of the array
+		return arrayType.ElementType
+	}
+
+	// If not an array, report error
+	r.Ctx.Reports.Add(
+		r.Program.FullPath,
+		(*e.Indexable).Loc(),
+		"cannot index non-array type "+indexableType.String(),
+		report.TYPECHECK_PHASE,
+	).SetLevel(report.SEMANTIC_ERROR)
+	return nil
+}
+
+// isIntegerTypeForIndexing checks if a type can be used as an array index
+func isIntegerTypeForIndexing(t semantic.Type) bool {
+	if primType, ok := t.(*semantic.PrimitiveType); ok {
+		return isIntegerType(primType.Name)
+	}
+	return false
 }
 
 // inferTypeScopeResolutionType infers the type of a type scope resolution expression
