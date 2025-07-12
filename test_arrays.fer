@@ -1,0 +1,21 @@
+// Test array functionality
+
+// Basic array literals
+let numbers = [1, 2, 3, 4, 5];
+let strings = ["hello", "world"];
+let floats = [1.0, 2.5, 3.14];
+
+// Array indexing
+let first = numbers[0];
+let second = numbers[1];
+let greeting = strings[0];
+
+// Array assignment
+numbers[0] = 10;
+strings[1] = "ferret";
+
+// This should cause a type error (mixed types)
+// let mixed = [1, "hello", 3.0];
+
+// This should cause a type error (string index)
+// let invalid = numbers["hello"];

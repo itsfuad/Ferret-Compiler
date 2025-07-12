@@ -1,0 +1,2 @@
+let myValue = 10;
+let typedValue: data::MyType = myValue; // This should work if type alias resolution is working

@@ -165,32 +165,48 @@ a %= b;            // Modulo and assign
 
 #### Project Structure
 ```
-Ferret_Compiler/
-├── compiler/           # Go-based compiler implementation
-│   ├── cmd/           # CLI entry point and argument parsing
-│   ├── colors/        # Terminal color output utilities
-│   ├── ctx/           # Compiler context management
-│   └── internal/
-│       ├── config/    # Project configuration (.ferret.json)
-│       ├── frontend/  # Lexer, parser, and AST
-│       ├── semantic/  # Symbol resolution and type checking
-│       ├── source/    # Source code location tracking
-│       ├── report/    # Error reporting system
-│       ├── types/     # Type system definitions
-│       └── utils/     # Utility functions
-├── app/               # Sample Ferret programs
-│   ├── cmd/          # Main application files
-│   ├── data/         # Data modules
-│   └── maths/        # Math utility modules
-├── scripts/           # Build and development scripts
-│   ├── build.*       # Compiler build scripts
-│   ├── test.*        # Test execution scripts
-│   ├── fmt.*         # Code formatting scripts
-│   ├── run.*         # Quick development test scripts
-│   ├── ci-check.*    # Local CI validation scripts
-│   ├── pack.*        # Extension packaging scripts
-│   └── README.md     # Script documentation
-└── .github/workflows/ # CI/CD pipeline definitions
+Ferret-Compiler/
+├── compiler/              # Go-based compiler implementation
+│   ├── cmd/              # CLI entry point and argument parsing
+│   ├── colors/           # Terminal color output utilities
+│   ├── ctx/              # Compiler context management
+│   ├── internal/         # Internal compiler packages
+│   │   ├── config/       # Project configuration (.ferret.json)
+│   │   ├── frontend/     # Frontend compilation pipeline
+│   │   │   ├── ast/      # Abstract syntax tree definitions
+│   │   │   ├── lexer/    # Tokenization and lexical analysis
+│   │   │   └── parser/   # Syntax parsing and AST generation
+│   │   ├── semantic/     # Semantic analysis pipeline
+│   │   │   ├── analyzer/ # Semantic analysis orchestration
+│   │   │   ├── resolver/ # Symbol resolution and scope analysis
+│   │   │   └── typecheck/# Type checking and validation
+│   │   ├── source/       # Source code location tracking
+│   │   ├── report/       # Error reporting and diagnostics
+│   │   ├── types/        # Type system definitions
+│   │   ├── testutil/     # Testing utilities
+│   │   └── utils/        # General utility functions
+│   └── go.mod           # Go module definition
+│   
+├── app/                  # Sample Ferret programs and test files
+│   ├── cmd/             # Main application files
+│   ├── maths/           # Math utility modules
+│   ├── remote/          # Remote module examples
+│   ├── data.fer         # Data module example
+│   ├── test_*.fer       # Test files for language features
+│   └── .ferret.json     # Project configuration file
+├── bin/                  # Compiled executables
+├── scripts/              # Build and development scripts
+│   ├── build.*          # Compiler build scripts
+│   ├── test.*           # Test execution scripts
+│   ├── fmt.*            # Code formatting scripts
+│   ├── run.*            # Quick development test scripts
+│   ├── ci-check.*       # Local CI validation scripts
+│   ├── pack.*           # Extension packaging scripts
+│   └── README.md        # Script documentation
+└── .github/              # GitHub-specific files
+    ├── workflows/       # CI/CD pipeline definitions
+    ├── ISSUE_TEMPLATE/  # Issue templates
+    └── FUNDING.yml      # Funding information
 ```
 
 ## Type Declarations

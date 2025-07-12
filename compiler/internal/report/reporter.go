@@ -281,7 +281,7 @@ func (r Reports) ShowStatus() {
 	totalProblemsString := ""
 
 	if warningCount > 0 {
-		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s)", warningCount, _strings.Plural("warning", "warnings ", warningCount))
+		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s) ", warningCount, _strings.Plural("warning", "warnings ", warningCount))
 		if probCount > 0 {
 			totalProblemsString += colors.ORANGE.Sprintf(", ")
 		}

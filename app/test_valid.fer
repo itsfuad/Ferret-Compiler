@@ -1,0 +1,9 @@
+//Valid type inference test
+
+let a = 5;        // Should infer i32
+let b = 10;       // Should infer i32  
+let sum = a + b;  // Should infer i32 (i32 + i32 = i32)
+
+let str1 = "Hello"; // Should infer str
+let str2 = " World"; // Should infer str
+let message = str1 + str2; // Should infer str (str + str = str)

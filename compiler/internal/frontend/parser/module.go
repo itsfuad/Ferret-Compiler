@@ -47,8 +47,6 @@ func parseImport(p *Parser) ast.Node {
 		return nil
 	}
 
-	isRemote := fs.IsRemote(importpath)
-
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
 			Value:    importpath,
@@ -56,7 +54,6 @@ func parseImport(p *Parser) ast.Node {
 		},
 		ModuleName: moduleName,
 		FullPath:   moduleFullPath,
-		IsRemote:   isRemote,
 		Location:   loc,
 	}
 
