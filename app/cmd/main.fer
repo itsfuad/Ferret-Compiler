@@ -18,9 +18,23 @@ import "app/data";
 // - Standard library imports use "std/" prefix
 // - External libraries use "github.com/user/repo/path" format
 // - .fer extension is automatically added by the resolver
-// - Remote modules resolve their imports relative to their own repository root
 
-let a = 1;
+// Test numeric operations (should return largest type)
+let x: i32 = 42;
+let y: i64 = 100;
+let z: i64 = x + y; // i32 + i64 should result in i64
+
+// Test string concatenation (should only work with str + str)
+let str1: str = "Hello ";
+let str2: str = "World";
+let greeting: str = str1 + str2; // str + str should work
+
+// This should cause an error (str + non-str)
+// let invalid: str = str1 + x;
+
+let a = 5;
+let b = 10;
+let sum = 1+3;
 
 let name, age : str, i32 = "John", 30;
 
@@ -56,3 +70,25 @@ let scientific : f64 = 1.23e4; // 1.23 * 10^4
 // }
 
 let cxx : data::MyType = data::kk;
+
+//let someValue = laterDeclaredValue;
+let laterDeclaredValue = "This value is declared later in the code.";
+
+type Car struct {
+    make: str,
+    model: str,
+    year: i32
+};
+
+let myCar = @Car {
+    make: "Toyota",
+    model: "Corolla",
+    year: 2020
+};
+
+myCar.make = "Honda"; // Update the make of the car
+//notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
+
+//array 
+let numbers = [1, 2, 3, 4, 5]; // Array of integers
+// let mixedArray = [1, "two", 3.0]; // Array
