@@ -44,7 +44,7 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 	importPath := ctxx.FullPathToImportPath(filePath)
 	modulename := ctxx.FullPathToModuleName(filePath)
 
-	tokens := lexer.Tokenize(filePath, debug)
+	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
 		tokens:                 tokens,

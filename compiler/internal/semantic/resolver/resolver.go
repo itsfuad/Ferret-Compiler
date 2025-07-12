@@ -72,7 +72,11 @@ func resolveTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
 		r.Ctx.Reports.Add(r.Program.FullPath, stmt.Alias.Loc(), "<type decl> current module not found for type declaration: "+r.Program.ImportPath, report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
-	currentModule.SymbolTable.Declare(typeName, &semantic.Symbol{Name: typeName, Kind: semantic.SymbolType, Type: stmt.BaseType})
+
+	// Convert AST type to semantic type
+	semanticType := semantic.ASTToSemanticType(stmt.BaseType)
+	sym := semantic.NewSymbolWithLocation(typeName, semantic.SymbolType, semanticType, stmt.Alias.Loc())
+	currentModule.SymbolTable.Declare(typeName, sym)
 }
 
 func resolveImport(r *analyzer.AnalyzerNode, currentModule *ctx.Module, importStmt *ast.ImportStmt) {
@@ -109,7 +113,13 @@ func resolveVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
 			resolveNode(r, v.ExplicitType)
 		}
 
-		sym := &semantic.Symbol{Name: name, Kind: kind, Type: v.ExplicitType}
+		// Convert AST type to semantic type
+		var semanticType semantic.Type
+		if v.ExplicitType != nil {
+			semanticType = semantic.ASTToSemanticType(v.ExplicitType)
+		}
+
+		sym := semantic.NewSymbolWithLocation(name, kind, semanticType, v.Identifier.Loc())
 
 		err := currentModule.SymbolTable.Declare(name, sym)
 		if err != nil {
@@ -131,7 +141,7 @@ func resolveAssignment(r *analyzer.AnalyzerNode, stmt *ast.AssignmentStmt) { // 
 				r.Ctx.Reports.Add(r.Program.FullPath, id.Loc(), "assignment to undeclared variable: "+id.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			} else if varSym.Type != nil {
 				// Type checking: ensure type exists for variable
-				typeName := string(varSym.Type.Type())
+				typeName := string(varSym.Type.TypeName())
 				typeSym, found := r.Ctx.Modules[r.Program.FullPath].SymbolTable.Lookup(typeName)
 				if !found || typeSym.Kind != semantic.SymbolType {
 					r.Ctx.Reports.Add(r.Program.FullPath, id.Loc(), "unknown type for variable: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)

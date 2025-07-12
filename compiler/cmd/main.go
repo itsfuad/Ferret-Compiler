@@ -16,6 +16,7 @@ import (
 
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/resolver"
+	"compiler/internal/semantic/typecheck"
 	//"compiler/internal/semantic/typecheck"
 )
 
@@ -52,6 +53,8 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 
 	// Run resolver
 	anz := analyzer.NewAnalyzerNode(program, context, isDebugEnabled)
+
+	// -- Resolve the program
 	resolver.ResolveProgram(anz)
 
 	if context.Reports.HasErrors() {
@@ -62,14 +65,16 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 		colors.GREEN.Println("---------- [Resolver done] ----------")
 	}
 
-	// // --- Type Checking ---
-	// // Pass resolver's symbol tables and alias map to typechecker
-	// typeChecker := typecheck.NewTypeChecker(program, context, debug)
-	// typeChecker.CheckProgram(program)
-	// if context.Reports.HasErrors() {
-	// 	context.Reports.DisplayAll()
-	// 	return context
-	// }
+	// --- Type Checking ---
+	typecheck.CheckProgram(anz)
+
+	if context.Reports.HasErrors() {
+		panic("Compilation stopped due to type checking errors")
+	}
+
+	if isDebugEnabled {
+		colors.GREEN.Println("---------- [Type Checking done] ----------")
+	}
 
 	return context
 }
