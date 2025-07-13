@@ -33,8 +33,8 @@ type CodeGenerator interface {
 func NewCodeGenerator(target Target, options *GeneratorOptions) CodeGenerator {
 	switch target {
 	case TargetX86_64:
-		return NewX86_64Generator(options)
+		return NewX86Generator(options)
 	default:
-		return NewX86_64Generator(options) // Default to x86-64
+		return NewX86Generator(options) // Default to x86-64
 	}
 }
