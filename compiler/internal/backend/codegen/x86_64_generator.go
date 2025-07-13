@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -11,12 +10,6 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/semantic"
 	"compiler/internal/types"
-)
-
-// Assembly instruction constants to avoid duplication
-const (
-	asmCmpRaxRbx  = "    cmp rax, rbx\n"
-	asmMovzxRaxAl = "    movzx rax, al\n"
 )
 
 // X86_64Generator generates x86-64 assembly code from Ferret AST
@@ -32,8 +25,8 @@ type X86_64Generator struct {
 	registers    map[string]bool // Track register usage
 }
 
-// NewX86Generator creates a new x86-64 assembly code generator
-func NewX86Generator(options *GeneratorOptions) *X86_64Generator {
+// NewX8664Generator creates a new x86-64 assembly code generator
+func NewX8664Generator(options *GeneratorOptions) *X86_64Generator {
 	if options == nil {
 		options = &GeneratorOptions{}
 	}
@@ -56,7 +49,21 @@ func (g *X86_64Generator) SetOptions(options map[string]interface{}) {
 // Generate generates x86-64 assembly code for the entire program
 func (g *X86_64Generator) Generate(program *ast.Program, compilerCtx *ctx.CompilerContext) (string, error) {
 	g.context = NewCodeGenContext(compilerCtx)
-	g.context.CurrentModule = program.Modulename
+
+	// Find the correct module name from the available modules
+	var moduleName string
+	for name := range compilerCtx.Modules {
+		if strings.HasSuffix(name, program.Modulename) || name == program.Modulename {
+			moduleName = name
+			break
+		}
+	}
+	if moduleName == "" {
+		// Fallback to program modulename
+		moduleName = program.Modulename
+	}
+
+	g.context.CurrentModule = moduleName
 	g.labelCounter = 0
 	g.stackOffset = 0
 
@@ -70,6 +77,11 @@ func (g *X86_64Generator) Generate(program *ast.Program, compilerCtx *ctx.Compil
 	g.generateDataSection(program, compilerCtx)
 	g.generateBSSSection(program, compilerCtx)
 	g.generateTextSection(program, compilerCtx)
+
+	// Debug output for last expression if debug mode is enabled
+	if g.options.DebugInfo {
+		g.outputLastExpressionDebug(program, compilerCtx)
+	}
 
 	// Combine all sections
 	g.combineOutput()
@@ -124,7 +136,7 @@ func (g *X86_64Generator) generateTextSection(program *ast.Program, compilerCtx 
 
 // generateDataVariables generates initialized variables in .data section
 func (g *X86_64Generator) generateDataVariables(varDecl *ast.VarDeclStmt, compilerCtx *ctx.CompilerContext) {
-	module := g.findModule(compilerCtx)
+	module := compilerCtx.Modules[g.context.CurrentModule]
 	if module == nil {
 		return
 	}
@@ -140,13 +152,10 @@ func (g *X86_64Generator) generateDataVariables(varDecl *ast.VarDeclStmt, compil
 			sanitizedName := g.sanitizeLabel(varName)
 			initializer := varDecl.Initializers[i]
 
-			// Constants always go to data section, variables only if they have constant initializers
+			// Only generate data declarations for constants
+			// Variables with initializers will be handled at runtime
 			if varDecl.IsConst {
 				g.generateDataDeclaration(sanitizedName, symbol.Type, initializer)
-			} else if g.isConstantExpression(initializer) {
-				g.generateDataDeclaration(sanitizedName, symbol.Type, initializer)
-			} else {
-				// Don't add to data section - it will be handled in BSS section
 			}
 		}
 	}
@@ -154,7 +163,7 @@ func (g *X86_64Generator) generateDataVariables(varDecl *ast.VarDeclStmt, compil
 
 // generateBSSVariables generates uninitialized variables in .bss section
 func (g *X86_64Generator) generateBSSVariables(varDecl *ast.VarDeclStmt, compilerCtx *ctx.CompilerContext) {
-	module := g.findModule(compilerCtx)
+	module := compilerCtx.Modules[g.context.CurrentModule]
 	if module == nil {
 		return
 	}
@@ -169,13 +178,17 @@ func (g *X86_64Generator) generateBSSVariables(varDecl *ast.VarDeclStmt, compile
 		sanitizedName := g.sanitizeLabel(varName)
 		size := g.getTypeSize(symbol.Type)
 
-		// Variables without initializers OR with non-constant initializers go to BSS
-		if i >= len(varDecl.Initializers) {
-			// No initializer
-			g.bssSection.WriteString(fmt.Sprintf("%s: resb %d    ; uninitialized variable %s\n", sanitizedName, size, varName))
-		} else if !g.isConstantExpression(varDecl.Initializers[i]) {
-			// Non-constant initializer (computed at runtime)
-			g.bssSection.WriteString(fmt.Sprintf("%s: resb %d    ; variable %s (runtime initialized)\n", sanitizedName, size, varName))
+		// Generate BSS entries for:
+		// 1. Variables without initializers
+		// 2. Variables with initializers (will be initialized at runtime)
+		if i >= len(varDecl.Initializers) || !varDecl.IsConst {
+			comment := ""
+			if i < len(varDecl.Initializers) {
+				comment = "    ; variable " + varName + " (runtime initialized)"
+			} else {
+				comment = "    ; variable " + varName + " (uninitialized)"
+			}
+			g.bssSection.WriteString(fmt.Sprintf("%s: resb %d%s\n", sanitizedName, size, comment))
 		}
 	}
 }
@@ -189,14 +202,13 @@ func (g *X86_64Generator) generateDataDeclaration(name string, varType semantic.
 
 // generateStringLiterals generates string literals in .data section
 func (g *X86_64Generator) generateStringLiterals(program *ast.Program, compilerCtx *ctx.CompilerContext) {
-	// String literals are generated on-demand in expressions for now
-	// Future improvement: collect all string literals and generate them here
+	// TODO: Collect all string literals and generate them
+	// For now, we'll generate them on-demand in expressions
 }
 
 // generateFunctions generates assembly code for functions
 func (g *X86_64Generator) generateFunctions(program *ast.Program, compilerCtx *ctx.CompilerContext) {
-	// Function definitions will be implemented when function AST nodes are available
-	// For now, all code is generated in the main entry point
+	// TODO: Generate function definitions when function AST nodes are available
 }
 
 // generateMainEntry generates the main entry point
@@ -211,9 +223,9 @@ func (g *X86_64Generator) generateMainEntry(program *ast.Program, compilerCtx *c
 	for _, node := range program.Nodes {
 		switch n := node.(type) {
 		case *ast.VarDeclStmt:
-			// Generate variable declaration code (only for variables, not constants)
+			// Generate runtime initialization for variables (not constants)
 			if !n.IsConst {
-				g.generateVarDeclCode(n, compilerCtx)
+				g.generateVariableInitialization(n, compilerCtx)
 			}
 		case *ast.ExpressionStmt:
 			for _, expr := range *n.Expressions {
@@ -222,8 +234,8 @@ func (g *X86_64Generator) generateMainEntry(program *ast.Program, compilerCtx *c
 		case *ast.AssignmentStmt:
 			g.generateAssignmentCode(n, compilerCtx)
 		case *ast.ImportStmt:
-			// Skip import statements
-			continue
+			// Generate import code
+			g.generateImportCode(n, compilerCtx)
 		case *ast.TypeDeclStmt:
 			// Skip type definitions
 			continue
@@ -237,34 +249,31 @@ func (g *X86_64Generator) generateMainEntry(program *ast.Program, compilerCtx *c
 	g.textSection.WriteString("    syscall\n")
 }
 
-// generateVarDeclCode generates assembly code for variable declarations
-func (g *X86_64Generator) generateVarDeclCode(varDecl *ast.VarDeclStmt, compilerCtx *ctx.CompilerContext) {
-	// Constants don't need runtime initialization since they're already in data section
-	if varDecl.IsConst {
+// generateVariableInitialization generates runtime initialization code for variables
+func (g *X86_64Generator) generateVariableInitialization(varDecl *ast.VarDeclStmt, compilerCtx *ctx.CompilerContext) {
+	module := compilerCtx.Modules[g.context.CurrentModule]
+	if module == nil {
 		return
 	}
 
 	for i, variable := range varDecl.Variables {
-		varName := variable.Identifier.Name
-		sanitizedName := g.sanitizeLabel(varName)
-
-		g.textSection.WriteString(fmt.Sprintf("    ; Variable declaration: %s\n", varName))
-
-		// If there's an initializer, check if it needs runtime initialization
 		if i < len(varDecl.Initializers) {
+			varName := variable.Identifier.Name
+			_, found := module.SymbolTable.Lookup(varName)
+			if !found {
+				continue
+			}
+
+			sanitizedName := g.sanitizeLabel(varName)
 			initializer := varDecl.Initializers[i]
 
-			// Only generate runtime initialization for non-constant expressions
-			if !g.isConstantExpression(initializer) {
-				// Generate code for the initializer expression (result in rax)
-				g.generateExpressionCode(initializer, compilerCtx)
+			g.textSection.WriteString(fmt.Sprintf("    ; Variable declaration: %s\n", varName))
 
-				// Store the result in the variable's memory location
-				g.textSection.WriteString(fmt.Sprintf("    mov [%s], rax    ; store computed value in %s\n", sanitizedName, varName))
-			} else {
-				// Constant is already initialized in data section, no runtime code needed
-				g.textSection.WriteString(fmt.Sprintf("    ; %s already initialized in data section\n", varName))
-			}
+			// Generate code to evaluate the initializer expression
+			g.generateExpressionCode(initializer, compilerCtx)
+
+			// Store the result in the variable
+			g.textSection.WriteString(fmt.Sprintf("    mov [%s], rax    ; store computed value in %s\n", sanitizedName, varName))
 		}
 	}
 }
@@ -339,29 +348,29 @@ func (g *X86_64Generator) generateBinaryExpressionCode(expr *ast.BinaryExpr, com
 		g.textSection.WriteString("    idiv rbx\n")
 		g.textSection.WriteString("    mov rax, rdx    ; remainder is in rdx\n")
 	case lexer.DOUBLE_EQUAL_TOKEN:
-		g.textSection.WriteString(asmCmpRaxRbx)
+		g.textSection.WriteString("    cmp rax, rbx\n")
 		g.textSection.WriteString("    sete al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.NOT_EQUAL_TOKEN:
-		g.textSection.WriteString(asmCmpRaxRbx)
+		g.textSection.WriteString("    cmp rax, rbx\n")
 		g.textSection.WriteString("    setne al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.LESS_TOKEN:
-		g.textSection.WriteString(asmCmpRaxRbx)
+		g.textSection.WriteString("    cmp rax, rbx\n")
 		g.textSection.WriteString("    setl al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.LESS_EQUAL_TOKEN:
-		g.textSection.WriteString(asmCmpRaxRbx)
+		g.textSection.WriteString("    cmp rax, rbx\n")
 		g.textSection.WriteString("    setle al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.GREATER_TOKEN:
-		g.textSection.WriteString(asmCmpRaxRbx)
+		g.textSection.WriteString("    cmp rax, rbx\n")
 		g.textSection.WriteString("    setg al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.GREATER_EQUAL_TOKEN:
-		g.textSection.WriteString(asmCmpRaxRbx)
+		g.textSection.WriteString("    cmp rax, rbx\n")
 		g.textSection.WriteString("    setge al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.BIT_AND_TOKEN:
 		g.textSection.WriteString("    and rax, rbx\n")
 	case lexer.BIT_OR_TOKEN:
@@ -385,7 +394,7 @@ func (g *X86_64Generator) generateUnaryExpressionCode(expr *ast.UnaryExpr, compi
 	case lexer.NOT_TOKEN:
 		g.textSection.WriteString("    test rax, rax\n")
 		g.textSection.WriteString("    setz al\n")
-		g.textSection.WriteString(asmMovzxRaxAl)
+		g.textSection.WriteString("    movzx rax, al\n")
 	case lexer.BIT_XOR_TOKEN: // Bitwise NOT
 		g.textSection.WriteString("    not rax\n")
 	default:
@@ -409,7 +418,7 @@ func (g *X86_64Generator) generateAssignmentCode(assignment *ast.AssignmentStmt,
 		varName := g.sanitizeLabel(lval.Name)
 		g.textSection.WriteString(fmt.Sprintf("    mov [%s], rax\n", varName))
 	case *ast.FieldAccessExpr:
-		// Struct field assignment not yet implemented
+		// TODO: Handle struct field assignment
 		g.textSection.WriteString("    ; struct field assignment not implemented\n")
 	default:
 		g.textSection.WriteString("    ; unsupported lvalue\n")
@@ -422,8 +431,8 @@ func (g *X86_64Generator) generateConstantValue(expr ast.Expression) string {
 	case *ast.IntLiteral:
 		return strconv.FormatInt(e.Value, 10)
 	case *ast.FloatLiteral:
-		// For simplicity, store as bit pattern
-		return fmt.Sprintf("__float64__(%f)", e.Value)
+		// For NASM, we need to use proper floating-point format
+		return strconv.FormatFloat(e.Value, 'f', 6, 64)
 	case *ast.StringLiteral:
 		return fmt.Sprintf("'%s', 0", g.escapeString(e.Value))
 	case *ast.BoolLiteral:
@@ -520,40 +529,79 @@ func (g *X86_64Generator) escapeString(s string) string {
 	return s
 }
 
-// isConstantExpression checks if an expression is a compile-time constant
-func (g *X86_64Generator) isConstantExpression(expr ast.Expression) bool {
-	switch expr.(type) {
-	case *ast.IntLiteral, *ast.FloatLiteral, *ast.StringLiteral, *ast.BoolLiteral, *ast.ByteLiteral:
-		return true
-	default:
-		return false
+// outputLastExpressionDebug outputs debug information about the last expression
+func (g *X86_64Generator) outputLastExpressionDebug(program *ast.Program, compilerCtx *ctx.CompilerContext) {
+	var lastExpr ast.Expression
+	var lastExprType string
+
+	// Find the last expression in the program
+	for i := len(program.Nodes) - 1; i >= 0; i-- {
+		node := program.Nodes[i]
+		switch n := node.(type) {
+		case *ast.VarDeclStmt:
+			// Check for initializers in variable declarations
+			if len(n.Initializers) > 0 {
+				lastExpr = n.Initializers[len(n.Initializers)-1]
+				lastExprType = "variable declaration initializer"
+				break
+			}
+		case *ast.ExpressionStmt:
+			if len(*n.Expressions) > 0 {
+				lastExpr = (*n.Expressions)[len(*n.Expressions)-1]
+				lastExprType = "expression statement"
+				break
+			}
+		case *ast.AssignmentStmt:
+			if len(*n.Right) > 0 {
+				lastExpr = (*n.Right)[len(*n.Right)-1]
+				lastExprType = "assignment"
+				break
+			}
+		}
+		if lastExpr != nil {
+			break
+		}
+	}
+
+	if lastExpr != nil {
+		fmt.Printf("🐛 Debug: Last expression (%s): %s\n", lastExprType, g.formatExpressionForDebug(lastExpr))
 	}
 }
 
-// findModule finds the appropriate module in the compiler context
-func (g *X86_64Generator) findModule(compilerCtx *ctx.CompilerContext) *ctx.Module {
-	// Try different module name formats
-	projectRootName := filepath.Base(compilerCtx.ProjectRoot)
-	moduleNames := []string{
-		g.context.CurrentModule,
-		projectRootName + "/" + g.context.CurrentModule,
+// formatExpressionForDebug formats an expression for debug output
+func (g *X86_64Generator) formatExpressionForDebug(expr ast.Expression) string {
+	switch e := expr.(type) {
+	case *ast.IntLiteral:
+		return fmt.Sprintf("%d (int literal)", e.Value)
+	case *ast.FloatLiteral:
+		return fmt.Sprintf("%f (float literal)", e.Value)
+	case *ast.StringLiteral:
+		return fmt.Sprintf("\"%s\" (string literal)", e.Value)
+	case *ast.BoolLiteral:
+		return fmt.Sprintf("%t (bool literal)", e.Value)
+	case *ast.IdentifierExpr:
+		return fmt.Sprintf("%s (identifier)", e.Name)
+	case *ast.BinaryExpr:
+		left := g.formatExpressionForDebug(*e.Left)
+		right := g.formatExpressionForDebug(*e.Right)
+		return fmt.Sprintf("(%s %s %s)", left, e.Operator.Value, right)
+	case *ast.UnaryExpr:
+		operand := g.formatExpressionForDebug(*e.Operand)
+		return fmt.Sprintf("%s%s", e.Operator.Value, operand)
+	default:
+		return "unknown expression"
 	}
+}
 
-	// Try iterating through all modules to find the right one
-	for moduleName, mod := range compilerCtx.Modules {
-		for _, testName := range moduleNames {
-			if moduleName == testName {
-				return mod
-			}
-		}
-	}
+// generateImportCode handles import statements
+func (g *X86_64Generator) generateImportCode(importStmt *ast.ImportStmt, compilerCtx *ctx.CompilerContext) {
+	// For now, we'll add a comment in the assembly
+	importPath := importStmt.ImportPath.Value
+	g.textSection.WriteString(fmt.Sprintf("    ; Import: %s\n", importPath))
 
-	// If still not found, use the first available module (for single-file programs)
-	if len(compilerCtx.Modules) == 1 {
-		for _, mod := range compilerCtx.Modules {
-			return mod
-		}
-	}
-
-	return nil
+	// TODO: Implement actual import linking when the module system is ready
+	// This would involve:
+	// 1. Finding the imported module's object file or assembly
+	// 2. Adding external symbol declarations
+	// 3. Linking the modules together during final compilation
 }
