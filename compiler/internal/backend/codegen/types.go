@@ -32,8 +32,7 @@ type CodeGenerator interface {
 // NewCodeGenerator creates a new code generator for the specified target
 func NewCodeGenerator(target Target, options *GeneratorOptions) CodeGenerator {
 	switch target {
-	case TargetX86_64:
-		return NewX86Generator(options)
+	// Later, we can add more targets like ARM64, RISCV64, etc.
 	default:
 		return NewX86Generator(options) // Default to x86-64
 	}

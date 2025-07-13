@@ -13,6 +13,12 @@ import (
 	"compiler/internal/types"
 )
 
+// Assembly instruction constants to avoid duplication
+const (
+	asmCmpRaxRbx  = "    cmp rax, rbx\n"
+	asmMovzxRaxAl = "    movzx rax, al\n"
+)
+
 // X86_64Generator generates x86-64 assembly code from Ferret AST
 type X86_64Generator struct {
 	options      *GeneratorOptions
@@ -118,37 +124,7 @@ func (g *X86_64Generator) generateTextSection(program *ast.Program, compilerCtx 
 
 // generateDataVariables generates initialized variables in .data section
 func (g *X86_64Generator) generateDataVariables(varDecl *ast.VarDeclStmt, compilerCtx *ctx.CompilerContext) {
-	// Find the module - try both the program module name and full path variants
-	var module *ctx.Module = nil
-
-	// Try different module name formats
-	projectRootName := filepath.Base(compilerCtx.ProjectRoot)
-	moduleNames := []string{
-		g.context.CurrentModule,
-		projectRootName + "/" + g.context.CurrentModule,
-	}
-
-	// Also try iterating through all modules to find the right one
-	for moduleName, mod := range compilerCtx.Modules {
-		for _, testName := range moduleNames {
-			if moduleName == testName {
-				module = mod
-				break
-			}
-		}
-		if module != nil {
-			break
-		}
-	}
-
-	// If still not found, use the first available module (for single-file programs)
-	if module == nil && len(compilerCtx.Modules) == 1 {
-		for _, mod := range compilerCtx.Modules {
-			module = mod
-			break
-		}
-	}
-
+	module := g.findModule(compilerCtx)
 	if module == nil {
 		return
 	}
@@ -178,37 +154,7 @@ func (g *X86_64Generator) generateDataVariables(varDecl *ast.VarDeclStmt, compil
 
 // generateBSSVariables generates uninitialized variables in .bss section
 func (g *X86_64Generator) generateBSSVariables(varDecl *ast.VarDeclStmt, compilerCtx *ctx.CompilerContext) {
-	// Find the module - try both the program module name and full path variants
-	var module *ctx.Module = nil
-
-	// Try different module name formats
-	projectRootName := filepath.Base(compilerCtx.ProjectRoot)
-	moduleNames := []string{
-		g.context.CurrentModule,
-		projectRootName + "/" + g.context.CurrentModule,
-	}
-
-	// Also try iterating through all modules to find the right one
-	for moduleName, mod := range compilerCtx.Modules {
-		for _, testName := range moduleNames {
-			if moduleName == testName {
-				module = mod
-				break
-			}
-		}
-		if module != nil {
-			break
-		}
-	}
-
-	// If still not found, use the first available module (for single-file programs)
-	if module == nil && len(compilerCtx.Modules) == 1 {
-		for _, mod := range compilerCtx.Modules {
-			module = mod
-			break
-		}
-	}
-
+	module := g.findModule(compilerCtx)
 	if module == nil {
 		return
 	}
@@ -243,13 +189,14 @@ func (g *X86_64Generator) generateDataDeclaration(name string, varType semantic.
 
 // generateStringLiterals generates string literals in .data section
 func (g *X86_64Generator) generateStringLiterals(program *ast.Program, compilerCtx *ctx.CompilerContext) {
-	// TODO: Collect all string literals and generate them
-	// For now, we'll generate them on-demand in expressions
+	// String literals are generated on-demand in expressions for now
+	// Future improvement: collect all string literals and generate them here
 }
 
 // generateFunctions generates assembly code for functions
 func (g *X86_64Generator) generateFunctions(program *ast.Program, compilerCtx *ctx.CompilerContext) {
-	// TODO: Generate function definitions when function AST nodes are available
+	// Function definitions will be implemented when function AST nodes are available
+	// For now, all code is generated in the main entry point
 }
 
 // generateMainEntry generates the main entry point
@@ -392,29 +339,29 @@ func (g *X86_64Generator) generateBinaryExpressionCode(expr *ast.BinaryExpr, com
 		g.textSection.WriteString("    idiv rbx\n")
 		g.textSection.WriteString("    mov rax, rdx    ; remainder is in rdx\n")
 	case lexer.DOUBLE_EQUAL_TOKEN:
-		g.textSection.WriteString("    cmp rax, rbx\n")
+		g.textSection.WriteString(asmCmpRaxRbx)
 		g.textSection.WriteString("    sete al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.NOT_EQUAL_TOKEN:
-		g.textSection.WriteString("    cmp rax, rbx\n")
+		g.textSection.WriteString(asmCmpRaxRbx)
 		g.textSection.WriteString("    setne al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.LESS_TOKEN:
-		g.textSection.WriteString("    cmp rax, rbx\n")
+		g.textSection.WriteString(asmCmpRaxRbx)
 		g.textSection.WriteString("    setl al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.LESS_EQUAL_TOKEN:
-		g.textSection.WriteString("    cmp rax, rbx\n")
+		g.textSection.WriteString(asmCmpRaxRbx)
 		g.textSection.WriteString("    setle al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.GREATER_TOKEN:
-		g.textSection.WriteString("    cmp rax, rbx\n")
+		g.textSection.WriteString(asmCmpRaxRbx)
 		g.textSection.WriteString("    setg al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.GREATER_EQUAL_TOKEN:
-		g.textSection.WriteString("    cmp rax, rbx\n")
+		g.textSection.WriteString(asmCmpRaxRbx)
 		g.textSection.WriteString("    setge al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.BIT_AND_TOKEN:
 		g.textSection.WriteString("    and rax, rbx\n")
 	case lexer.BIT_OR_TOKEN:
@@ -438,7 +385,7 @@ func (g *X86_64Generator) generateUnaryExpressionCode(expr *ast.UnaryExpr, compi
 	case lexer.NOT_TOKEN:
 		g.textSection.WriteString("    test rax, rax\n")
 		g.textSection.WriteString("    setz al\n")
-		g.textSection.WriteString("    movzx rax, al\n")
+		g.textSection.WriteString(asmMovzxRaxAl)
 	case lexer.BIT_XOR_TOKEN: // Bitwise NOT
 		g.textSection.WriteString("    not rax\n")
 	default:
@@ -462,7 +409,7 @@ func (g *X86_64Generator) generateAssignmentCode(assignment *ast.AssignmentStmt,
 		varName := g.sanitizeLabel(lval.Name)
 		g.textSection.WriteString(fmt.Sprintf("    mov [%s], rax\n", varName))
 	case *ast.FieldAccessExpr:
-		// TODO: Handle struct field assignment
+		// Struct field assignment not yet implemented
 		g.textSection.WriteString("    ; struct field assignment not implemented\n")
 	default:
 		g.textSection.WriteString("    ; unsupported lvalue\n")
@@ -581,4 +528,32 @@ func (g *X86_64Generator) isConstantExpression(expr ast.Expression) bool {
 	default:
 		return false
 	}
+}
+
+// findModule finds the appropriate module in the compiler context
+func (g *X86_64Generator) findModule(compilerCtx *ctx.CompilerContext) *ctx.Module {
+	// Try different module name formats
+	projectRootName := filepath.Base(compilerCtx.ProjectRoot)
+	moduleNames := []string{
+		g.context.CurrentModule,
+		projectRootName + "/" + g.context.CurrentModule,
+	}
+
+	// Try iterating through all modules to find the right one
+	for moduleName, mod := range compilerCtx.Modules {
+		for _, testName := range moduleNames {
+			if moduleName == testName {
+				return mod
+			}
+		}
+	}
+
+	// If still not found, use the first available module (for single-file programs)
+	if len(compilerCtx.Modules) == 1 {
+		for _, mod := range compilerCtx.Modules {
+			return mod
+		}
+	}
+
+	return nil
 }

@@ -94,11 +94,12 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 	return context
 }
 
-func parseArgs() (string, bool, bool, string) {
+func parseArgs() (string, bool, bool, string, string) {
 	var filename string
 	var debug bool
 	var initProject bool
 	var initPath string
+	var outputPath string
 
 	args := os.Args[1:]
 
@@ -106,6 +107,11 @@ func parseArgs() (string, bool, bool, string) {
 		switch arg {
 		case "--debug":
 			debug = true
+		case "-o", "--output":
+			// Check if next argument is the output path
+			if i+1 < len(args) && args[i+1][:1] != "-" {
+				outputPath = args[i+1]
+			}
 		case "init":
 			initProject = true
 			// Check if next argument is a path
@@ -113,6 +119,14 @@ func parseArgs() (string, bool, bool, string) {
 				initPath = args[i+1]
 			}
 		default:
+			// Skip if this is an output path argument
+			if i > 0 && (args[i-1] == "-o" || args[i-1] == "--output") {
+				continue
+			}
+			// Skip if this is an init path argument
+			if i > 0 && args[i-1] == "init" {
+				continue
+			}
 			// If it's not a flag and we haven't set filename yet, this is the filename
 			if !initProject && filename == "" && arg[:1] != "-" {
 				filename = arg
@@ -120,7 +134,7 @@ func parseArgs() (string, bool, bool, string) {
 		}
 	}
 
-	return filename, debug, initProject, initPath
+	return filename, debug, initProject, initPath, outputPath
 }
 
 func main() {
