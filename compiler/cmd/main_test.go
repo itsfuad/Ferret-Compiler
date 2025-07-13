@@ -79,7 +79,7 @@ func TestParseArgs(t *testing.T) {
 			// Set up test args (prepend program name as os.Args[0])
 			os.Args = append([]string{"ferret"}, tt.args...)
 
-			filename, debug, initProject, initPath := parseArgs()
+			filename, debug, initProject, initPath, _ := parseArgs()
 
 			if filename != tt.wantFilename {
 				t.Errorf("parseArgs() filename = %v, want %v", filename, tt.wantFilename)
@@ -149,7 +149,7 @@ func TestParseArgsEdgeCases(t *testing.T) {
 			// Set up test args (prepend program name as os.Args[0])
 			os.Args = append([]string{"ferret"}, tt.args...)
 
-			filename, debug, initProject, initPath := parseArgs()
+			filename, debug, initProject, initPath, _ := parseArgs()
 
 			if filename != tt.wantFilename {
 				t.Errorf("parseArgs() filename = %v, want %v", filename, tt.wantFilename)
@@ -179,7 +179,7 @@ func TestInitFunctionality(t *testing.T) {
 	// Test init in temporary directory
 	os.Args = []string{"ferret", "init", tempDir}
 
-	filename, debug, initProject, initPath := parseArgs()
+	filename, debug, initProject, initPath, _ := parseArgs()
 
 	if !initProject {
 		t.Fatal("Expected initProject to be true")
