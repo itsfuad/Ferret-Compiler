@@ -1,4 +1,8 @@
 // Simple test for code generation
+
+const pi = 3.1416; // type auto inferred as float64
+const radius: i32 = 5; // explicit type declaration
+
 let x: i32 = 42;
 let y: i32 = 10;
 let sum: i32 = x + y;

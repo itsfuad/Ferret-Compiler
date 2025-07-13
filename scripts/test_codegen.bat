@@ -5,17 +5,23 @@ echo.
 
 cd ..\compiler
 
+echo Ensuring config file exists...
+if not exist .ferret.json (
+    copy ..\app\.ferret.json .
+)
+
 echo Compiling simple.fer to assembly...
-go run cmd/main.go compile ../app/simple.fer --output ../app/simple.s
+set SIMPLE_PATH=%cd%\..\app\simple.fer
+go run cmd/main.go "%SIMPLE_PATH%" --debug
 
 if %errorlevel% equ 0 (
     echo.
     echo ✓ Compilation successful!
-    echo Generated assembly file: ../app/simple.s
+    echo Generated assembly file: ../app/output.asm
     echo.
     echo Assembly output:
     echo ----------------------------------------
-    type ..\app\simple.s
+    type ..\app\output.asm
     echo ----------------------------------------
 ) else (
     echo.
