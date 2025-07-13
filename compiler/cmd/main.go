@@ -10,6 +10,7 @@ import (
 	"compiler/ctx"
 	"compiler/internal/config"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/backend"
 
 	//"compiler/internal/semantic"
 	// "strings"
@@ -75,6 +76,19 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 
 	if isDebugEnabled {
 		colors.GREEN.Println("---------- [Type Checking done] ----------")
+	}
+
+	// --- Code Generation ---
+	// Generate assembly code
+	outputPath := filepath.Join(filepath.Dir(fullPath), "output.asm")
+	err = backend.CompileToAssembly(program, context, outputPath)
+	if err != nil {
+		colors.RED.Printf("Code generation failed: %v\n", err)
+		return context
+	}
+
+	if isDebugEnabled {
+		colors.GREEN.Println("---------- [Code Generation done] ----------")
 	}
 
 	return context
