@@ -11,12 +11,12 @@ import (
 )
 
 // CompileToAssembly compiles a Ferret program to x86-64 assembly
-func CompileToAssembly(program *ast.Program, compilerCtx *ctx.CompilerContext, outputPath string) error {
+func CompileToAssembly(program *ast.Program, compilerCtx *ctx.CompilerContext, outputPath string, isDebug bool) error {
 	// Create code generator options
 	options := &codegen.GeneratorOptions{
 		OutputFile:    outputPath,
 		OptimizeLevel: 0, // No optimization for now
-		DebugInfo:     true,
+		DebugInfo:     isDebug,
 	}
 
 	// Create x86-64 code generator
