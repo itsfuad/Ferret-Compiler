@@ -262,6 +262,7 @@ type Matrix [][]f32;
 - [ ] Branch analysis
 - [x] Resolver
 - [x] Type checking
+- [x] Code generation (x86-64 assembly)
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
