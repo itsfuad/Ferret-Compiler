@@ -264,6 +264,9 @@ type Matrix [][]f32;
 - [x] Type checking
 - [x] Code generation (x86-64 assembly)
 
+## Future Plans
+[ ] Clean dependency with 'ferret clean'
+
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
