@@ -5,14 +5,15 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 
 	"compiler/colors"
 	"compiler/ctx"
+	"compiler/internal/backend"
 	"compiler/internal/config"
 	"compiler/internal/frontend/parser"
 
 	//"compiler/internal/semantic"
-	// "strings"
 
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/resolver"
@@ -20,7 +21,7 @@ import (
 	//"compiler/internal/semantic/typecheck"
 )
 
-func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
+func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.CompilerContext {
 	fullPath, err := filepath.Abs(filePath)
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
@@ -77,14 +78,33 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 		colors.GREEN.Println("---------- [Type Checking done] ----------")
 	}
 
+	// --- Code Generation ---
+	// Generate assembly code
+	if outputPath == "" {
+		// Use the program name for the output file
+		fileName := filepath.Base(fullPath)
+		baseName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+		outputPath = filepath.Join(filepath.Dir(fullPath), baseName+".asm")
+	}
+	err = backend.CompileToAssembly(program, context, outputPath, isDebugEnabled)
+	if err != nil {
+		colors.RED.Printf("Code generation failed: %v\n", err)
+		return context
+	}
+
+	if isDebugEnabled {
+		colors.GREEN.Println("---------- [Code Generation done] ----------")
+	}
+
 	return context
 }
 
-func parseArgs() (string, bool, bool, string) {
+func parseArgs() (string, bool, bool, string, string) {
 	var filename string
 	var debug bool
 	var initProject bool
 	var initPath string
+	var outputPath string
 
 	args := os.Args[1:]
 
@@ -92,6 +112,12 @@ func parseArgs() (string, bool, bool, string) {
 		switch arg {
 		case "--debug":
 			debug = true
+		case "-o", "--output":
+			// Check if next argument is the output path
+			if i+1 < len(args) && args[i+1][:1] != "-" {
+				outputPath = args[i+1]
+				i++ // Skip the next argument since we consumed it
+			}
 		case "init":
 			initProject = true
 			// Check if next argument is a path
@@ -106,7 +132,7 @@ func parseArgs() (string, bool, bool, string) {
 		}
 	}
 
-	return filename, debug, initProject, initPath
+	return filename, debug, initProject, initPath, outputPath
 }
 
 func main() {
@@ -115,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	filename, debug, initProject, initPath := parseArgs()
+	filename, debug, initProject, initPath, outputPath := parseArgs()
 
 	// Handle init command
 	if initProject {
@@ -148,7 +174,7 @@ func main() {
 		colors.BLUE.Println("Debug mode enabled")
 	}
 
-	context := Compile(filename, debug)
+	context := Compile(filename, debug, outputPath)
 
 	// Only destroy and print modules if context is not nil
 	if context != nil {
