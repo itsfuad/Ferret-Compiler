@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -25,8 +26,8 @@ type X86_64Generator struct {
 	registers    map[string]bool // Track register usage
 }
 
-// NewX86_64Generator creates a new x86-64 assembly code generator
-func NewX86_64Generator(options *GeneratorOptions) *X86_64Generator {
+// NewX86Generator creates a new x86-64 assembly code generator
+func NewX86Generator(options *GeneratorOptions) *X86_64Generator {
 	if options == nil {
 		options = &GeneratorOptions{}
 	}
@@ -121,9 +122,10 @@ func (g *X86_64Generator) generateDataVariables(varDecl *ast.VarDeclStmt, compil
 	var module *ctx.Module = nil
 
 	// Try different module name formats
+	projectRootName := filepath.Base(compilerCtx.ProjectRoot)
 	moduleNames := []string{
 		g.context.CurrentModule,
-		"app/" + g.context.CurrentModule,
+		projectRootName + "/" + g.context.CurrentModule,
 	}
 
 	// Also try iterating through all modules to find the right one
@@ -180,9 +182,10 @@ func (g *X86_64Generator) generateBSSVariables(varDecl *ast.VarDeclStmt, compile
 	var module *ctx.Module = nil
 
 	// Try different module name formats
+	projectRootName := filepath.Base(compilerCtx.ProjectRoot)
 	moduleNames := []string{
 		g.context.CurrentModule,
-		"app/" + g.context.CurrentModule,
+		projectRootName + "/" + g.context.CurrentModule,
 	}
 
 	// Also try iterating through all modules to find the right one
