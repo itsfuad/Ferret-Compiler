@@ -34,6 +34,6 @@ func NewCodeGenerator(target Target, options *GeneratorOptions) CodeGenerator {
 	switch target {
 	// Later, we can add more targets like ARM64, RISCV64, etc.
 	default:
-		return NewX86Generator(options) // Default to x86-64
+		return NewX8664Generator(options) // Default to x86-64
 	}
 }
