@@ -8,9 +8,9 @@ import (
 
 	"compiler/colors"
 	"compiler/ctx"
+	"compiler/internal/backend"
 	"compiler/internal/config"
 	"compiler/internal/frontend/parser"
-	"compiler/internal/backend"
 
 	//"compiler/internal/semantic"
 	// "strings"
@@ -21,7 +21,7 @@ import (
 	//"compiler/internal/semantic/typecheck"
 )
 
-func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
+func Compile(filePath string, outputPath string, isDebugEnabled bool) *ctx.CompilerContext {
 	fullPath, err := filepath.Abs(filePath)
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
@@ -80,7 +80,9 @@ func Compile(filePath string, isDebugEnabled bool) *ctx.CompilerContext {
 
 	// --- Code Generation ---
 	// Generate assembly code
-	outputPath := filepath.Join(filepath.Dir(fullPath), "output.asm")
+	if outputPath == "" {
+		outputPath = filepath.Join(filepath.Dir(fullPath), "output.asm")
+	}
 	err = backend.CompileToAssembly(program, context, outputPath)
 	if err != nil {
 		colors.RED.Printf("Code generation failed: %v\n", err)
@@ -103,30 +105,24 @@ func parseArgs() (string, bool, bool, string, string) {
 
 	args := os.Args[1:]
 
-	for i, arg := range args {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
 		switch arg {
 		case "--debug":
 			debug = true
 		case "-o", "--output":
-			// Check if next argument is the output path
-			if i+1 < len(args) && args[i+1][:1] != "-" {
+			if i+1 < len(args) {
 				outputPath = args[i+1]
+				i++ // Skip next argument as it's the output path
 			}
 		case "init":
 			initProject = true
-			// Check if next argument is a path
 			if i+1 < len(args) && args[i+1][:1] != "-" {
 				initPath = args[i+1]
+				i++ // Skip next argument as it's the init path
 			}
 		default:
-			// Skip if this is an output path argument
-			if i > 0 && (args[i-1] == "-o" || args[i-1] == "--output") {
-				continue
-			}
-			// Skip if this is an init path argument
-			if i > 0 && args[i-1] == "init" {
-				continue
-			}
 			// If it's not a flag and we haven't set filename yet, this is the filename
 			if !initProject && filename == "" && arg[:1] != "-" {
 				filename = arg
@@ -139,11 +135,11 @@ func parseArgs() (string, bool, bool, string, string) {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [--debug] | ferret init [path]")
+		fmt.Println("Usage: ferret <filename> [-o output] [--debug] | ferret init [path]")
 		os.Exit(1)
 	}
 
-	filename, debug, initProject, initPath := parseArgs()
+	filename, debug, initProject, initPath, outputPath := parseArgs()
 
 	// Handle init command
 	if initProject {
@@ -168,7 +164,7 @@ func main() {
 
 	// Check for filename argument
 	if filename == "" {
-		fmt.Println("Usage: ferret <filename> [--debug] | ferret init [path]")
+		fmt.Println("Usage: ferret <filename> [-o output] [--debug] | ferret init [path]")
 		os.Exit(1)
 	}
 
@@ -176,7 +172,7 @@ func main() {
 		colors.BLUE.Println("Debug mode enabled")
 	}
 
-	context := Compile(filename, debug)
+	context := Compile(filename, outputPath, debug)
 
 	// Only destroy and print modules if context is not nil
 	if context != nil {
