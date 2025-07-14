@@ -6,7 +6,7 @@ import (
 )
 
 type Node interface {
-	INode() Node
+	INode()
 	Loc() *source.Location
 }
 
@@ -26,7 +26,7 @@ type ExpressionList []Expression
 func (el *ExpressionList) Loc() *source.Location {
 	return (*el)[0].Loc()
 }
-func (el *ExpressionList) INode() Node { return el }
+func (el *ExpressionList) INode() {} // Impliments Node interface
 
 // Statement represents any node that doesn't produce a value
 type Statement interface {
@@ -44,8 +44,8 @@ func (e *ExpressionStmt) Loc() *source.Location {
 	return &e.Location
 }
 
-func (e *ExpressionStmt) INode() Node { return e }
-func (e *ExpressionStmt) Stmt()       {} // Stmt is a marker interface for all statements
+func (e *ExpressionStmt) INode() {} // Impliments Node interface
+func (e *ExpressionStmt) Stmt()  {} // Stmt is a marker interface for all statements
 
 // TypeScopeResolution represents scope resolution for types (e.g., module::TypeName)
 type TypeScopeResolution struct {
@@ -54,8 +54,8 @@ type TypeScopeResolution struct {
 	source.Location
 }
 
-func (t *TypeScopeResolution) INode() Node { return t }
-func (t *TypeScopeResolution) Expr()       {} // Expr is a marker interface for all expressions
+func (t *TypeScopeResolution) INode() {} // Impliments Node interface
+func (t *TypeScopeResolution) Expr()  {} // Expr is a marker interface for all expressions
 func (t *TypeScopeResolution) Loc() *source.Location {
 	return &t.Location
 }
@@ -73,8 +73,8 @@ type VarScopeResolution struct {
 	source.Location
 }
 
-func (v *VarScopeResolution) INode() Node { return v }
-func (v *VarScopeResolution) Expr()       {} // Expr is a marker interface for all expressions
+func (v *VarScopeResolution) INode() {} // Impliments Node interface
+func (v *VarScopeResolution) Expr()  {} // Expr is a marker interface for all expressions
 func (v *VarScopeResolution) Loc() *source.Location {
 	return &v.Location
 }
