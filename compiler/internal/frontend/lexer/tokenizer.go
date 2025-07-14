@@ -7,26 +7,7 @@ import (
 	"regexp"
 
 	"compiler/internal/source"
-)
-
-const (
-	hexDigits = `[0-9a-fA-F]`
-	hexNumber = `0[xX]` + hexDigits + `(?:` + hexDigits + `|_` + hexDigits + `)*`
-
-	octDigits = `[0-7]`
-	octNumber = `0[oO]` + octDigits + `(?:` + octDigits + `|_` + octDigits + `)*`
-
-	binDigits = `[01]`
-	binNumber = `0[bB]` + binDigits + `(?:` + binDigits + `|_` + binDigits + `)*`
-
-	decDigits = `[0-9]`
-	decNumber = decDigits + `(?:` + decDigits + `|_` + decDigits + `)*`
-
-	floatFrac   = `\.` + decDigits + `(?:` + decDigits + `|_` + decDigits + `)*`
-	floatExp    = `[eE][+-]?` + decDigits + `(?:` + decDigits + `|_` + decDigits + `)*`
-	floatNumber = decNumber + `(?:` + floatFrac + `)?(?:` + floatExp + `)?`
-
-	numberPattern = `-?(?:` + hexNumber + `|` + octNumber + `|` + binNumber + `|` + floatNumber + `)`
+	"compiler/internal/utils/numeric"
 )
 
 type regexHandler func(lex *Lexer, regex *regexp.Regexp)
@@ -89,7 +70,7 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`\/\*[\s\S]*?\*\/`), skipHandler},             // multi line comments
 			{regexp.MustCompile(`"[^"]*"`), stringHandler},                    // string literals
 			{regexp.MustCompile(`'[^']'`), byteHandler},                       // byte literals
-			{regexp.MustCompile(numberPattern), numberHandler},                // numbers (hex, octal, binary, float, integer)
+			{regexp.MustCompile(numeric.NumberPattern), numberHandler},        // numbers (hex, octal, binary, float, integer)
 			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
 			{regexp.MustCompile(`\+\+`), defaultHandler(PLUS_PLUS_TOKEN)},
 			{regexp.MustCompile(`\-\-`), defaultHandler(MINUS_MINUS_TOKEN)},
