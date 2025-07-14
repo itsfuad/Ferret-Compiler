@@ -13,7 +13,7 @@ type BinaryExpr struct {
 	source.Location
 }
 
-func (b *BinaryExpr) INode() Node           { return b }
+func (b *BinaryExpr) INode()                {} // Impliments Node interface
 func (b *BinaryExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (b *BinaryExpr) Loc() *source.Location { return &b.Location }
 
@@ -23,7 +23,7 @@ type UnaryExpr struct {
 	source.Location
 }
 
-func (u *UnaryExpr) INode() Node           { return u }
+func (u *UnaryExpr) INode()                {} // Impliments Node interface
 func (u *UnaryExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (u *UnaryExpr) Loc() *source.Location { return &u.Location }
 
@@ -33,7 +33,7 @@ type PrefixExpr struct {
 	source.Location
 }
 
-func (p *PrefixExpr) INode() Node           { return p }
+func (p *PrefixExpr) INode()                {} // Impliments Node interface
 func (p *PrefixExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (p *PrefixExpr) Loc() *source.Location { return &p.Location }
 
@@ -43,7 +43,7 @@ type PostfixExpr struct {
 	source.Location
 }
 
-func (p *PostfixExpr) INode() Node           { return p }
+func (p *PostfixExpr) INode()                {} // Impliments Node interface
 func (p *PostfixExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (p *PostfixExpr) Loc() *source.Location { return &p.Location }
 
@@ -52,7 +52,7 @@ type IdentifierExpr struct {
 	source.Location
 }
 
-func (i *IdentifierExpr) INode() Node           { return i }
+func (i *IdentifierExpr) INode()                {} // Impliments Node interface
 func (i *IdentifierExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (i *IdentifierExpr) LValue()               {} // LValue is a marker interface for all lvalues
 func (i *IdentifierExpr) Loc() *source.Location { return &i.Location }
@@ -64,7 +64,7 @@ type FunctionCallExpr struct {
 	source.Location
 }
 
-func (f *FunctionCallExpr) INode() Node           { return f }
+func (f *FunctionCallExpr) INode()                {} // Impliments Node interface
 func (f *FunctionCallExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (f *FunctionCallExpr) Loc() *source.Location { return &f.Location }
 
@@ -75,7 +75,7 @@ type FieldAccessExpr struct {
 	source.Location
 }
 
-func (f *FieldAccessExpr) INode() Node           { return f }
+func (f *FieldAccessExpr) INode()                {} // Impliments Node interface
 func (f *FieldAccessExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (f *FieldAccessExpr) LValue()               {} // LValue is a marker interface for all lvalues
 func (f *FieldAccessExpr) Loc() *source.Location { return &f.Location }
