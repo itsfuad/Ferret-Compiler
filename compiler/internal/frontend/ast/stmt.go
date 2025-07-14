@@ -32,7 +32,7 @@ func (m *Program) SaveAST() error {
 	return nil
 }
 
-func (m *Program) INode() Node           { return m }
+func (m *Program) INode()                {} // Impliments Node interface
 func (m *Program) Stmt()                 {} // Stmt is a marker interface for all statements
 func (m *Program) Loc() *source.Location { return &m.Location }
 
@@ -44,7 +44,7 @@ type VarDeclStmt struct {
 	source.Location
 }
 
-func (v *VarDeclStmt) INode() Node           { return v }
+func (v *VarDeclStmt) INode()                {} // Impliments Node interface
 func (v *VarDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (v *VarDeclStmt) Loc() *source.Location { return &v.Location }
 
@@ -59,7 +59,7 @@ type AssignmentStmt struct {
 	source.Location
 }
 
-func (a *AssignmentStmt) INode() Node           { return a }
+func (a *AssignmentStmt) INode()                {} // Impliments Node interface
 func (a *AssignmentStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (a *AssignmentStmt) Loc() *source.Location { return &a.Location }
 
@@ -70,7 +70,7 @@ type TypeDeclStmt struct {
 	source.Location
 }
 
-func (t *TypeDeclStmt) INode() Node           { return t }
+func (t *TypeDeclStmt) INode()                {} // Impliments Node interface
 func (t *TypeDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
@@ -80,7 +80,7 @@ type ReturnStmt struct {
 	source.Location
 }
 
-func (r *ReturnStmt) INode() Node           { return r }
+func (r *ReturnStmt) INode()                {} // Impliments Node interface
 func (r *ReturnStmt) Stmt()                 {} // Stmt is a marker method for statements
 func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 
@@ -93,7 +93,7 @@ type ImportStmt struct {
 	source.Location
 }
 
-func (i *ImportStmt) INode() Node           { return i }
+func (i *ImportStmt) INode()                {} // Impliments Node interface
 func (i *ImportStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (i *ImportStmt) Loc() *source.Location { return &i.Location }
 
@@ -102,6 +102,6 @@ type ModuleDeclStmt struct {
 	source.Location
 }
 
-func (m *ModuleDeclStmt) INode() Node           { return m }
+func (m *ModuleDeclStmt) INode()                {} // Impliments Node interface
 func (m *ModuleDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (m *ModuleDeclStmt) Loc() *source.Location { return &m.Location }

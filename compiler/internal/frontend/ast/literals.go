@@ -9,7 +9,7 @@ type IntLiteral struct {
 	source.Location
 }
 
-func (i *IntLiteral) INode() Node           { return i }
+func (i *IntLiteral) INode()                {} // Impliments Node interface
 func (i *IntLiteral) Expr()                 {} // Expr is a marker interface for all expressions
 func (i *IntLiteral) Loc() *source.Location { return &i.Location }
 
@@ -19,7 +19,7 @@ type FloatLiteral struct {
 	source.Location
 }
 
-func (f *FloatLiteral) INode() Node           { return f }
+func (f *FloatLiteral) INode()                {} // Impliments Node interface
 func (f *FloatLiteral) Expr()                 {} // Expr is a marker interface for all expressions
 func (f *FloatLiteral) Loc() *source.Location { return &f.Location }
 
@@ -28,7 +28,7 @@ type StringLiteral struct {
 	source.Location
 }
 
-func (s *StringLiteral) INode() Node           { return s }
+func (s *StringLiteral) INode()                {} // Impliments Node interface
 func (s *StringLiteral) Expr()                 {} // Expr is a marker interface for all expressions
 func (s *StringLiteral) Loc() *source.Location { return &s.Location }
 
@@ -37,7 +37,7 @@ type BoolLiteral struct {
 	source.Location
 }
 
-func (b *BoolLiteral) INode() Node           { return b }
+func (b *BoolLiteral) INode()                {} // Impliments Node interface
 func (b *BoolLiteral) Expr()                 {} // Expr is a marker interface for all expressions
 func (b *BoolLiteral) Loc() *source.Location { return &b.Location }
 
@@ -46,7 +46,7 @@ type ByteLiteral struct {
 	source.Location
 }
 
-func (b *ByteLiteral) INode() Node           { return b }
+func (b *ByteLiteral) INode()                {} // Impliments Node interface
 func (b *ByteLiteral) Expr()                 {} // Expr is a marker interface for all expressions
 func (b *ByteLiteral) Loc() *source.Location { return &b.Location }
 
@@ -56,7 +56,7 @@ type IndexableExpr struct {
 	source.Location
 }
 
-func (i *IndexableExpr) INode() Node           { return i }
+func (i *IndexableExpr) INode()                {} // Impliments Node interface
 func (i *IndexableExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (i *IndexableExpr) Loc() *source.Location { return &i.Location }
 
@@ -65,7 +65,7 @@ type ArrayLiteralExpr struct {
 	source.Location
 }
 
-func (a *ArrayLiteralExpr) INode() Node           { return a }
+func (a *ArrayLiteralExpr) INode()                {} // Impliments Node interface
 func (a *ArrayLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (a *ArrayLiteralExpr) Loc() *source.Location { return &a.Location }
 
@@ -77,7 +77,7 @@ type StructLiteralExpr struct {
 	source.Location
 }
 
-func (s *StructLiteralExpr) INode() Node           { return s }
+func (s *StructLiteralExpr) INode()                {} // Impliments Node interface
 func (s *StructLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (s *StructLiteralExpr) Loc() *source.Location { return &s.Location }
 
@@ -88,6 +88,6 @@ type FunctionLiteral struct {
 	source.Location
 }
 
-func (f *FunctionLiteral) INode() Node           { return f }
+func (f *FunctionLiteral) INode()                {} // Impliments Node interface
 func (f *FunctionLiteral) Expr()                 {} // Expr is a marker interface for all expressions
 func (f *FunctionLiteral) Loc() *source.Location { return &f.Location }
