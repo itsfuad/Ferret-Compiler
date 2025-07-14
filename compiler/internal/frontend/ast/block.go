@@ -8,7 +8,7 @@ type Block struct {
 	source.Location
 }
 
-func (b *Block) INode() Node           { return b }
+func (b *Block) INode()                {} // Impliments Node interface
 func (b *Block) Block()                {} // Block is a marker method for statements
 func (b *Block) Loc() *source.Location { return &b.Location }
 
@@ -19,7 +19,7 @@ type FunctionDecl struct {
 	source.Location
 }
 
-func (f *FunctionDecl) INode() Node           { return f }
+func (f *FunctionDecl) INode()                {} // Impliments Node interface
 func (f *FunctionDecl) Block()                {} // Block is a marker interface for all expressions
 func (f *FunctionDecl) Loc() *source.Location { return &f.Location }
 
@@ -31,7 +31,7 @@ type IfStmt struct {
 	source.Location
 }
 
-func (i *IfStmt) INode() Node           { return i }
+func (i *IfStmt) INode()                {} // Impliments Node interface
 func (i *IfStmt) Block()                {} // Block is a marker interface for all statements
 func (i *IfStmt) Loc() *source.Location { return &i.Location }
 
@@ -44,6 +44,6 @@ type MethodDecl struct {
 	source.Location
 }
 
-func (m *MethodDecl) INode() Node           { return m }
+func (m *MethodDecl) INode()                {} // Impliments Node interface
 func (m *MethodDecl) Block()                {} // Block is a marker interface for all statements
 func (m *MethodDecl) Loc() *source.Location { return &m.Location }
