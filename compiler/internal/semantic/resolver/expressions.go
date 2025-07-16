@@ -114,7 +114,7 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral) {
 	// Resolve function body
 	if fn.Body != nil {
 		for _, node := range fn.Body.Nodes {
-			resolveNode(r, node)
+			resolveASTNode(r, node)
 		}
 	}
 }
