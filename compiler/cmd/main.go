@@ -55,7 +55,7 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.Compi
 	anz := analyzer.NewAnalyzerNode(program, context, isDebugEnabled)
 
 	// -- Resolve the program
-	resolver.ResolveProgram(anz)
+	resolver.Resolve(anz)
 
 	if context.Reports.HasErrors() {
 		panic("Compilation stopped due to errors")
