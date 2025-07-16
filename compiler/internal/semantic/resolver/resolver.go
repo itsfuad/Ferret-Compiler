@@ -10,18 +10,18 @@ import (
 	"compiler/internal/semantic/analyzer"
 )
 
-// ResolveProgram is the main entry point for the resolver phase
-func ResolveProgram(r *analyzer.AnalyzerNode) {
+// Resolve is the main entry point for the resolver phase
+func Resolve(r *analyzer.AnalyzerNode) {
 	for _, node := range r.Program.Nodes {
-		resolveNode(r, node)
+		resolveASTNode(r, node)
 	}
 	if r.Debug {
 		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)
 	}
 }
 
-// resolveNode dispatches resolution to the appropriate handler based on node type
-func resolveNode(r *analyzer.AnalyzerNode, node ast.Node) {
+// resolveASTNode dispatches resolution to the appropriate handler based on node type
+func resolveASTNode(r *analyzer.AnalyzerNode, node ast.Node) {
 	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
 	if err != nil {
 		r.Ctx.Reports.Add(r.Program.FullPath, r.Program.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
@@ -41,6 +41,10 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node) {
 		resolveTypeDecl(r, n)
 	case *ast.TypeScopeResolution:
 		resolveTypeScopeResolution(r, n)
+	case *ast.FunctionDecl:
+		resolveFunctionDecl(r, n)
+	case *ast.Block:
+		resolveBlockStmt(r, n)
 	// Basic data types - these are primitive types that don't need special resolution
 	case *ast.StringType:
 		// String type is a primitive, no additional resolution needed
