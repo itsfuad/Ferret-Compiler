@@ -98,4 +98,9 @@ fn nothing() {
     // This function does nothing
 }
 
-nothing(); // Call the function
+fn withParam(param: str) {
+    // This function takes a string parameter and does nothing with it
+    // fmt.println(param); // Uncomment to print the parameter
+}
+
+cxx(); // Call the function

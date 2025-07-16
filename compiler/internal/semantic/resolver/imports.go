@@ -15,7 +15,7 @@ func resolveImport(r *analyzer.AnalyzerNode, currentModule *ctx.Module, importSt
 			importModuleAST := importModule.AST
 			//semantic.AddPreludeSymbols(importModule.SymbolTable)
 			anz := analyzer.NewAnalyzerNode(importModuleAST, r.Ctx, r.Debug)
-			ResolveProgram(anz)
+			Resolve(anz)
 			currentModule.SymbolTable.Imports[importStmt.ModuleName] = importModule.SymbolTable
 		} else {
 			r.Ctx.Reports.Add(r.Program.FullPath, importStmt.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
