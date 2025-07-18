@@ -43,7 +43,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Modu
 	}
 
 	//module must be parses and stored already
-	module, err := c.Ctx.GetModule(imp.ImportPath.Value)	
+	module, err := c.Ctx.GetModule(imp.ImportPath.Value)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.COLLECTOR_PHASE)
 		return
