@@ -1,5 +1,7 @@
 package source
 
+import "fmt"
+
 // Location represents a span of source code with start and end positions
 type Location struct {
 	Start *Position
@@ -23,4 +25,12 @@ func (l *Location) Contains(pos *Position) bool {
 		return false
 	}
 	return true
+}
+
+func (l *Location) String() string {
+	if l.Start == nil || l.End == nil {
+		return "Location(unknown)"
+	}
+
+	return fmt.Sprintf("Location(%d:%d - %d:%d)", l.Start.Line, l.Start.Column, l.End.Line, l.End.Column)
 }

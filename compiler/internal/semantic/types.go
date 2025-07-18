@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"compiler/internal/frontend/ast"
 	"compiler/internal/types"
 )
 
@@ -179,4 +180,62 @@ func (f *FunctionType) Equals(other Type) bool {
 		return true
 	}
 	return false
+}
+
+// ASTToSemanticType converts an AST DataType to a semantic Type
+func ASTToSemanticType(astType ast.DataType) Type {
+	if astType == nil {
+		return nil
+	}
+
+	switch t := astType.(type) {
+	case *ast.IntType:
+		return &PrimitiveType{Name: t.TypeName}
+	case *ast.FloatType:
+		return &PrimitiveType{Name: t.TypeName}
+	case *ast.StringType:
+		return &PrimitiveType{Name: t.TypeName}
+	case *ast.BoolType:
+		return &PrimitiveType{Name: t.TypeName}
+	case *ast.ByteType:
+		return &PrimitiveType{Name: t.TypeName}
+	case *ast.UserDefinedType:
+		return &UserType{Name: t.TypeName}
+	case *ast.ArrayType:
+		elementType := ASTToSemanticType(t.ElementType)
+		return &ArrayType{
+			ElementType: elementType,
+			Name:        t.TypeName,
+		}
+	case *ast.StructType:
+		fields := make(map[string]Type)
+		for _, field := range t.Fields {
+			if field.FieldType != nil {
+				fieldName := field.FieldIdentifier.Name
+				fieldType := ASTToSemanticType(field.FieldType)
+				fields[fieldName] = fieldType
+			}
+		}
+		return &StructType{
+			Name:   t.TypeName,
+			Fields: fields,
+		}
+	case *ast.FunctionType:
+		var params []Type
+		for _, param := range t.Parameters {
+			params = append(params, ASTToSemanticType(param))
+		}
+		var returns []Type
+		for _, ret := range t.ReturnTypes {
+			returns = append(returns, ASTToSemanticType(ret))
+		}
+		return &FunctionType{
+			Parameters:  params,
+			ReturnTypes: returns,
+			Name:        t.TypeName,
+		}
+	default:
+		// For unknown AST types, create a user type
+		return &UserType{Name: astType.Type()}
+	}
 }
