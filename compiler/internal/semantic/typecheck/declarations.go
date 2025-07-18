@@ -6,6 +6,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
+	"fmt"
 )
 
 func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt, cm *ctx.Module) {
@@ -13,11 +14,11 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 
 		variableInModule, _ := cm.SymbolTable.Lookup(variable.Identifier.Name)
 		initializer := varDecl.Initializers[i]
-		typeToAdd := inferExpressionType(r, initializer, cm)
+		typeToAdd := inferTypeFromExpression(r, initializer, cm)
 
 		if variable.ExplicitType == nil {
 			colors.CYAN.Printf("Infering type for variable '%s'\n", variable.Identifier.Name)
-			
+
 			variableInModule.Type = typeToAdd
 
 			if r.Debug {
@@ -25,10 +26,11 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 			}
 		} else if variable.ExplicitType != nil && typeToAdd != nil {
 			//both explicit type and initializer are provided. they must match
-			if variableInModule.Type.Equals(typeToAdd) {
+			explicitType := getDatatype(variable.ExplicitType)
+			if IsAssignableFrom(explicitType, typeToAdd) {
 				colors.CYAN.Printf("Variable '%s' type matches explicit type: %s\n", variable.Identifier.Name, typeToAdd)
 			} else {
-				r.Ctx.Reports.Add(r.Program.FullPath, variable.ExplicitType.Loc(), "Explicit type does not match initializer type", report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'", typeToAdd.String(), variable.Identifier.Name, explicitType.String()), report.TYPECHECK_PHASE)
 				return
 			}
 		}

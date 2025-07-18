@@ -1,7 +1,7 @@
 let a: i32 = 10;
 let b = 23.232;
 
-let sum: str = a + b;
+let sum: i32 = a + b;
 
 // let x, y, z : i32; // all three variables are of type i32
 
