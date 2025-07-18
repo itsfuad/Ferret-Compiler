@@ -68,8 +68,8 @@ func (t *TypeScopeResolution) Type() types.TYPE_NAME {
 
 // VarScopeResolution represents scope resolution for variables (e.g., module::variableName)
 type VarScopeResolution struct {
-	Module *IdentifierExpr
-	Var    *IdentifierExpr
+	Module     *IdentifierExpr
+	Identifier *IdentifierExpr
 	source.Location
 }
 
@@ -79,5 +79,5 @@ func (v *VarScopeResolution) Loc() *source.Location {
 	return &v.Location
 }
 func (v *VarScopeResolution) Type() types.TYPE_NAME {
-	return types.TYPE_NAME(v.Var.Name)
+	return types.TYPE_NAME(v.Identifier.Name)
 }

@@ -313,7 +313,7 @@ func (g *X86_64Generator) generateExpressionCode(expr ast.Expression, compilerCt
 
 	case *ast.VarScopeResolution:
 		// Handle module::variable access
-		varName := g.sanitizeLabel(e.Var.Name)
+		varName := g.sanitizeLabel(e.Identifier.Name)
 		g.textSection.WriteString(fmt.Sprintf("    mov rax, [%s]\n", varName))
 
 	default:

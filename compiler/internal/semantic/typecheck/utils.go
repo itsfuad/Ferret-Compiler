@@ -8,6 +8,7 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/types"
+	"fmt"
 )
 
 // getDatatype converts an AST DataType to a semantic Type
@@ -15,8 +16,8 @@ func getDatatype(astType ast.DataType) semantic.Type {
 	return semantic.ASTToSemanticType(astType)
 }
 
-// inferTypeFromExpression infers the semantic type from an AST expression
-func inferTypeFromExpression(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) semantic.Type {
+// evaluateExpressionType infers the semantic type from an AST expression
+func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) semantic.Type {
 	if expr == nil {
 		return nil
 	}
@@ -45,10 +46,18 @@ func inferTypeFromExpression(r *analyzer.AnalyzerNode, expr ast.Expression, cm *
 		resultType = inferArrayLiteralType(r, e, cm)
 	case *ast.IndexableExpr:
 		resultType = inferIndexableType(r, e, cm)
+	case *ast.VarScopeResolution:
+		resultType = inferImportedSymbolType(r, e, cm)
 
 	default:
 		// Unknown expression type
 		resultType = nil
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			e.Loc(),
+			fmt.Sprintf("Unsupported expression type <%T> for type inference", e),
+			report.TYPECHECK_PHASE,
+		)
 	}
 
 	// Debug logging
@@ -57,6 +66,37 @@ func inferTypeFromExpression(r *analyzer.AnalyzerNode, expr ast.Expression, cm *
 	}
 
 	return resultType
+}
+
+func inferImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, _ *ctx.Module) semantic.Type {
+
+	moduleKey := r.Program.ModulenameToImportpath[res.Module.Name]
+	if moduleKey == "" {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Module '%s' is not imported", res.Module.Name), report.RESOLVER_PHASE)
+		return nil
+	}
+
+	module, err := r.Ctx.GetModule(moduleKey)
+	if err != nil {
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, res.Loc(), "Failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
+		return nil
+	}
+
+	resIdentifier, found := module.SymbolTable.Lookup(res.Identifier.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol '%s' not found in module '%s'", res.Identifier.Name, moduleKey), report.RESOLVER_PHASE)
+		return nil
+	}
+	if resIdentifier.Type == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol '%s' has no type defined", res.Identifier.Name), report.RESOLVER_PHASE)
+		return nil
+	}
+	if r.Debug {
+		//print symbol X found in module Y imported from Z
+		colors.AQUA.Printf("Resolved imported symbol '%s' of type '%s' from module '%s' imported from '%s'\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, moduleKey)
+	}
+
+	return resIdentifier.Type
 }
 
 // ===== CORE ASSIGNABILITY CHECK =====
@@ -219,8 +259,8 @@ func inferIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) semantic.Type {
 
 // inferBinaryExprType infers the result type of binary expressions
 func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) semantic.Type {
-	leftType := inferTypeFromExpression(r, *e.Left, cm)
-	rightType := inferTypeFromExpression(r, *e.Right, cm)
+	leftType := evaluateExpressionType(r, *e.Left, cm)
+	rightType := evaluateExpressionType(r, *e.Right, cm)
 
 	if leftType == nil || rightType == nil {
 		return nil
@@ -342,14 +382,14 @@ func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 	}
 
 	// Get type from first element
-	elementType := inferTypeFromExpression(r, e.Elements[0], cm)
+	elementType := evaluateExpressionType(r, e.Elements[0], cm)
 	if elementType == nil {
 		return nil
 	}
 
 	// Verify all elements are compatible
 	for _, element := range e.Elements[1:] {
-		elemType := inferTypeFromExpression(r, element, cm)
+		elemType := evaluateExpressionType(r, element, cm)
 		if elemType == nil {
 			continue
 		}
@@ -375,14 +415,14 @@ func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 
 // inferIndexableType infers types for array/map indexing
 func inferIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) semantic.Type {
-	indexableType := inferTypeFromExpression(r, *e.Indexable, cm)
+	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
 	if indexableType == nil {
 		return nil
 	}
 
 	// Check if it's an array
 	if arrayType, ok := indexableType.(*semantic.ArrayType); ok {
-		indexType := inferTypeFromExpression(r, *e.Index, cm)
+		indexType := evaluateExpressionType(r, *e.Index, cm)
 		if indexType == nil {
 			return nil
 		}
