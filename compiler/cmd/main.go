@@ -16,6 +16,7 @@ import (
 	"compiler/internal/frontend/parser"
 
 	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/collector"
 	"compiler/internal/semantic/resolver"
 	"compiler/internal/semantic/typecheck"
 )
@@ -51,22 +52,26 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.Compi
 		colors.BLUE.Printf("---------- [Parsing done] ----------\n")
 	}
 
-	// Run resolver
 	anz := analyzer.NewAnalyzerNode(program, context, isDebugEnabled)
 
-	// -- Resolve the program
-	resolver.Resolve(anz)
+	// --- Semantic Analysis ---
+	// Collect symbols
+	collector.CollectSymbols(anz)
+
+	if isDebugEnabled {
+		colors.BLUE.Printf("---------- [Symbol Collection done] ----------\n")
+	}
+
+	resolver.ResolveProgram(anz)
 
 	if context.Reports.HasErrors() {
-		panic("Compilation stopped due to errors")
+		panic("Compilation stopped due to resolver errors")
 	}
 
 	if isDebugEnabled {
 		colors.GREEN.Println("---------- [Resolver done] ----------")
 	}
 
-	// --- Type Checking ---
-	// Type check the entry point program (which will handle imports internally)
 	typecheck.CheckProgram(anz)
 
 	if context.Reports.HasErrors() {

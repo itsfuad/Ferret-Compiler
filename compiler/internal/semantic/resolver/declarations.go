@@ -1,97 +1,84 @@
 package resolver
 
 import (
+	"compiler/colors"
+	"compiler/ctx"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
-	"compiler/internal/types"
 )
 
-// resolveTypeDecl handles type declaration resolution
-func resolveTypeDecl(r *analyzer.AnalyzerNode, stmt *ast.TypeDeclStmt) {
-	// check if type is already declared or built-in or keyword
-	typeName := stmt.Alias.Name
-	if lexer.IsKeyword(typeName) || types.IsPrimitiveType(typeName) {
-		r.Ctx.Reports.Add(r.Program.FullPath, stmt.Alias.Loc(), "cannot declare type with reserved keyword: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
+	//identifier empty check is done in collector phase, so we can assume it's not empty here
+	
+	//now add the function definition to the current module's symbol table
+	currentModule, _ := r.Ctx.GetModule(r.Program.ImportPath) // no error since already checked in collector phase
+	symbol, found := currentModule.SymbolTable.Lookup(fn.Identifier.Name); if !found {
+		r.Ctx.Reports.Add(r.Program.FullPath, fn.Loc(), "Function '"+fn.Identifier.Name+"' is not declared", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 		return
 	}
-	//declare the type in the current module
-	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
-	if err != nil {
-		r.Ctx.Reports.Add(r.Program.FullPath, stmt.Alias.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
-		return
+	//add the type information to the symbol
+	var paramTypes []semantic.Type
+	if fn.Function.Params != nil {
+		for _, param := range fn.Function.Params {
+			if param.Type == nil {
+				r.Ctx.Reports.Add(r.Program.FullPath, &param.Identifier.Location, "parameter type must be specified", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				return
+			}
+			resolveNode(r, param.Type, cm)
+			paramType := semantic.ASTToSemanticType(param.Type)
+			paramTypes = append(paramTypes, paramType)
+		}
 	}
 
-	// Convert AST type to semantic type
-	semanticType := semantic.ASTToSemanticType(stmt.BaseType)
-	sym := semantic.NewSymbolWithLocation(typeName, semantic.SymbolType, semanticType, stmt.Alias.Loc())
-	currentModule.SymbolTable.Declare(typeName, sym)
+	var returnTypes []semantic.Type
+	if fn.Function.ReturnType != nil {
+		for _, ret := range fn.Function.ReturnType {
+			resolveNode(r, ret, cm)
+			retType := semantic.ASTToSemanticType(ret)
+			returnTypes = append(returnTypes, retType)
+		}
+	}
+
+	// Resolve function body
+	if fn.Function.Body != nil {
+		resolveNode(r, fn.Function.Body, cm)
+	}
+
+	// Create function type and symbol
+	functionType := semantic.FunctionType{
+		Parameters:  paramTypes,
+		ReturnTypes: returnTypes,
+	}
+
+	symbol.Type = &functionType
 }
 
-// resolveVarDecl handles variable declaration resolution
-func resolveVarDecl(r *analyzer.AnalyzerNode, stmt *ast.VarDeclStmt) {
-	currentModuleImportpath := r.Program.ImportPath
-	for i, v := range stmt.Variables {
-		name := v.Identifier.Name
-		kind := semantic.SymbolVar
-		if stmt.IsConst {
-			kind = semantic.SymbolConst
+func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *ctx.Module) {
+	for _, variable := range decl.Variables {
+
+		var expType semantic.Type
+
+		if variable.ExplicitType != nil {
+			expType = semantic.ASTToSemanticType(variable.ExplicitType)
+			if expType == nil {
+				r.Ctx.Reports.Add(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				return
+			}
 		}
-		// Type checking: ensure explicit type exists if provided
-		currentModule, err := r.Ctx.GetModule(currentModuleImportpath)
+		err := cm.SymbolTable.Declare(variable.Identifier.Name, semantic.NewSymbolWithLocation(variable.Identifier.Name, semantic.SymbolVar, expType, variable.Identifier.Loc()))
 		if err != nil {
-			r.Ctx.Reports.Add(r.Program.FullPath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+			r.Ctx.Reports.Add(r.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
 			return
 		}
 
-		if v.ExplicitType != nil {
-			resolveASTNode(r, v.ExplicitType)
-		}
-
-		// Convert AST type to semantic type
-		var semanticType semantic.Type
-		if v.ExplicitType != nil {
-			semanticType = semantic.ASTToSemanticType(v.ExplicitType)
-		}
-
-		sym := semantic.NewSymbolWithLocation(name, kind, semanticType, v.Identifier.Loc())
-
-		err = currentModule.SymbolTable.Declare(name, sym)
-		if err != nil {
-			// Redeclaration error
-			r.Ctx.Reports.Add(r.Program.FullPath, v.Identifier.Loc(), err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
-		}
-		// Check initializer expression if present
-		if i < len(stmt.Initializers) && stmt.Initializers[i] != nil {
-			resolveExpr(r, stmt.Initializers[i])
-		}
-	}
-}
-
-// resolveAssignment handles assignment statement resolution
-func resolveAssignment(r *analyzer.AnalyzerNode, stmt *ast.AssignmentStmt) {
-	// Check that all left-hand side variables are declared
-	for _, lhs := range *stmt.Left {
-		if id, ok := lhs.(*ast.IdentifierExpr); ok {
-			varSym, found := r.Ctx.Modules[r.Program.FullPath].SymbolTable.Lookup(id.Name)
-			if !found {
-				r.Ctx.Reports.Add(r.Program.FullPath, id.Loc(), "assignment to undeclared variable: "+id.Name, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
-			} else if varSym.Type != nil {
-				// Type checking: ensure type exists for variable
-				typeName := string(varSym.Type.TypeName())
-				typeSym, found := r.Ctx.Modules[r.Program.FullPath].SymbolTable.Lookup(typeName)
-				if !found || typeSym.Kind != semantic.SymbolType {
-					r.Ctx.Reports.Add(r.Program.FullPath, id.Loc(), "unknown type for variable: "+typeName, report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
-				}
+		if r.Debug {
+			if expType == nil {
+				colors.YELLOW.Printf("Declared variable symbol '%s' with no explicit type at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
+			} else {
+				colors.TEAL.Printf("Declared variable symbol '%s' with type '%v' at %s\n", variable.Identifier.Name, expType, variable.Identifier.Loc().String())
 			}
-		} else {
-			resolveExpr(r, lhs)
 		}
-	}
-	// Check right-hand side expressions
-	for _, rhs := range *stmt.Right {
-		resolveExpr(r, rhs)
 	}
 }
