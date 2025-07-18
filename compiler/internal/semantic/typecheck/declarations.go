@@ -14,7 +14,7 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 
 		variableInModule, _ := cm.SymbolTable.Lookup(variable.Identifier.Name)
 		initializer := varDecl.Initializers[i]
-		typeToAdd := inferTypeFromExpression(r, initializer, cm)
+		typeToAdd := evaluateExpressionType(r, initializer, cm)
 
 		if variable.ExplicitType == nil {
 			colors.CYAN.Printf("Infering type for variable '%s'\n", variable.Identifier.Name)
