@@ -1,4 +1,4 @@
-package resolver
+package typecheck
 
 import (
 	"compiler/colors"
@@ -8,27 +8,27 @@ import (
 	"compiler/internal/semantic/analyzer"
 )
 
-// ResolveProgram is the main entry point for the resolver phase
-func ResolveProgram(r *analyzer.AnalyzerNode) {
+func CheckProgram(r *analyzer.AnalyzerNode) {
 	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
 	if err != nil {
 		r.Ctx.Reports.Add(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
 		return
 	}
 	for _, node := range r.Program.Nodes {
-		resolveNode(r, node, currentModule)
+		checkNode(r, node, currentModule)
 	}
 	if r.Debug {
-		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)
+		colors.GREEN.Printf("Type checked '%s'\n", r.Program.FullPath)
 	}
 }
 
-// resolveNode dispatches resolution to the appropriate handler based on node type
-func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
+func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 	switch n := node.(type) {
 	case *ast.FunctionDecl:
-		resolveFunctionDecl(r, n, cm)
+		//checkFunctionDecl(r, n, cm)
 	case *ast.VarDeclStmt:
-		resolveVariableDeclaration(r, n, cm)
+		checkVariableDeclaration(r, n, cm)
+	default:
+		r.Ctx.Reports.Add(r.Program.FullPath, node.Loc(), "Unsupported node type for type checking", report.TYPECHECK_PHASE).SetLevel(report.SEMANTIC_ERROR)
 	}
 }
