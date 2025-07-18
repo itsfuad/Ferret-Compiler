@@ -260,9 +260,10 @@ type Matrix [][]f32;
 - [ ] Advanced code generation
 - [x] Rich error reporting
 - [ ] Branch analysis
-- [x] Resolver
-- [x] Type checking
-- [x] Code generation (x86-64 assembly)
+- [x] Collector (Implementing from scratch)
+- [x] Resolver (Re-implementing from scratch)
+- [x] Type checking (Re-implementing from scratch)
+- [x] Code generation (x86-64 assembly) (Re-implimenting from scratch)
 
 ## Future Plans
 [ ] Clean dependency with 'ferret clean'

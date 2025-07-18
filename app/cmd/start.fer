@@ -1,5 +1,7 @@
 import "app/cmd/other";
 
+let expr = (10 + 22;
+
 let a: i32 = 10;
 let b = 23.232;
 
