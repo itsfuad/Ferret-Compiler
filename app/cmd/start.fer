@@ -1,17 +1,23 @@
+import "app/cmd/other";
+
 let a: i32 = 10;
 let b = 23.232;
 
-let sum: i32 = a + b;
+let sum: f64 = a + b + other::sumOf4Int; // sum is inferred as f64
+
+//other::sumOf4Int;
+
+let p = other::sumOf4Int; // p is inferred as i32
 
 // let x, y, z : i32; // all three variables are of type i32
 
 // let name, age, height : str, i32, f64 = "Alice", 25, 5.5; // multiple variable declaration with types
 
 
-fn doSomething() {
-    // This function does something
-}
+// fn doSomething() {
+//     // This function does something
+// }
 
-fn add(a: i32, b: i32) -> i32 {
-    return a + b;
-}
+// fn add(a: i32, b: i32) -> i32 {
+//     return a + b;
+// }
