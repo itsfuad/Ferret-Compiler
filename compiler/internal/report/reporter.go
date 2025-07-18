@@ -241,45 +241,55 @@ func (r *Reports) createNew(filePath string, location *source.Location, msg stri
 	return report
 }
 
+func (e *Report) setLevel(level REPORT_TYPE) {
+	if level == NULL {
+		panic("call SetLevel() method with valid Error level")
+	}
+	e.Level = level
+	if level == CRITICAL_ERROR || level == SYNTAX_ERROR {
+		panic("critical or syntax error encountered, stopping compilation")
+	}
+}
+
 // AddError creates and registers a new error report
 func (r *Reports) AddError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 	report := r.createNew(filePath, location, msg, phase)
-	report.Level = NORMAL_ERROR
+	report.setLevel(NORMAL_ERROR)
 	return report
 }
 
 // AddSemanticError creates and registers a new semantic error report
 func (r *Reports) AddSemanticError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 	report := r.createNew(filePath, location, msg, phase)
-	report.Level = SEMANTIC_ERROR
+	report.setLevel(SEMANTIC_ERROR)
 	return report
 }
 
 // AddSyntaxError creates and registers a new syntax error report
 func (r *Reports) AddSyntaxError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 	report := r.createNew(filePath, location, msg, phase)
-	report.Level = SYNTAX_ERROR
+	report.setLevel(SYNTAX_ERROR)
 	return report
 }
 
 // AddCriticalError creates and registers a new critical error report
 func (r *Reports) AddCriticalError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 	report := r.createNew(filePath, location, msg, phase)
-	report.Level = CRITICAL_ERROR
+	report.setLevel(CRITICAL_ERROR)
 	return report
 }
 
 // AddWarning creates and registers a new warning report
 func (r *Reports) AddWarning(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 	report := r.createNew(filePath, location, msg, phase)
-	report.Level = WARNING
+	report.setLevel(WARNING)
 	return report
 }
 
 // AddInfo creates and registers a new info report
 func (r *Reports) AddInfo(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 	report := r.createNew(filePath, location, msg, phase)
-	report.Level = INFO
+	report.setLevel(INFO)
 	return report
 }
 

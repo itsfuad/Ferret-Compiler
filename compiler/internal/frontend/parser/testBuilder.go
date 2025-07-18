@@ -79,7 +79,7 @@ func evaluateTestResult(t *testing.T, r interface{}, nodes []ast.Node, desc stri
 	if isValid && (r != nil || len(nodes) == 0) { // true if panic is nil or nodes are not empty
 		t.Errorf("%s: expected no panic or no 0 nodes, got %s", desc, whatsgot)
 	} else if !isValid && (r == nil && len(nodes) > 0) { // true if panic is not nil or nodes are empty
-		t.Errorf("%s: expected panic or 0 nodes, got %s", desc, whatsgot)
+		t.Errorf("%s: expected panic or 0 nodes, got %s, Nodes: %v, first: %#v", desc, whatsgot, nodes, nodes[0])
 	}
 }
 

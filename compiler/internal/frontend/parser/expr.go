@@ -294,7 +294,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma")
 				break
 			}
 		}
