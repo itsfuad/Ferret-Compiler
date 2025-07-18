@@ -239,3 +239,58 @@ func ASTToSemanticType(astType ast.DataType) Type {
 		return &UserType{Name: astType.Type()}
 	}
 }
+
+// IsStringType checks if a type is string
+func IsStringType(t Type) bool {
+	if prim, ok := t.(*PrimitiveType); ok {
+		return prim.Name == types.STRING
+	}
+	return false
+}
+
+// IsBoolType checks if a type is boolean
+func IsBoolType(t Type) bool {
+	if prim, ok := t.(*PrimitiveType); ok {
+		return prim.Name == types.BOOL
+	}
+	return false
+}
+
+// IsNumericType checks if a type is numeric
+func IsNumericType(t Type) bool {
+	if prim, ok := t.(*PrimitiveType); ok {
+		return IsNumericTypeName(prim.Name)
+	}
+	return false
+}
+
+// IsIntegerType checks if a type is an integer type
+func IsIntegerType(t Type) bool {
+	if prim, ok := t.(*PrimitiveType); ok {
+		return IsIntegerTypeName(prim.Name)
+	}
+	return false
+}
+
+// IsNumericTypeName checks if a type name is numeric
+func IsNumericTypeName(typeName types.TYPE_NAME) bool {
+	switch typeName {
+	case types.INT8, types.INT16, types.INT32, types.INT64,
+		types.UINT8, types.UINT16, types.UINT32, types.UINT64,
+		types.FLOAT32, types.FLOAT64, types.BYTE:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsIntegerTypeName checks if a type name is an integer type
+func IsIntegerTypeName(typeName types.TYPE_NAME) bool {
+	switch typeName {
+	case types.INT8, types.INT16, types.INT32, types.INT64,
+		types.UINT8, types.UINT16, types.UINT32, types.UINT64, types.BYTE:
+		return true
+	default:
+		return false
+	}
+}

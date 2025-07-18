@@ -243,6 +243,42 @@ func (r *Reports) Add(filePath string, location *source.Location, msg string, ph
 	return report
 }
 
+// AddError creates and registers a new error report
+func (r *Reports) AddError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
+	report := r.Add(filePath, location, msg, phase)
+	report.SetLevel(NORMAL_ERROR)
+}
+
+// AddSemanticError creates and registers a new semantic error report
+func (r *Reports) AddSemanticError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
+	report := r.Add(filePath, location, msg, phase)
+	report.SetLevel(SEMANTIC_ERROR)
+}
+
+// AddSyntaxError creates and registers a new syntax error report
+func (r *Reports) AddSyntaxError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
+	report := r.Add(filePath, location, msg, phase)
+	report.SetLevel(SYNTAX_ERROR)
+}
+
+// AddCriticalError creates and registers a new critical error report
+func (r *Reports) AddCriticalError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
+	report := r.Add(filePath, location, msg, phase)
+	report.SetLevel(CRITICAL_ERROR)
+}
+
+// AddWarning creates and registers a new warning report
+func (r *Reports) AddWarning(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
+	report := r.Add(filePath, location, msg, phase)
+	report.SetLevel(WARNING)
+}
+
+// AddInfo creates and registers a new info report
+func (r *Reports) AddInfo(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
+	report := r.Add(filePath, location, msg, phase)
+	report.SetLevel(INFO)
+}
+
 // SetLevel assigns a diagnostic level to the report, increments its count,
 // and triggers DisplayAll if the level is critical or denotes a syntax error.
 func (e *Report) SetLevel(level REPORT_TYPE) {
