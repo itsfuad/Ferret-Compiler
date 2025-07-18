@@ -18,11 +18,11 @@ type REPORT_TYPE string
 type COMPILATION_PHASE string
 
 const (
-	LEXING_PHASE    COMPILATION_PHASE = "Lexing"
-	PARSING_PHASE   COMPILATION_PHASE = "Parsing"
-	COLLECTOR_PHASE COMPILATION_PHASE = "Collector"
-	RESOLVER_PHASE  COMPILATION_PHASE = "Resolver"
-	TYPECHECK_PHASE COMPILATION_PHASE = "Type Checking"
+	LEXING_PHASE    COMPILATION_PHASE = "lexing"
+	PARSING_PHASE   COMPILATION_PHASE = "parsing"
+	COLLECTOR_PHASE COMPILATION_PHASE = "collecting symbols"
+	RESOLVER_PHASE  COMPILATION_PHASE = "resolving"
+	TYPECHECK_PHASE COMPILATION_PHASE = "type checking"
 )
 
 const (
@@ -104,20 +104,18 @@ func printReport(r *Report) {
 
 	switch r.Level {
 	case WARNING:
-		reportMsgType = "[Warning 🚨]: "
+		reportMsgType = fmt.Sprintf("[Warning while %s 🚨]: ", r.Phase)
 	case INFO:
-		reportMsgType = "[Info 😓]: "
+		reportMsgType = fmt.Sprintf("[Info while %s 😓]: ", r.Phase)
 	case CRITICAL_ERROR:
-		reportMsgType = "[Critical Error 💀]: "
+		reportMsgType = fmt.Sprintf("[Critical Error while %s 💀]: ", r.Phase)
 	case SYNTAX_ERROR:
-		reportMsgType = "[Syntax Error 😑]: "
+		reportMsgType = fmt.Sprintf("[Syntax Error while %s 😑]: ", r.Phase)
 	case NORMAL_ERROR:
-		reportMsgType = "[Error 😨]: "
+		reportMsgType = fmt.Sprintf("[Error while %s 😨]: ", r.Phase)
 	case SEMANTIC_ERROR:
-		reportMsgType = "[Semantic Error 😱]: "
+		reportMsgType = fmt.Sprintf("[Semantic Error while %s 😱]: ", r.Phase)
 	}
-
-	reportMsgType = fmt.Sprintf("%s :: %s", r.Phase, reportMsgType)
 
 	reportColor := colorMap[r.Level]
 
@@ -209,9 +207,9 @@ func (r *Report) AddHintAt(msg string, col int) *Report {
 	return r
 }
 
-// Add creates and registers a new diagnostic report with basic position validation.
+// createNew creates and registers a new diagnostic report with basic position validation.
 // It returns a pointer to the newly created Diagnostic.
-func (r *Reports) Add(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+func (r *Reports) createNew(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
 
 	if location.Start.Line < 1 {
 		location.Start.Line = 1
@@ -244,51 +242,45 @@ func (r *Reports) Add(filePath string, location *source.Location, msg string, ph
 }
 
 // AddError creates and registers a new error report
-func (r *Reports) AddError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
-	report := r.Add(filePath, location, msg, phase)
-	report.SetLevel(NORMAL_ERROR)
+func (r *Reports) AddError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+	report := r.createNew(filePath, location, msg, phase)
+	report.Level = NORMAL_ERROR
+	return report
 }
 
 // AddSemanticError creates and registers a new semantic error report
-func (r *Reports) AddSemanticError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
-	report := r.Add(filePath, location, msg, phase)
-	report.SetLevel(SEMANTIC_ERROR)
+func (r *Reports) AddSemanticError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+	report := r.createNew(filePath, location, msg, phase)
+	report.Level = SEMANTIC_ERROR
+	return report
 }
 
 // AddSyntaxError creates and registers a new syntax error report
-func (r *Reports) AddSyntaxError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
-	report := r.Add(filePath, location, msg, phase)
-	report.SetLevel(SYNTAX_ERROR)
+func (r *Reports) AddSyntaxError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+	report := r.createNew(filePath, location, msg, phase)
+	report.Level = SYNTAX_ERROR
+	return report
 }
 
 // AddCriticalError creates and registers a new critical error report
-func (r *Reports) AddCriticalError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
-	report := r.Add(filePath, location, msg, phase)
-	report.SetLevel(CRITICAL_ERROR)
+func (r *Reports) AddCriticalError(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+	report := r.createNew(filePath, location, msg, phase)
+	report.Level = CRITICAL_ERROR
+	return report
 }
 
 // AddWarning creates and registers a new warning report
-func (r *Reports) AddWarning(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
-	report := r.Add(filePath, location, msg, phase)
-	report.SetLevel(WARNING)
+func (r *Reports) AddWarning(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+	report := r.createNew(filePath, location, msg, phase)
+	report.Level = WARNING
+	return report
 }
 
 // AddInfo creates and registers a new info report
-func (r *Reports) AddInfo(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) {
-	report := r.Add(filePath, location, msg, phase)
-	report.SetLevel(INFO)
-}
-
-// SetLevel assigns a diagnostic level to the report, increments its count,
-// and triggers DisplayAll if the level is critical or denotes a syntax error.
-func (e *Report) SetLevel(level REPORT_TYPE) {
-	if level == NULL {
-		panic("call SetLevel() method with valid Error level")
-	}
-	e.Level = level
-	if level == CRITICAL_ERROR || level == SYNTAX_ERROR {
-		panic("critical or syntax error encountered, stopping compilation")
-	}
+func (r *Reports) AddInfo(filePath string, location *source.Location, msg string, phase COMPILATION_PHASE) *Report {
+	report := r.createNew(filePath, location, msg, phase)
+	report.Level = INFO
+	return report
 }
 
 // ShowStatus displays a summary of compilation status along with counts of warnings and errors.

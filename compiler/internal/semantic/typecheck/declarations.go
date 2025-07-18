@@ -30,7 +30,7 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 			if IsAssignableFrom(explicitType, typeToAdd) {
 				colors.CYAN.Printf("Variable '%s' type matches explicit type: %s\n", variable.Identifier.Name, typeToAdd)
 			} else {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'", typeToAdd.String(), variable.Identifier.Name, explicitType.String()), report.TYPECHECK_PHASE)
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, initializer.Loc(), fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'", typeToAdd.String(), variable.Identifier.Name, explicitType.String()), report.TYPECHECK_PHASE)
 				return
 			}
 		}

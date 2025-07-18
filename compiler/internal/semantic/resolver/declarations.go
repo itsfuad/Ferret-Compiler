@@ -11,11 +11,12 @@ import (
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
 	//identifier empty check is done in collector phase, so we can assume it's not empty here
-	
+
 	//now add the function definition to the current module's symbol table
 	currentModule, _ := r.Ctx.GetModule(r.Program.ImportPath) // no error since already checked in collector phase
-	symbol, found := currentModule.SymbolTable.Lookup(fn.Identifier.Name); if !found {
-		r.Ctx.Reports.Add(r.Program.FullPath, fn.Loc(), "Function '"+fn.Identifier.Name+"' is not declared", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+	symbol, found := currentModule.SymbolTable.Lookup(fn.Identifier.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function '"+fn.Identifier.Name+"' is not declared", report.RESOLVER_PHASE)
 		return
 	}
 	//add the type information to the symbol
@@ -23,7 +24,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
 			if param.Type == nil {
-				r.Ctx.Reports.Add(r.Program.FullPath, &param.Identifier.Location, "parameter type must be specified", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, &param.Identifier.Location, "parameter type must be specified", report.RESOLVER_PHASE)
 				return
 			}
 			resolveNode(r, param.Type, cm)
@@ -63,13 +64,13 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 		if variable.ExplicitType != nil {
 			expType = semantic.ASTToSemanticType(variable.ExplicitType)
 			if expType == nil {
-				r.Ctx.Reports.Add(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration", report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration", report.RESOLVER_PHASE)
 				return
 			}
 		}
 		err := cm.SymbolTable.Declare(variable.Identifier.Name, semantic.NewSymbolWithLocation(variable.Identifier.Name, semantic.SymbolVar, expType, variable.Identifier.Loc()))
 		if err != nil {
-			r.Ctx.Reports.Add(r.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.RESOLVER_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.RESOLVER_PHASE)
 			return
 		}
 

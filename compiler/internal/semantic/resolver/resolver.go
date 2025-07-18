@@ -12,7 +12,7 @@ import (
 func ResolveProgram(r *analyzer.AnalyzerNode) {
 	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
 	if err != nil {
-		r.Ctx.Reports.Add(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.RESOLVER_PHASE).SetLevel(report.CRITICAL_ERROR)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 	for _, node := range r.Program.Nodes {

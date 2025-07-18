@@ -30,7 +30,7 @@ func parseImport(p *Parser) ast.Node {
 		// Default: use last part of path (without extension)
 		parts := strings.Split(importpath, "/")
 		if len(parts) == 0 {
-			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&start.Start, &importToken.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&start.Start, &importToken.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE)
 			return nil
 		}
 		sufs := strings.Split(parts[len(parts)-1], ".")
@@ -42,7 +42,7 @@ func parseImport(p *Parser) ast.Node {
 
 	moduleFullPath, err := fs.ResolveModule(importpath, p.fullPath, p.ctx)
 	if err != nil {
-		p.ctx.Reports.Add(p.fullPath, &loc, err.Error(), report.PARSING_PHASE).SetLevel(report.CRITICAL_ERROR)
+		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 		colors.RED.Println("Error resolving module:", err)
 		return nil
 	}
@@ -67,7 +67,7 @@ func parseImport(p *Parser) ast.Node {
 
 		cycleStr := strings.Join(moduleNames, " -> ")
 		cycleMsg := fmt.Sprintf("Circular import detected: %s", cycleStr)
-		p.ctx.Reports.Add(p.fullPath, &loc, cycleMsg, report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+		p.ctx.Reports.AddSemanticError(p.fullPath, &loc, cycleMsg, report.PARSING_PHASE)
 		colors.RED.Println(cycleMsg)
 		return stmt
 	}
@@ -82,7 +82,7 @@ func parseImport(p *Parser) ast.Node {
 	if !p.ctx.HasModule(importpath) {
 		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
 		if module == nil {
-			p.ctx.Reports.Add(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE).SetLevel(report.SEMANTIC_ERROR)
+			p.ctx.Reports.AddSemanticError(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE)
 			return &ast.ImportStmt{Location: loc}
 		}
 	}
@@ -98,7 +98,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -109,7 +109,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		}, true
 	} else {
 		token := p.peek()
-		p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE)
 		return nil, false
 	}
 }
