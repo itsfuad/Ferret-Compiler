@@ -29,13 +29,13 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node) {
 
 func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl) {
 	if fn.Identifier.Name == "" {
-		c.Ctx.Reports.Add(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE).SetLevel(report.SYNTAX_ERROR)
+		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE)
 		return
 	}
 
 	currentModule, err := c.Ctx.GetModule(c.Program.ImportPath)
 	if err != nil {
-		c.Ctx.Reports.Add(c.Program.FullPath, fn.Loc(), "Failed to get current module: "+err.Error(), report.COLLECTOR_PHASE).SetLevel(report.CRITICAL_ERROR)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to get current module: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -43,7 +43,7 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl) {
 	symbol := semantic.NewSymbolWithLocation(fn.Identifier.Name, semantic.SymbolFunc, nil, fn.Loc())
 	err = currentModule.SymbolTable.Declare(fn.Identifier.Name, symbol)
 	if err != nil {
-		c.Ctx.Reports.Add(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE).SetLevel(report.CRITICAL_ERROR)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
 	if c.Debug {
