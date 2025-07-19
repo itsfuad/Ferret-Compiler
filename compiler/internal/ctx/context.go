@@ -29,13 +29,33 @@ type CompilerContext struct {
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 	// Track modules that are currently being parsed to prevent infinite recursion
-	ParsingModules map[string]bool
+	_parsingModules map[string]bool
 	// Keep track of the parsing stack to show cycle paths
-	ParsingStack []string
+	_parsingStack []string
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
 	RemoteConfigs map[string]bool
+}
+
+func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
+	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return ""
+	}
+	relPath = filepath.ToSlash(relPath)
+	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+	rootName := filepath.Base(c.ProjectRoot)
+	return rootName + "/" + moduleName
+}
+
+func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
+	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return ""
+	}
+	filename := filepath.Base(fullPath)
+	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectConfig {
@@ -179,24 +199,24 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	c.Modules[importPath] = &Module{AST: module, SymbolTable: NewSymbolTable(c.Builtins)}
 }
 
-// IsModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) IsModuleParsing(importPath string) bool {
-	if c.ParsingModules == nil {
+// isModuleParsing checks if a module is currently being parsed
+func (c *CompilerContext) isModuleParsing(importPath string) bool {
+	if c._parsingModules == nil {
 		return false
 	}
-	return c.ParsingModules[importPath]
+	return c._parsingModules[importPath]
 }
 
 // GetCyclePath returns the cycle path if the given module is already being parsed
 // Returns the complete path from the entry point, showing the full import chain
 func (c *CompilerContext) GetCyclePath(importPath string) ([]string, bool) {
-	if !c.IsModuleParsing(importPath) {
+	if !c.isModuleParsing(importPath) {
 		return nil, false
 	}
 
 	// Find the first occurrence of the module that creates the cycle
 	cycleStartIndex := -1
-	for i, stackModule := range c.ParsingStack {
+	for i, stackModule := range c._parsingStack {
 		if stackModule == importPath {
 			cycleStartIndex = i
 			break
@@ -205,36 +225,36 @@ func (c *CompilerContext) GetCyclePath(importPath string) ([]string, bool) {
 
 	if cycleStartIndex == -1 {
 		// This shouldn't happen, but handle it gracefully
-		return c.ParsingStack, true
+		return c._parsingStack, true
 	}
 
 	// Return the current parsing stack which shows the complete path from entry point
 	// to where the cycle would occur (the unambiguous cycle path)
-	return c.ParsingStack, true
+	return c._parsingStack, true
 }
 
 // StartParsing marks a module as currently being parsed
 func (c *CompilerContext) StartParsing(importPath string) {
-	if c.ParsingModules == nil {
-		c.ParsingModules = make(map[string]bool)
+	if c._parsingModules == nil {
+		c._parsingModules = make(map[string]bool)
 	}
-	if c.ParsingStack == nil {
-		c.ParsingStack = make([]string, 0)
+	if c._parsingStack == nil {
+		c._parsingStack = make([]string, 0)
 	}
 
-	c.ParsingModules[importPath] = true
-	c.ParsingStack = append(c.ParsingStack, importPath)
+	c._parsingModules[importPath] = true
+	c._parsingStack = append(c._parsingStack, importPath)
 }
 
 // FinishParsing marks a module as no longer being parsed
 func (c *CompilerContext) FinishParsing(importPath string) {
-	if c.ParsingModules != nil {
-		delete(c.ParsingModules, importPath)
+	if c._parsingModules != nil {
+		delete(c._parsingModules, importPath)
 	}
 
 	// Remove from stack (should be the last element)
-	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == importPath {
-		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
+	if len(c._parsingStack) > 0 && c._parsingStack[len(c._parsingStack)-1] == importPath {
+		c._parsingStack = c._parsingStack[:len(c._parsingStack)-1]
 	}
 }
 
@@ -294,8 +314,8 @@ func (c *CompilerContext) Destroy() {
 	}
 }
 
-// AddDepEdge adds an edge from importer to imported in the dependency graph
-func (c *CompilerContext) AddDepEdge(importer, imported string) {
+// addDepEdge adds an edge from importer to imported in the dependency graph
+func (c *CompilerContext) addDepEdge(importer, imported string) {
 	if c.DepGraph == nil {
 		c.DepGraph = make(map[string][]string)
 	}
@@ -311,8 +331,8 @@ func (c *CompilerContext) AddDepEdge(importer, imported string) {
 	}
 }
 
-// DetectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
-func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
+// detectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
+func (c *CompilerContext) detectCycle(start string) ([]string, bool) {
 	colors.BLUE.Printf("Starting cycle detection from: %s\n", start)
 
 	state := make(map[string]int) // 0 = unvisited, 1 = visiting, 2 = visited
@@ -362,24 +382,4 @@ func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
 	cycle, found := visit(start)
 	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, cycle)
 	return cycle, found
-}
-
-func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
-	relPath = filepath.ToSlash(relPath)
-	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-	rootName := filepath.Base(c.ProjectRoot)
-	return rootName + "/" + moduleName
-}
-
-func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
-	filename := filepath.Base(fullPath)
-	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }

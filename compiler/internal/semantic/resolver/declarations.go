@@ -22,7 +22,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
 			resolveNode(r, param.Type, cm)
-			paramType, err := ctx.ASTToSemanticType(param.Type, cm)
+			paramType, err := ctx.DeriveSemanticType(param.Type, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -35,7 +35,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	if fn.Function.ReturnType != nil {
 		for _, ret := range fn.Function.ReturnType {
 			resolveNode(r, ret, cm)
-			retType, err := ctx.ASTToSemanticType(ret, cm)
+			retType, err := ctx.DeriveSemanticType(ret, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, ret.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -69,7 +69,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 		}
 
 		if variable.ExplicitType != nil {
-			got, err := ctx.ASTToSemanticType(variable.ExplicitType, cm)
+			got, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -96,7 +96,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 
-	typeToDeclare, err := ctx.ASTToSemanticType(decl.BaseType, cm)
+	typeToDeclare, err := ctx.DeriveSemanticType(decl.BaseType, cm)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.BaseType.Loc(), "Invalid base type for type declaration: "+err.Error(), report.RESOLVER_PHASE)
 		return
