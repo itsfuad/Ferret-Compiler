@@ -28,7 +28,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Modu
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
 }
 
-func inferImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) ctx.Type {
+func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) ctx.Type {
 
 	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
 	if !ok {

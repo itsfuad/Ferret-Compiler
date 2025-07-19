@@ -24,7 +24,7 @@ func IsAssignableFrom(target, source ctx.Type) bool {
 	resolvedTarget := resolveUserType(target)
 	resolvedSource := resolveUserType(source)
 
-	colors.MAGENTA.Printf("Checking assignability: %v -> %v\n", resolvedSource, resolvedTarget)
+	colors.MAGENTA.Printf("Checking assignability: %v → %v\n", resolvedSource, resolvedTarget)
 
 	if resolvedTarget.Equals(resolvedSource) {
 		return true
@@ -60,7 +60,7 @@ func IsAssignableFrom(target, source ctx.Type) bool {
 // For now, it only checks the Definition field. For full resolution, use resolveTypeAlias instead.
 func resolveUserType(t ctx.Type) ctx.Type {
 	if userType, ok := t.(*ctx.UserType); ok {
-		colors.BRIGHT_BLUE.Printf("Resolving user type: %s, Def: %v\n", userType.Name, userType.Definition)
+		colors.BRIGHT_BLUE.Printf("Resolving user type: `%s` → `%v`\n", userType.Name, userType.Definition)
 		if userType.Definition != nil {
 			return resolveUserType(userType.Definition)
 		}
@@ -168,16 +168,16 @@ func isStructCompatible(target, source ctx.Type) bool {
 
 // ===== EXPRESSION TYPE INFERENCE HELPERS =====
 
-// inferIdentifierType gets the type of an identifier from the symbol table
-func inferIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) ctx.Type {
+// checkIdentifierType gets the type of an identifier from the symbol table
+func checkIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) ctx.Type {
 	if sym, found := cm.SymbolTable.Lookup(e.Name); found {
 		return sym.Type
 	}
 	return nil
 }
 
-// inferBinaryExprType infers the result type of binary expressions
-func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) ctx.Type {
+// checkBinaryExprType infers the result type of binary expressions
+func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) ctx.Type {
 	leftType := evaluateExpressionType(r, *e.Left, cm)
 	rightType := evaluateExpressionType(r, *e.Right, cm)
 
@@ -288,8 +288,8 @@ func getCommonNumericType(left, right ctx.Type) ctx.Type {
 	return right
 }
 
-// inferArrayLiteralType infers array literal types
-func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) ctx.Type {
+// checkArrayLiteralType infers array literal types
+func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) ctx.Type {
 	if len(e.Elements) == 0 {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -332,8 +332,8 @@ func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 	return &ctx.ArrayType{ElementType: elementType, Name: types.ARRAY}
 }
 
-// inferIndexableType infers types for array/map indexing
-func inferIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) ctx.Type {
+// checkIndexableType infers types for array/map indexing
+func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) ctx.Type {
 	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
 	if indexableType == nil {
 		return nil

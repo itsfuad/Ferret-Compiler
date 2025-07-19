@@ -1,5 +1,7 @@
-import "app/cmd/start";
+//import "app/cmd/start";
 
 type String str;
+
+const name = "Fuad";
 
 let sumOf4Int = 2 + 3 + 4 + 5; // sumOf4Int is inferred as i32
