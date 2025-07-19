@@ -261,6 +261,8 @@ func (p *Parser) Parse() *ast.Program {
 
 	// Start tracking the entry point parsing
 	p.ctx.StartParsing(p.fullPath)
+	// Finish tracking the entry point parsing
+	defer p.ctx.FinishParsing(p.fullPath)
 
 	for !p.isAtEnd() {
 		// Parse the statement
@@ -276,9 +278,6 @@ func (p *Parser) Parse() *ast.Program {
 	if len(nodes) == 0 {
 		return &ast.Program{}
 	}
-
-	// Finish tracking the entry point parsing
-	p.ctx.FinishParsing(p.fullPath)
 
 	if p.debug {
 		colors.BLUE.Printf("Parsed '%s'\n", p.fullPath)
