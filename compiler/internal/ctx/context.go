@@ -29,9 +29,9 @@ type CompilerContext struct {
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 	// Track modules that are currently being parsed to prevent infinite recursion
-	_parsingModules map[string]bool
+	ParsingModules map[string]bool
 	// Keep track of the parsing stack to show cycle paths
-	_parsingStack []string
+	ParsingStack []string
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
@@ -199,62 +199,98 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	c.Modules[importPath] = &Module{AST: module, SymbolTable: NewSymbolTable(c.Builtins)}
 }
 
-// isModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) isModuleParsing(importPath string) bool {
-	if c._parsingModules == nil {
+// IsModuleParsing checks if a module is currently being parsed
+func (c *CompilerContext) IsModuleParsing(importPath string) bool {
+	if c.ParsingModules == nil {
 		return false
 	}
-	return c._parsingModules[importPath]
+	return c.ParsingModules[importPath]
 }
 
-// GetCyclePath returns the cycle path if the given module is already being parsed
-// Returns the complete path from the entry point, showing the full import chain
-func (c *CompilerContext) GetCyclePath(importPath string) ([]string, bool) {
-	if !c.isModuleParsing(importPath) {
-		return nil, false
+// DetectCycle detects if adding an edge from 'from' to 'to' would create a cycle
+// Returns the cycle path starting from the original module if a cycle is detected
+func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
+	// Normalize paths to handle forward/backward slash inconsistency
+	from = filepath.ToSlash(from)
+	to = filepath.ToSlash(to)
+	
+	colors.CYAN.Printf("DetectCycle: %s -> %s\n", filepath.Base(from), filepath.Base(to))
+
+	// Initialize DepGraph if needed
+	if c.DepGraph == nil {
+		c.DepGraph = make(map[string][]string)
 	}
 
-	// Find the first occurrence of the module that creates the cycle
-	cycleStartIndex := -1
-	for i, stackModule := range c._parsingStack {
-		if stackModule == importPath {
-			cycleStartIndex = i
-			break
+	// Check if this edge would create a cycle by doing a DFS from 'to' to see if we can reach 'from'
+	visited := make(map[string]bool)
+	path := make([]string, 0)
+	
+	if cycle := c.findCyclePath(to, from, visited, path); cycle != nil {
+		// Found a cycle, return it WITHOUT adding the edge
+		colors.RED.Printf("CYCLE DETECTED: %v\n", cycle)
+		return cycle, true
+	}
+	
+	// No cycle found, add the edge (with normalized paths)
+	c.DepGraph[from] = append(c.DepGraph[from], to)
+	colors.GREEN.Printf("Edge added: %s -> %s\n", filepath.Base(from), filepath.Base(to))
+	return nil, false
+}// findCyclePath uses DFS to find if there's a path from 'start' to 'target'
+// If found, returns the complete cycle path
+func (c *CompilerContext) findCyclePath(start, target string, visited map[string]bool, path []string) []string {
+	// Normalize paths
+	start = filepath.ToSlash(start)
+	target = filepath.ToSlash(target)
+	
+	if start == target {
+		// Found the target, construct the cycle
+		cyclePath := make([]string, len(path)+2)
+		cyclePath[0] = target // Start the cycle from target
+		copy(cyclePath[1:], path)
+		cyclePath[len(cyclePath)-1] = target // Close the cycle
+		return cyclePath
+	}
+	
+	if visited[start] {
+		return nil // Already visited this node
+	}
+	
+	visited[start] = true
+	path = append(path, start)
+	
+	// Visit all neighbors
+	for _, neighbor := range c.DepGraph[start] {
+		neighbor = filepath.ToSlash(neighbor) // Normalize neighbor path
+		if cycle := c.findCyclePath(neighbor, target, visited, path); cycle != nil {
+			return cycle
 		}
 	}
-
-	if cycleStartIndex == -1 {
-		// This shouldn't happen, but handle it gracefully
-		return c._parsingStack, true
-	}
-
-	// Return the current parsing stack which shows the complete path from entry point
-	// to where the cycle would occur (the unambiguous cycle path)
-	return c._parsingStack, true
+	
+	return nil
 }
 
 // StartParsing marks a module as currently being parsed
 func (c *CompilerContext) StartParsing(importPath string) {
-	if c._parsingModules == nil {
-		c._parsingModules = make(map[string]bool)
+	if c.ParsingModules == nil {
+		c.ParsingModules = make(map[string]bool)
 	}
-	if c._parsingStack == nil {
-		c._parsingStack = make([]string, 0)
+	if c.ParsingStack == nil {
+		c.ParsingStack = make([]string, 0)
 	}
 
-	c._parsingModules[importPath] = true
-	c._parsingStack = append(c._parsingStack, importPath)
+	c.ParsingModules[importPath] = true
+	c.ParsingStack = append(c.ParsingStack, importPath)
 }
 
 // FinishParsing marks a module as no longer being parsed
 func (c *CompilerContext) FinishParsing(importPath string) {
-	if c._parsingModules != nil {
-		delete(c._parsingModules, importPath)
+	if c.ParsingModules != nil {
+		delete(c.ParsingModules, importPath)
 	}
 
 	// Remove from stack (should be the last element)
-	if len(c._parsingStack) > 0 && c._parsingStack[len(c._parsingStack)-1] == importPath {
-		c._parsingStack = c._parsingStack[:len(c._parsingStack)-1]
+	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == importPath {
+		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
 	}
 }
 
@@ -312,74 +348,4 @@ func (c *CompilerContext) Destroy() {
 	if c.CachePath != "" {
 		os.RemoveAll(c.CachePath)
 	}
-}
-
-// addDepEdge adds an edge from importer to imported in the dependency graph
-func (c *CompilerContext) addDepEdge(importer, imported string) {
-	if c.DepGraph == nil {
-		c.DepGraph = make(map[string][]string)
-	}
-	colors.CYAN.Printf("Adding dependency edge: %s -> %s\n", importer, imported)
-	c.DepGraph[importer] = append(c.DepGraph[importer], imported)
-
-	// Debug: print current dependency graph
-	colors.YELLOW.Println("Current dependency graph:")
-	for from, tos := range c.DepGraph {
-		for _, to := range tos {
-			colors.YELLOW.Printf("  %s -> %s\n", from, to)
-		}
-	}
-}
-
-// detectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
-func (c *CompilerContext) detectCycle(start string) ([]string, bool) {
-	colors.BLUE.Printf("Starting cycle detection from: %s\n", start)
-
-	state := make(map[string]int) // 0 = unvisited, 1 = visiting, 2 = visited
-	var stack []string
-
-	var visit func(string) ([]string, bool)
-
-	visit = func(node string) ([]string, bool) {
-		switch state[node] {
-		case 1:
-			// Cycle found
-			colors.RED.Printf("CYCLE DETECTED! Node %s is already in the recursion stack\n", node)
-			for i, n := range stack {
-				if n == node {
-					cycle := append(stack[i:], node)
-					colors.RED.Printf("Cycle path: %v\n", cycle)
-					return cycle, true
-				}
-			}
-			return []string{node}, true
-
-		case 2:
-			// Already visited
-			colors.GREEN.Printf("Node %s already processed, skipping\n", node)
-			return nil, false
-		}
-
-		// Mark as visiting
-		state[node] = 1
-		stack = append(stack, node)
-		colors.BLUE.Printf("Visiting node: %s (stack: %v)\n", node, stack)
-
-		// Visit neighbors
-		for _, neighbor := range c.DepGraph[node] {
-			if cycle, found := visit(neighbor); found {
-				return cycle, true
-			}
-		}
-
-		// Done processing
-		stack = stack[:len(stack)-1]
-		state[node] = 2
-		colors.GREEN.Printf("Completed processing node: %s\n", node)
-		return nil, false
-	}
-
-	cycle, found := visit(start)
-	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, cycle)
-	return cycle, found
 }
