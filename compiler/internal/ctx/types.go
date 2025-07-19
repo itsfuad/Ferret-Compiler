@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-
 	"compiler/internal/types"
 )
 

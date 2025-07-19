@@ -213,7 +213,7 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 	// Normalize paths to handle forward/backward slash inconsistency
 	from = filepath.ToSlash(from)
 	to = filepath.ToSlash(to)
-	
+
 	colors.CYAN.Printf("DetectCycle: %s -> %s\n", filepath.Base(from), filepath.Base(to))
 
 	// Initialize DepGraph if needed
@@ -224,24 +224,24 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 	// Check if this edge would create a cycle by doing a DFS from 'to' to see if we can reach 'from'
 	visited := make(map[string]bool)
 	path := make([]string, 0)
-	
+
 	if cycle := c.findCyclePath(to, from, visited, path); cycle != nil {
 		// Found a cycle, return it WITHOUT adding the edge
 		colors.RED.Printf("CYCLE DETECTED: %v\n", cycle)
 		return cycle, true
 	}
-	
+
 	// No cycle found, add the edge (with normalized paths)
 	c.DepGraph[from] = append(c.DepGraph[from], to)
 	colors.GREEN.Printf("Edge added: %s -> %s\n", filepath.Base(from), filepath.Base(to))
 	return nil, false
-}// findCyclePath uses DFS to find if there's a path from 'start' to 'target'
+} // findCyclePath uses DFS to find if there's a path from 'start' to 'target'
 // If found, returns the complete cycle path
 func (c *CompilerContext) findCyclePath(start, target string, visited map[string]bool, path []string) []string {
 	// Normalize paths
 	start = filepath.ToSlash(start)
 	target = filepath.ToSlash(target)
-	
+
 	if start == target {
 		// Found the target, construct the cycle
 		cyclePath := make([]string, len(path)+2)
@@ -250,14 +250,14 @@ func (c *CompilerContext) findCyclePath(start, target string, visited map[string
 		cyclePath[len(cyclePath)-1] = target // Close the cycle
 		return cyclePath
 	}
-	
+
 	if visited[start] {
 		return nil // Already visited this node
 	}
-	
+
 	visited[start] = true
 	path = append(path, start)
-	
+
 	// Visit all neighbors
 	for _, neighbor := range c.DepGraph[start] {
 		neighbor = filepath.ToSlash(neighbor) // Normalize neighbor path
@@ -265,7 +265,7 @@ func (c *CompilerContext) findCyclePath(start, target string, visited map[string
 			return cycle
 		}
 	}
-	
+
 	return nil
 }
 
