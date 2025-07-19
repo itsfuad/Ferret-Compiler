@@ -2,115 +2,29 @@ package typecheck
 
 import (
 	"compiler/colors"
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/types"
-	"fmt"
 )
-
-// getDatatype converts an AST DataType to a semantic Type
-func getDatatype(astType ast.DataType) semantic.Type {
-	return semantic.ASTToSemanticType(astType)
-}
-
-// evaluateExpressionType infers the semantic type from an AST expression
-func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) semantic.Type {
-	if expr == nil {
-		return nil
-	}
-
-	var resultType semantic.Type
-
-	switch e := expr.(type) {
-	// Literals
-	case *ast.StringLiteral:
-		resultType = &semantic.PrimitiveType{Name: types.STRING}
-	case *ast.IntLiteral:
-		resultType = &semantic.PrimitiveType{Name: types.INT32}
-	case *ast.FloatLiteral:
-		resultType = &semantic.PrimitiveType{Name: types.FLOAT64}
-	case *ast.BoolLiteral:
-		resultType = &semantic.PrimitiveType{Name: types.BOOL}
-	case *ast.ByteLiteral:
-		resultType = &semantic.PrimitiveType{Name: types.BYTE}
-
-	// Complex expressions
-	case *ast.IdentifierExpr:
-		resultType = inferIdentifierType(e, cm)
-	case *ast.BinaryExpr:
-		resultType = inferBinaryExprType(r, e, cm)
-	case *ast.ArrayLiteralExpr:
-		resultType = inferArrayLiteralType(r, e, cm)
-	case *ast.IndexableExpr:
-		resultType = inferIndexableType(r, e, cm)
-	case *ast.VarScopeResolution:
-		resultType = inferImportedSymbolType(r, e, cm)
-
-	default:
-		// Unknown expression type
-		resultType = nil
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			e.Loc(),
-			fmt.Sprintf("Unsupported expression type <%T> for type inference", e),
-			report.TYPECHECK_PHASE,
-		)
-	}
-
-	// Debug logging
-	if r.Debug && resultType != nil {
-		colors.YELLOW.Printf("Inferred type for expression: %s\n", resultType.String())
-	}
-
-	return resultType
-}
-
-func inferImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, _ *ctx.Module) semantic.Type {
-
-	moduleKey := r.Program.ModulenameToImportpath[res.Module.Name]
-	if moduleKey == "" {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Module '%s' is not imported", res.Module.Name), report.RESOLVER_PHASE)
-		return nil
-	}
-
-	module, err := r.Ctx.GetModule(moduleKey)
-	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, res.Loc(), "Failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
-		return nil
-	}
-
-	resIdentifier, found := module.SymbolTable.Lookup(res.Identifier.Name)
-	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol '%s' not found in module '%s'", res.Identifier.Name, moduleKey), report.RESOLVER_PHASE)
-		return nil
-	}
-	if resIdentifier.Type == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol '%s' has no type defined", res.Identifier.Name), report.RESOLVER_PHASE)
-		return nil
-	}
-	if r.Debug {
-		//print symbol X found in module Y imported from Z
-		colors.AQUA.Printf("Resolved imported symbol '%s' of type '%s' from module '%s' imported from '%s'\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, moduleKey)
-	}
-
-	return resIdentifier.Type
-}
 
 // ===== CORE ASSIGNABILITY CHECK =====
 
 // IsAssignableFrom checks if a value of type 'source' can be assigned to 'target'
-func IsAssignableFrom(target, source semantic.Type) bool {
+// Note: This function has limited type resolution capability. For full alias resolution,
+// the type checker should use resolveTypeAlias with analyzer context.
+func IsAssignableFrom(target, source ctx.Type) bool {
 	// Exact type match
 	if target.Equals(source) {
 		return true
 	}
 
-	// Handle user types (aliases)
+	// Handle user types (aliases) - limited resolution without symbol table access
 	resolvedTarget := resolveUserType(target)
 	resolvedSource := resolveUserType(source)
+
+	colors.MAGENTA.Printf("Checking assignability: %v -> %v\n", resolvedSource, resolvedTarget)
 
 	if resolvedTarget.Equals(resolvedSource) {
 		return true
@@ -141,18 +55,23 @@ func IsAssignableFrom(target, source semantic.Type) bool {
 
 // ===== HELPER FUNCTIONS =====
 
-// resolveUserType resolves user types to their underlying types
-func resolveUserType(t semantic.Type) semantic.Type {
-	if userType, ok := t.(*semantic.UserType); ok && userType.Definition != nil {
-		return resolveUserType(userType.Definition)
+// resolveUserType resolves user types to their underlying types A -> B -> C(not user type), return C
+// Note: This function requires access to symbol tables to properly resolve type aliases.
+// For now, it only checks the Definition field. For full resolution, use resolveTypeAlias instead.
+func resolveUserType(t ctx.Type) ctx.Type {
+	if userType, ok := t.(*ctx.UserType); ok {
+		colors.BRIGHT_BLUE.Printf("Resolving user type: %s, Def: %v\n", userType.Name, userType.Definition)
+		if userType.Definition != nil {
+			return resolveUserType(userType.Definition)
+		}
 	}
 	return t
 }
 
 // isNumericPromotion checks if source can be promoted to target (implicit conversion)
-func isNumericPromotion(target, source semantic.Type) bool {
-	targetPrim, targetOk := target.(*semantic.PrimitiveType)
-	sourcePrim, sourceOk := source.(*semantic.PrimitiveType)
+func isNumericPromotion(target, source ctx.Type) bool {
+	targetPrim, targetOk := target.(*ctx.PrimitiveType)
+	sourcePrim, sourceOk := source.(*ctx.PrimitiveType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -185,9 +104,9 @@ func isNumericPromotion(target, source semantic.Type) bool {
 }
 
 // isArrayCompatible checks array type compatibility
-func isArrayCompatible(target, source semantic.Type) bool {
-	targetArray, targetOk := target.(*semantic.ArrayType)
-	sourceArray, sourceOk := source.(*semantic.ArrayType)
+func isArrayCompatible(target, source ctx.Type) bool {
+	targetArray, targetOk := target.(*ctx.ArrayType)
+	sourceArray, sourceOk := source.(*ctx.ArrayType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -197,9 +116,9 @@ func isArrayCompatible(target, source semantic.Type) bool {
 }
 
 // isFunctionCompatible checks function type compatibility
-func isFunctionCompatible(target, source semantic.Type) bool {
-	targetFunc, targetOk := target.(*semantic.FunctionType)
-	sourceFunc, sourceOk := source.(*semantic.FunctionType)
+func isFunctionCompatible(target, source ctx.Type) bool {
+	targetFunc, targetOk := target.(*ctx.FunctionType)
+	sourceFunc, sourceOk := source.(*ctx.FunctionType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -228,9 +147,9 @@ func isFunctionCompatible(target, source semantic.Type) bool {
 }
 
 // isStructCompatible checks structural compatibility of structs
-func isStructCompatible(target, source semantic.Type) bool {
-	targetStruct, targetOk := target.(*semantic.StructType)
-	sourceStruct, sourceOk := source.(*semantic.StructType)
+func isStructCompatible(target, source ctx.Type) bool {
+	targetStruct, targetOk := target.(*ctx.StructType)
+	sourceStruct, sourceOk := source.(*ctx.StructType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -250,7 +169,7 @@ func isStructCompatible(target, source semantic.Type) bool {
 // ===== EXPRESSION TYPE INFERENCE HELPERS =====
 
 // inferIdentifierType gets the type of an identifier from the symbol table
-func inferIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) semantic.Type {
+func inferIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) ctx.Type {
 	if sym, found := cm.SymbolTable.Lookup(e.Name); found {
 		return sym.Type
 	}
@@ -258,7 +177,7 @@ func inferIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) semantic.Type {
 }
 
 // inferBinaryExprType infers the result type of binary expressions
-func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) semantic.Type {
+func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) ctx.Type {
 	leftType := evaluateExpressionType(r, *e.Left, cm)
 	rightType := evaluateExpressionType(r, *e.Right, cm)
 
@@ -280,7 +199,7 @@ func inferBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Mo
 }
 
 // getBinaryOperationResultType determines the result type of binary operations
-func getBinaryOperationResultType(operator string, left, right semantic.Type) semantic.Type {
+func getBinaryOperationResultType(operator string, left, right ctx.Type) ctx.Type {
 	switch operator {
 	case "+", "-", "*", "/", "%":
 		return getArithmeticResultType(operator, left, right)
@@ -296,14 +215,14 @@ func getBinaryOperationResultType(operator string, left, right semantic.Type) se
 }
 
 // getArithmeticResultType handles arithmetic operations
-func getArithmeticResultType(operator string, left, right semantic.Type) semantic.Type {
+func getArithmeticResultType(operator string, left, right ctx.Type) ctx.Type {
 	// String concatenation
-	if operator == "+" && semantic.IsStringType(left) && semantic.IsStringType(right) {
-		return &semantic.PrimitiveType{Name: types.STRING}
+	if operator == "+" && ctx.IsStringType(left) && ctx.IsStringType(right) {
+		return &ctx.PrimitiveType{Name: types.STRING}
 	}
 
 	// Numeric operations
-	if semantic.IsNumericType(left) && semantic.IsNumericType(right) {
+	if ctx.IsNumericType(left) && ctx.IsNumericType(right) {
 		return getCommonNumericType(left, right)
 	}
 
@@ -311,37 +230,37 @@ func getArithmeticResultType(operator string, left, right semantic.Type) semanti
 }
 
 // getComparisonResultType handles comparison operations
-func getComparisonResultType(left, right semantic.Type) semantic.Type {
+func getComparisonResultType(left, right ctx.Type) ctx.Type {
 	if IsAssignableFrom(left, right) || IsAssignableFrom(right, left) {
-		return &semantic.PrimitiveType{Name: types.BOOL}
+		return &ctx.PrimitiveType{Name: types.BOOL}
 	}
 	return nil
 }
 
 // getLogicalResultType handles logical operations
-func getLogicalResultType(left, right semantic.Type) semantic.Type {
-	if semantic.IsBoolType(left) && semantic.IsBoolType(right) {
-		return &semantic.PrimitiveType{Name: types.BOOL}
+func getLogicalResultType(left, right ctx.Type) ctx.Type {
+	if ctx.IsBoolType(left) && ctx.IsBoolType(right) {
+		return &ctx.PrimitiveType{Name: types.BOOL}
 	}
 	return nil
 }
 
 // getBitwiseResultType handles bitwise operations
-func getBitwiseResultType(left, right semantic.Type) semantic.Type {
-	if semantic.IsIntegerType(left) && semantic.IsIntegerType(right) {
+func getBitwiseResultType(left, right ctx.Type) ctx.Type {
+	if ctx.IsIntegerType(left) && ctx.IsIntegerType(right) {
 		return getCommonNumericType(left, right)
 	}
 	return nil
 }
 
 // getCommonNumericType finds the common type for numeric operations
-func getCommonNumericType(left, right semantic.Type) semantic.Type {
+func getCommonNumericType(left, right ctx.Type) ctx.Type {
 	if left.Equals(right) {
 		return left
 	}
 
-	leftPrim, leftOk := left.(*semantic.PrimitiveType)
-	rightPrim, rightOk := right.(*semantic.PrimitiveType)
+	leftPrim, leftOk := left.(*ctx.PrimitiveType)
+	rightPrim, rightOk := right.(*ctx.PrimitiveType)
 
 	if !leftOk || !rightOk {
 		return nil
@@ -370,7 +289,7 @@ func getCommonNumericType(left, right semantic.Type) semantic.Type {
 }
 
 // inferArrayLiteralType infers array literal types
-func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) semantic.Type {
+func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) ctx.Type {
 	if len(e.Elements) == 0 {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -410,24 +329,24 @@ func inferArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 		}
 	}
 
-	return &semantic.ArrayType{ElementType: elementType, Name: types.ARRAY}
+	return &ctx.ArrayType{ElementType: elementType, Name: types.ARRAY}
 }
 
 // inferIndexableType infers types for array/map indexing
-func inferIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) semantic.Type {
+func inferIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) ctx.Type {
 	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
 	if indexableType == nil {
 		return nil
 	}
 
 	// Check if it's an array
-	if arrayType, ok := indexableType.(*semantic.ArrayType); ok {
+	if arrayType, ok := indexableType.(*ctx.ArrayType); ok {
 		indexType := evaluateExpressionType(r, *e.Index, cm)
 		if indexType == nil {
 			return nil
 		}
 
-		if !semantic.IsIntegerType(indexType) {
+		if !ctx.IsIntegerType(indexType) {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				(*e.Index).Loc(),

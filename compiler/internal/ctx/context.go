@@ -11,20 +11,19 @@ import (
 	"compiler/internal/config"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 )
 
 var contextCreated = false
 
 type Module struct {
 	AST         *ast.Program
-	SymbolTable *semantic.SymbolTable
+	SymbolTable *SymbolTable
 }
 
 type CompilerContext struct {
-	EntryPoint string                // Entry point file
-	Builtins   *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules    map[string]*Module    // key: import path
+	EntryPoint string             // Entry point file
+	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules    map[string]*Module // key: import path
 	Reports    report.Reports
 	CachePath  string
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
@@ -177,7 +176,7 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	if module == nil {
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
-	c.Modules[importPath] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
+	c.Modules[importPath] = &Module{AST: module, SymbolTable: NewSymbolTable(c.Builtins)}
 }
 
 // IsModuleParsing checks if a module is currently being parsed
@@ -270,7 +269,7 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 
 	return &CompilerContext{
 		EntryPoint:    entryPoint,
-		Builtins:      semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
+		Builtins:      AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
 		Modules:       make(map[string]*Module),
 		Reports:       report.Reports{},
 		CachePath:     cachePath,

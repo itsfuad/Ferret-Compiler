@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"compiler/ctx"
+	"compiler/internal/ctx"
 )
 
 const EXT = ".fer"

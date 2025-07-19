@@ -36,8 +36,9 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 			Location: *source.NewLocation(&token.Start, &token.End),
 		}
 		if p.peek().Kind == lexer.SCOPE_TOKEN {
-			p.advance()
-			typeNode, ok := parseType(p)
+			p.advance() // consume the scope token
+			// this is a type scope resolution like module::TypeName
+			typeNode, ok := parseType(p) // parse the type after the scope token
 			if !ok {
 				return nil, false
 			}
@@ -48,8 +49,8 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 			}, true
 		} else {
 			return &ast.UserDefinedType{
-				TypeName: types.TYPE_NAME(token.Value),
-				Location: *source.NewLocation(&token.Start, &token.End),
+				TypeName: types.TYPE_NAME(iden.Name),
+				Location: iden.Location,
 			}, true
 		}
 	}
