@@ -17,7 +17,7 @@ type UserDefinedType struct {
 	source.Location
 }
 
-func (t *UserDefinedType) INode() Node { return t }
+func (t *UserDefinedType) INode() {} // Impliments Node interface
 func (t *UserDefinedType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -33,7 +33,7 @@ type IntType struct {
 	source.Location
 }
 
-func (t *IntType) INode() Node { return t }
+func (t *IntType) INode() {} // Impliments Node interface
 func (t *IntType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -48,7 +48,7 @@ type FloatType struct {
 	source.Location
 }
 
-func (t *FloatType) INode() Node { return t }
+func (t *FloatType) INode() {} // Impliments Node interface
 func (t *FloatType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -62,7 +62,7 @@ type StringType struct {
 	source.Location
 }
 
-func (t *StringType) INode() Node { return t }
+func (t *StringType) INode() {} // Impliments Node interface
 func (t *StringType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -76,7 +76,7 @@ type ByteType struct {
 	source.Location
 }
 
-func (t *ByteType) INode() Node { return t }
+func (t *ByteType) INode() {} // Impliments Node interface
 func (t *ByteType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -90,7 +90,7 @@ type BoolType struct {
 	source.Location
 }
 
-func (t *BoolType) INode() Node { return t }
+func (t *BoolType) INode() {} // Impliments Node interface
 func (t *BoolType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -105,7 +105,7 @@ type ArrayType struct {
 	source.Location
 }
 
-func (t *ArrayType) INode() Node { return t }
+func (t *ArrayType) INode() {} // Impliments Node interface
 func (t *ArrayType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -133,7 +133,7 @@ type StructType struct {
 	source.Location
 }
 
-func (s *StructType) INode() Node           { return s }
+func (s *StructType) INode()                {} // Impliments Node interface
 func (s *StructType) Type() types.TYPE_NAME { return s.TypeName }
 func (s *StructType) Loc() *source.Location { return &s.Location }
 
@@ -151,7 +151,7 @@ type InterfaceType struct {
 	source.Location
 }
 
-func (i *InterfaceType) INode() Node           { return i }
+func (i *InterfaceType) INode()                {} // Impliments Node interface
 func (i *InterfaceType) Type() types.TYPE_NAME { return i.TypeName }
 func (i *InterfaceType) Loc() *source.Location { return &i.Location }
 
@@ -162,6 +162,6 @@ type FunctionType struct {
 	source.Location
 }
 
-func (f *FunctionType) INode() Node           { return f }
+func (f *FunctionType) INode()                {} // Impliments Node interface
 func (f *FunctionType) Type() types.TYPE_NAME { return f.TypeName }
 func (f *FunctionType) Loc() *source.Location { return &f.Location }

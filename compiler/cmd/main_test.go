@@ -8,7 +8,7 @@ import (
 
 const (
 	TEST_FILE  = "test.fer"
-	DEBUG_FLAG = "--debug"
+	DEBUG_FLAG = "-debug"
 )
 
 func TestParseArgs(t *testing.T) {

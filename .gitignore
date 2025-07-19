@@ -29,3 +29,6 @@ Thumbs.db
 
 # Project files
 app/**/*.json
+
+# others
+*.sarif
