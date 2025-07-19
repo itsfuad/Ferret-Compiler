@@ -69,6 +69,9 @@ let scientific : f64 = 1.23e4; // 1.23 * 10^4
 //     };
 // }
 
+
+type Int i32;
+
 let cxx : data::MyType = data::kk;
 
 //let someValue = laterDeclaredValue;
@@ -92,3 +95,15 @@ let laterDeclaredValue = "This value is declared later in the code.";
 //array 
 //let numbers = [1, 2, 3, 4, 5]; // Array of integers
 // let mixedArray = [1, "two", 3.0]; // Array
+
+//function
+fn nothing() {
+    // This function does nothing
+}
+
+fn withParam(param: str) {
+    // This function takes a string parameter and does nothing with it
+    // fmt.println(param); // Uncomment to print the parameter
+}
+
+cxx(); // Call the function

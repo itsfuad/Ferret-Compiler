@@ -1,7 +1,6 @@
 package ctx
 
 import (
-	"reflect"
 	"testing"
 
 	"compiler/internal/frontend/ast"
@@ -70,67 +69,84 @@ func TestParsingFunctions(t *testing.T) {
 	ctx := &CompilerContext{}
 
 	// Test IsModuleParsing
-	if ctx.IsModuleParsing("test") {
+	if ctx.isModuleParsing("test") {
 		t.Error("IsModuleParsing should return false for non-existent module")
 	}
 
 	// Test StartParsing
 	ctx.StartParsing("test")
-	if !ctx.IsModuleParsing("test") {
+	if !ctx.isModuleParsing("test") {
 		t.Error("IsModuleParsing should return true after StartParsing")
 	}
-	if len(ctx.ParsingStack) != 1 || ctx.ParsingStack[0] != "test" {
+	if len(ctx._parsingStack) != 1 || ctx._parsingStack[0] != "test" {
 		t.Error("ParsingStack should contain the module after StartParsing")
-	}
-
-	// Test GetCyclePath
-	path, found := ctx.GetCyclePath("test")
-	if !found {
-		t.Error("GetCyclePath should find a cycle for a module being parsed")
-	}
-	if len(path) != 1 || path[0] != "test" {
-		t.Error("GetCyclePath should return the correct path")
 	}
 
 	// Test FinishParsing
 	ctx.FinishParsing("test")
-	if ctx.IsModuleParsing("test") {
+	if ctx.isModuleParsing("test") {
 		t.Error("IsModuleParsing should return false after FinishParsing")
 	}
-	if len(ctx.ParsingStack) != 0 {
+	if len(ctx._parsingStack) != 0 {
 		t.Error("ParsingStack should be empty after FinishParsing")
 	}
 }
 
+// TestCycleDetection tests the cycle detection functionality
 func TestCycleDetection(t *testing.T) {
-	ctx := &CompilerContext{
-		DepGraph: make(map[string][]string),
-	}
+	ctx := &CompilerContext{}
 
-	// Set up a simple dependency graph
-	ctx.AddDepEdge("A", "B")
-	ctx.AddDepEdge("B", "C")
-	ctx.AddDepEdge("C", "D")
-
-	// No cycle
-	cycle, found := ctx.DetectCycle("A")
+	// Test that DetectCycle returns false when no cycle exists
+	cycle, found := ctx.DetectCycle("A", "B")
 	if found {
-		t.Errorf("Shouldn't detect cycle in acyclic graph, got: %v", cycle)
+		t.Error("DetectCycle should return false when no cycle exists")
+	}
+	if cycle != nil {
+		t.Error("DetectCycle should return nil cycle when no cycle exists")
 	}
 
-	// Create a cycle
-	ctx.AddDepEdge("D", "B")
+	// Create a dependency chain: A -> B -> C
+	ctx.DetectCycle("A", "B") // This should not detect a cycle
+	ctx.DetectCycle("B", "C") // This should not detect a cycle
 
-	// Should detect cycle
-	cycle, found = ctx.DetectCycle("A")
+	// Now try to create a cycle: C -> A, which should complete the cycle A -> B -> C -> A
+	cycle, found = ctx.DetectCycle("C", "A")
 	if !found {
-		t.Error("Failed to detect cycle in cyclic graph")
+		t.Error("DetectCycle should detect the cycle C -> A")
 	}
 
-	// Verify the cycle contains the right nodes
-	expectedCycle := []string{"B", "C", "D", "B"}
-	if !reflect.DeepEqual(cycle, expectedCycle) {
-		t.Errorf("Expected cycle %v, got %v", expectedCycle, cycle)
+	// The cycle should start from C (the first module in the cycle path when detected)
+	expectedCycle := []string{"C", "A", "B", "C"}
+	if len(cycle) != len(expectedCycle) {
+		t.Errorf("Expected cycle length %d, got %d", len(expectedCycle), len(cycle))
+	}
+
+	for i, expected := range expectedCycle {
+		if i >= len(cycle) || cycle[i] != expected {
+			t.Errorf("Expected cycle %v, got %v", expectedCycle, cycle)
+			break
+		}
+	}
+
+	// Test direct cycle: A -> B -> A
+	ctx2 := &CompilerContext{}
+	ctx2.DetectCycle("A", "B")                // Create A -> B
+	cycle, found = ctx2.DetectCycle("B", "A") // Try to create B -> A (should detect cycle)
+
+	if !found {
+		t.Error("DetectCycle should detect direct cycle B -> A")
+	}
+
+	expectedDirectCycle := []string{"B", "A", "B"}
+	if len(cycle) != len(expectedDirectCycle) {
+		t.Errorf("Expected direct cycle length %d, got %d", len(expectedDirectCycle), len(cycle))
+	}
+
+	for i, expected := range expectedDirectCycle {
+		if i >= len(cycle) || cycle[i] != expected {
+			t.Errorf("Expected direct cycle %v, got %v", expectedDirectCycle, cycle)
+			break
+		}
 	}
 }
 
