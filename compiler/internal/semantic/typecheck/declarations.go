@@ -26,7 +26,7 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 			}
 		} else if variable.ExplicitType != nil && typeToAdd != nil {
 			//both explicit type and initializer are provided. they must match
-			explicitType, err := ctx.ASTToSemanticType(variable.ExplicitType, cm)
+			explicitType, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.TYPECHECK_PHASE)
 				return
