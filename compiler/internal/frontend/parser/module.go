@@ -57,8 +57,8 @@ func parseImport(p *Parser) ast.Node {
 		Location:   loc,
 	}
 
-	// Check if this module is already being parsed (circular dependency)
-	if cycle, found := p.ctx.GetCyclePath(moduleFullPath); found {
+	// Check for circular dependency before adding the import
+	if cycle, found := p.ctx.DetectCycle(p.fullPath, moduleFullPath); found {
 		// Convert full paths to module names for better readability
 		moduleNames := make([]string, len(cycle))
 		for i, path := range cycle {
@@ -67,16 +67,9 @@ func parseImport(p *Parser) ast.Node {
 
 		cycleStr := strings.Join(moduleNames, " -> ")
 		cycleMsg := fmt.Sprintf("Circular import detected: %s", cycleStr)
-		p.ctx.Reports.AddSemanticError(p.fullPath, &loc, cycleMsg, report.PARSING_PHASE)
-		colors.RED.Println(cycleMsg)
+		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, cycleMsg, report.PARSING_PHASE)
 		return stmt
 	}
-
-	// Add dependency edge for tracking
-	if p.ctx.DepGraph == nil {
-		p.ctx.DepGraph = make(map[string][]string)
-	}
-	p.ctx.DepGraph[p.fullPath] = append(p.ctx.DepGraph[p.fullPath], moduleFullPath)
 
 	// Check if the module is already cached
 	if !p.ctx.HasModule(importpath) {
