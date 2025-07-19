@@ -217,7 +217,7 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 	from = filepath.ToSlash(from)
 	to = filepath.ToSlash(to)
 
-	colors.CYAN.Printf("DetectCycle: %s -> %s\n", filepath.Base(from), filepath.Base(to))
+	colors.CYAN.Printf("DetectCycle: %s → %s\n", filepath.Base(from), filepath.Base(to))
 
 	// Initialize DepGraph if needed
 	if c.DepGraph == nil {
@@ -236,7 +236,7 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 
 	// No cycle found, add the edge (with normalized paths)
 	c.DepGraph[from] = append(c.DepGraph[from], to)
-	colors.GREEN.Printf("Edge added: %s -> %s\n", filepath.Base(from), filepath.Base(to))
+	colors.GREEN.Printf("Edge added: %s → %s\n", filepath.Base(from), filepath.Base(to))
 	return nil, false
 } // findCyclePath uses DFS to find if there's a path from 'start' to 'target'
 // If found, returns the complete cycle path

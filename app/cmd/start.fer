@@ -7,7 +7,7 @@ let myVar : Integer = 42; // myVar is of type Integer, which is an alias for i32
 
 let expr : Integer = (10 + 22) * 3;
 
-let name : other::String = "Alice"; // name is of type String, which is an alias for str
+let name : other::String = other::name; // name is of type String, which is an alias for str
 
 // let a: i32 = 10;
 // let b = 23.232;

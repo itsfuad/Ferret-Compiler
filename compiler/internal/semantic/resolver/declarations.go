@@ -65,7 +65,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
-			go resolveExpr(r, decl.Initializers[i], cm)
+			resolveExpr(r, decl.Initializers[i], cm)
 		}
 
 		if variable.ExplicitType != nil {
