@@ -26,16 +26,19 @@ type CompilerContext struct {
 	Modules    map[string]*Module // key: import path
 	Reports    report.Reports
 	CachePath  string
-	// Dependency graph: key is importer, value is list of imported module keys (as strings)
-	DepGraph map[string][]string
-	// Track modules that are currently being parsed to prevent infinite recursion
-	ParsingModules map[string]bool
-	// Keep track of the parsing stack to show cycle paths
-	ParsingStack []string
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
-	RemoteConfigs map[string]bool
+
+	remoteConfigs map[string]bool
+
+	// Dependency graph: key is importer, value is list of imported module keys (as strings)
+	DepGraph map[string][]string
+
+	// Track modules that are currently being parsed to prevent infinite recursion
+	_parsingModules map[string]bool
+	// Keep track of the parsing stack to show cycle paths
+	_parsingStack []string
 }
 
 func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
@@ -59,10 +62,10 @@ func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
 }
 
 func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectConfig {
-	if c.RemoteConfigs == nil {
+	if c.remoteConfigs == nil {
 		return nil
 	}
-	_, exists := c.RemoteConfigs[configFilepath]
+	_, exists := c.remoteConfigs[configFilepath]
 	if !exists {
 		return nil
 	}
@@ -78,10 +81,10 @@ func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectCo
 }
 
 func (c *CompilerContext) SetRemoteConfig(configFilepath string, data []byte) error {
-	if c.RemoteConfigs == nil {
-		c.RemoteConfigs = make(map[string]bool)
+	if c.remoteConfigs == nil {
+		c.remoteConfigs = make(map[string]bool)
 	}
-	c.RemoteConfigs[configFilepath] = true
+	c.remoteConfigs[configFilepath] = true
 	err := os.MkdirAll(filepath.Dir(configFilepath), 0755)
 	if err != nil {
 		return err
@@ -98,7 +101,7 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 
 	logicalPath = filepath.ToSlash(logicalPath)
 
-	if c.RemoteConfigs == nil {
+	if c.remoteConfigs == nil {
 		return nil
 	}
 
@@ -108,7 +111,7 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 	// Start from full path, walk up to github.com/user/repo
 	for i := len(parts); i >= 3; i-- {
 		prefix := strings.Join(parts[:i], "/")
-		if _, exists := c.RemoteConfigs[prefix]; exists {
+		if _, exists := c.remoteConfigs[prefix]; exists {
 			data, err := os.ReadFile(filepath.FromSlash(prefix))
 			if err != nil {
 				continue
@@ -199,12 +202,12 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	c.Modules[importPath] = &Module{AST: module, SymbolTable: NewSymbolTable(c.Builtins)}
 }
 
-// IsModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) IsModuleParsing(importPath string) bool {
-	if c.ParsingModules == nil {
+// isModuleParsing checks if a module is currently being parsed
+func (c *CompilerContext) isModuleParsing(importPath string) bool {
+	if c._parsingModules == nil {
 		return false
 	}
-	return c.ParsingModules[importPath]
+	return c._parsingModules[importPath]
 }
 
 // DetectCycle detects if adding an edge from 'from' to 'to' would create a cycle
@@ -271,26 +274,26 @@ func (c *CompilerContext) findCyclePath(start, target string, visited map[string
 
 // StartParsing marks a module as currently being parsed
 func (c *CompilerContext) StartParsing(importPath string) {
-	if c.ParsingModules == nil {
-		c.ParsingModules = make(map[string]bool)
+	if c._parsingModules == nil {
+		c._parsingModules = make(map[string]bool)
 	}
-	if c.ParsingStack == nil {
-		c.ParsingStack = make([]string, 0)
+	if c._parsingStack == nil {
+		c._parsingStack = make([]string, 0)
 	}
 
-	c.ParsingModules[importPath] = true
-	c.ParsingStack = append(c.ParsingStack, importPath)
+	c._parsingModules[importPath] = true
+	c._parsingStack = append(c._parsingStack, importPath)
 }
 
 // FinishParsing marks a module as no longer being parsed
 func (c *CompilerContext) FinishParsing(importPath string) {
-	if c.ParsingModules != nil {
-		delete(c.ParsingModules, importPath)
+	if c._parsingModules != nil {
+		delete(c._parsingModules, importPath)
 	}
 
 	// Remove from stack (should be the last element)
-	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == importPath {
-		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
+	if len(c._parsingStack) > 0 && c._parsingStack[len(c._parsingStack)-1] == importPath {
+		c._parsingStack = c._parsingStack[:len(c._parsingStack)-1]
 	}
 }
 

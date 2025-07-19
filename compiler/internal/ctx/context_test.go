@@ -69,25 +69,25 @@ func TestParsingFunctions(t *testing.T) {
 	ctx := &CompilerContext{}
 
 	// Test IsModuleParsing
-	if ctx.IsModuleParsing("test") {
+	if ctx.isModuleParsing("test") {
 		t.Error("IsModuleParsing should return false for non-existent module")
 	}
 
 	// Test StartParsing
 	ctx.StartParsing("test")
-	if !ctx.IsModuleParsing("test") {
+	if !ctx.isModuleParsing("test") {
 		t.Error("IsModuleParsing should return true after StartParsing")
 	}
-	if len(ctx.ParsingStack) != 1 || ctx.ParsingStack[0] != "test" {
+	if len(ctx._parsingStack) != 1 || ctx._parsingStack[0] != "test" {
 		t.Error("ParsingStack should contain the module after StartParsing")
 	}
 
 	// Test FinishParsing
 	ctx.FinishParsing("test")
-	if ctx.IsModuleParsing("test") {
+	if ctx.isModuleParsing("test") {
 		t.Error("IsModuleParsing should return false after FinishParsing")
 	}
-	if len(ctx.ParsingStack) != 0 {
+	if len(ctx._parsingStack) != 0 {
 		t.Error("ParsingStack should be empty after FinishParsing")
 	}
 }
