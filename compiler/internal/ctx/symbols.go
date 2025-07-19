@@ -1,4 +1,4 @@
-package semantic
+package ctx
 
 import (
 	"compiler/internal/source"

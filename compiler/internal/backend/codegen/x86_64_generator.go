@@ -5,10 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/semantic"
 	"compiler/internal/types"
 )
 
@@ -194,7 +193,7 @@ func (g *X86_64Generator) generateBSSVariables(varDecl *ast.VarDeclStmt, compile
 }
 
 // generateDataDeclaration generates a data declaration for an initialized variable
-func (g *X86_64Generator) generateDataDeclaration(name string, varType semantic.Type, initializer ast.Expression) {
+func (g *X86_64Generator) generateDataDeclaration(name string, varType ctx.Type, initializer ast.Expression) {
 	directive := g.getDataDirective(varType)
 	value := g.generateConstantValue(initializer)
 	g.dataSection.WriteString(fmt.Sprintf("%s: %s %s\n", name, directive, value))
@@ -448,7 +447,7 @@ func (g *X86_64Generator) generateConstantValue(expr ast.Expression) string {
 }
 
 // getDataDirective returns the appropriate assembly directive for a type
-func (g *X86_64Generator) getDataDirective(semType semantic.Type) string {
+func (g *X86_64Generator) getDataDirective(semType ctx.Type) string {
 	switch semType.TypeName() {
 	case types.INT8, types.UINT8, types.BYTE:
 		return "db"
@@ -472,7 +471,7 @@ func (g *X86_64Generator) getDataDirective(semType semantic.Type) string {
 }
 
 // getTypeSize returns the size in bytes for a type
-func (g *X86_64Generator) getTypeSize(semType semantic.Type) int {
+func (g *X86_64Generator) getTypeSize(semType ctx.Type) int {
 	switch semType.TypeName() {
 	case types.INT8, types.UINT8, types.BYTE, types.BOOL:
 		return 1

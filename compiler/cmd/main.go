@@ -9,7 +9,7 @@ import (
 	//"strings"
 
 	"compiler/colors"
-	"compiler/ctx"
+	"compiler/internal/ctx"
 
 	//"compiler/internal/backend"
 	"compiler/internal/config"

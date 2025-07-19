@@ -12,8 +12,8 @@
             "mode": "auto",
             "program": "${workspaceFolder}/compiler/cmd/main.go",
             "args": [
-                "${workspaceFolder}/app/cmd/main.fer",
-                "--debug"
+                "${workspaceFolder}/app/cmd/start.fer",
+                "-debug"
             ],
         }
     ]
