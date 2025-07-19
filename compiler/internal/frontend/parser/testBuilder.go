@@ -5,11 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"compiler/ctx"
 	"compiler/internal/config"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 	"compiler/internal/testutil"
 )
 
@@ -48,7 +47,7 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 
 	return &ctx.CompilerContext{
 		EntryPoint:    entryPoint,
-		Builtins:      semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)),
+		Builtins:      ctx.AddPreludeSymbols(ctx.NewSymbolTable(nil)),
 		Modules:       make(map[string]*ctx.Module),
 		Reports:       report.Reports{},
 		CachePath:     filepath.ToSlash(cachePath),
@@ -79,7 +78,7 @@ func evaluateTestResult(t *testing.T, r interface{}, nodes []ast.Node, desc stri
 	if isValid && (r != nil || len(nodes) == 0) { // true if panic is nil or nodes are not empty
 		t.Errorf("%s: expected no panic or no 0 nodes, got %s", desc, whatsgot)
 	} else if !isValid && (r == nil && len(nodes) > 0) { // true if panic is not nil or nodes are empty
-		t.Errorf("%s: expected panic or 0 nodes, got %s", desc, whatsgot)
+		t.Errorf("%s: expected panic or 0 nodes, got %s, Nodes: %v, first: %#v", desc, whatsgot, nodes, nodes[0])
 	}
 }
 

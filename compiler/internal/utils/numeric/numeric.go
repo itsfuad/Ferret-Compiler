@@ -6,17 +6,39 @@ import (
 	"strings"
 )
 
+// Regex pattern components for number formats
+const (
+	HexDigits = `[0-9a-fA-F]`
+	HexNumber = `0[xX]` + HexDigits + `(?:` + HexDigits + `|_` + HexDigits + `)*`
+
+	OctDigits = `[0-7]`
+	OctNumber = `0[oO]` + OctDigits + `(?:` + OctDigits + `|_` + OctDigits + `)*`
+
+	BinDigits = `[01]`
+	BinNumber = `0[bB]` + BinDigits + `(?:` + BinDigits + `|_` + BinDigits + `)*`
+
+	DecDigits = `[0-9]`
+	DecNumber = DecDigits + `(?:` + DecDigits + `|_` + DecDigits + `)*`
+
+	FloatFrac   = `\.` + DecDigits + `(?:` + DecDigits + `|_` + DecDigits + `)*`
+	FloatExp    = `[eE][+-]?` + DecDigits + `(?:` + DecDigits + `|_` + DecDigits + `)*`
+	FloatNumber = DecNumber + `(?:` + FloatFrac + `)?(?:` + FloatExp + `)?`
+
+	// Complete number pattern for tokenizing (includes optional minus sign)
+	NumberPattern = `-?(?:` + HexNumber + `|` + OctNumber + `|` + BinNumber + `|` + FloatNumber + `)`
+)
+
 var (
-	// Regular expressions for different number formats
+	// Regular expressions for different number formats (validation with anchors)
 	// Allow underscores between digits for readability
-	decimalRegex = regexp.MustCompile(`^-?[0-9](?:[0-9]|_[0-9])*$`)
-	hexRegex     = regexp.MustCompile(`^0[xX][0-9a-fA-F](?:[0-9a-fA-F]|_[0-9a-fA-F])*$`)
-	octalRegex   = regexp.MustCompile(`^0[oO][0-7](?:[0-7]|_[0-7])*$`)
-	binaryRegex  = regexp.MustCompile(`^0[bB][01](?:[01]|_[01])*$`)
+	decimalRegex = regexp.MustCompile(`^-?` + DecNumber + `$`)
+	hexRegex     = regexp.MustCompile(`^` + HexNumber + `$`)
+	octalRegex   = regexp.MustCompile(`^` + OctNumber + `$`)
+	binaryRegex  = regexp.MustCompile(`^` + BinNumber + `$`)
 	// Float patterns need to handle: 1.23, .123, 1., with optional underscores
-	floatRegex = regexp.MustCompile(`^-?[0-9](?:[0-9]|_[0-9])*\.[0-9](?:[0-9]|_[0-9])*$`)
+	floatRegex = regexp.MustCompile(`^-?` + DecNumber + `\.` + DecDigits + `(?:` + DecDigits + `|_` + DecDigits + `)*$`)
 	// Scientific notation: 1e10, 1.2e-10, .2e+10, etc.
-	scientificRegex = regexp.MustCompile(`^-?[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?[eE][+-]?[0-9]+$`)
+	scientificRegex = regexp.MustCompile(`^-?` + DecNumber + `(?:\.` + DecDigits + `(?:` + DecDigits + `|_` + DecDigits + `)*)?` + FloatExp + `$`)
 )
 
 // IsFloat checks if the string represents any valid float format

@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"compiler/colors"
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
@@ -15,14 +15,13 @@ import (
 )
 
 type Parser struct {
-	tokens                 []lexer.Token
-	tokenNo                int
-	fullPath               string
-	importPath             string
-	modulename             string            // module name derived from full path
-	modulenameToImportpath map[string]string // import alias -> full path
-	ctx                    *ctx.CompilerContext
-	debug                  bool // debug mode for additional logging
+	tokens     []lexer.Token
+	tokenNo    int
+	fullPath   string
+	importPath string
+	modulename string // module name derived from full path
+	ctx        *ctx.CompilerContext
+	debug      bool // debug mode for additional logging
 }
 
 func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
@@ -47,14 +46,13 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
-		tokens:                 tokens,
-		tokenNo:                0,
-		ctx:                    ctxx,
-		fullPath:               filePath,
-		importPath:             importPath,
-		modulename:             modulename,
-		modulenameToImportpath: make(map[string]string), // Initialize alias map
-		debug:                  debug,
+		tokens:     tokens,
+		tokenNo:    0,
+		ctx:        ctxx,
+		fullPath:   filePath,
+		importPath: importPath,
+		modulename: modulename,
+		debug:      debug,
 	}
 }
 
@@ -115,8 +113,8 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 
 	current := p.peek()
 
-	err := p.ctx.Reports.Add(p.fullPath, source.NewLocation(&current.Start, &current.End), message, report.PARSING_PHASE)
-	err.SetLevel(report.SYNTAX_ERROR)
+	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), message, report.PARSING_PHASE)
+
 	return p.peek()
 }
 
@@ -128,7 +126,7 @@ func parseExpressionList(p *Parser, first ast.Expression) ast.ExpressionList {
 		next := parseExpression(p)
 		if next == nil {
 			token := p.peek()
-			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE)
 			break
 		}
 		exprs = append(exprs, next)
@@ -154,8 +152,8 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 // handleUnexpectedToken reports an error for unexpected token and advances
 func handleUnexpectedToken(p *Parser) ast.Statement {
 	token := p.peek()
-	p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End),
-		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", token.Value), report.PARSING_PHASE).SetLevel(report.SYNTAX_ERROR)
+	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End),
+		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", token.Value), report.PARSING_PHASE)
 
 	p.advance() // skip the invalid token
 
@@ -194,7 +192,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 		values = parseExpressionList(p, parseExpression(p))
 		if values == nil {
 			token := p.peek()
-			p.ctx.Reports.Add(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword")
 		}
 		end = *values.Loc().End
 	}
@@ -247,7 +245,7 @@ func parseNode(p *Parser) ast.Node {
 			loc := source.NewLocation(&token.Start, &token.End)
 			loc.Start.Column += 1
 			loc.End.Column += 1
-			p.ctx.Reports.Add(p.fullPath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("Add a semicolon to the end of the statement")
 		}
 		end := p.advance()
 		node.Loc().End.Column = end.End.Column
@@ -263,6 +261,8 @@ func (p *Parser) Parse() *ast.Program {
 
 	// Start tracking the entry point parsing
 	p.ctx.StartParsing(p.fullPath)
+	// Finish tracking the entry point parsing
+	defer p.ctx.FinishParsing(p.fullPath)
 
 	for !p.isAtEnd() {
 		// Parse the statement
@@ -279,20 +279,16 @@ func (p *Parser) Parse() *ast.Program {
 		return &ast.Program{}
 	}
 
-	// Finish tracking the entry point parsing
-	p.ctx.FinishParsing(p.fullPath)
-
 	if p.debug {
 		colors.BLUE.Printf("Parsed '%s'\n", p.fullPath)
 	}
 
 	program := &ast.Program{
-		Nodes:                  nodes,
-		FullPath:               p.fullPath,
-		ImportPath:             p.importPath,
-		Modulename:             p.modulename,
-		ModulenameToImportpath: p.modulenameToImportpath,
-		Location:               *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
+		Nodes:      nodes,
+		FullPath:   p.fullPath,
+		ImportPath: p.importPath,
+		Modulename: p.modulename,
+		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 
 	// Add the module to the context

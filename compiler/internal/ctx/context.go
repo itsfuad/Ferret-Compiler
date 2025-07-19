@@ -11,39 +11,61 @@ import (
 	"compiler/internal/config"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 )
 
 var contextCreated = false
 
 type Module struct {
 	AST         *ast.Program
-	SymbolTable *semantic.SymbolTable
+	SymbolTable *SymbolTable
 }
 
 type CompilerContext struct {
-	EntryPoint string                // Entry point file
-	Builtins   *semantic.SymbolTable // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules    map[string]*Module    // key: import path
+	EntryPoint string             // Entry point file
+	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules    map[string]*Module // key: import path
 	Reports    report.Reports
 	CachePath  string
-	// Dependency graph: key is importer, value is list of imported module keys (as strings)
-	DepGraph map[string][]string
-	// Track modules that are currently being parsed to prevent infinite recursion
-	ParsingModules map[string]bool
-	// Keep track of the parsing stack to show cycle paths
-	ParsingStack []string
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
-	RemoteConfigs map[string]bool
+
+	remoteConfigs map[string]bool
+
+	// Dependency graph: key is importer, value is list of imported module keys (as strings)
+	DepGraph map[string][]string
+
+	// Track modules that are currently being parsed to prevent infinite recursion
+	_parsingModules map[string]bool
+	// Keep track of the parsing stack to show cycle paths
+	_parsingStack []string
+}
+
+func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
+	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return ""
+	}
+	relPath = filepath.ToSlash(relPath)
+	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+	rootName := filepath.Base(c.ProjectRoot)
+	return rootName + "/" + moduleName
+}
+
+func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
+	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return ""
+	}
+	filename := filepath.Base(fullPath)
+	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectConfig {
-	if c.RemoteConfigs == nil {
+	if c.remoteConfigs == nil {
 		return nil
 	}
-	_, exists := c.RemoteConfigs[configFilepath]
+	_, exists := c.remoteConfigs[configFilepath]
 	if !exists {
 		return nil
 	}
@@ -59,10 +81,10 @@ func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectCo
 }
 
 func (c *CompilerContext) SetRemoteConfig(configFilepath string, data []byte) error {
-	if c.RemoteConfigs == nil {
-		c.RemoteConfigs = make(map[string]bool)
+	if c.remoteConfigs == nil {
+		c.remoteConfigs = make(map[string]bool)
 	}
-	c.RemoteConfigs[configFilepath] = true
+	c.remoteConfigs[configFilepath] = true
 	err := os.MkdirAll(filepath.Dir(configFilepath), 0755)
 	if err != nil {
 		return err
@@ -79,7 +101,7 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 
 	logicalPath = filepath.ToSlash(logicalPath)
 
-	if c.RemoteConfigs == nil {
+	if c.remoteConfigs == nil {
 		return nil
 	}
 
@@ -89,7 +111,7 @@ func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.Pr
 	// Start from full path, walk up to github.com/user/repo
 	for i := len(parts); i >= 3; i-- {
 		prefix := strings.Join(parts[:i], "/")
-		if _, exists := c.RemoteConfigs[prefix]; exists {
+		if _, exists := c.remoteConfigs[prefix]; exists {
 			data, err := os.ReadFile(filepath.FromSlash(prefix))
 			if err != nil {
 				continue
@@ -177,65 +199,101 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	if module == nil {
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
-	c.Modules[importPath] = &Module{AST: module, SymbolTable: semantic.NewSymbolTable(c.Builtins)}
+	c.Modules[importPath] = &Module{AST: module, SymbolTable: NewSymbolTable(c.Builtins)}
 }
 
-// IsModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) IsModuleParsing(importPath string) bool {
-	if c.ParsingModules == nil {
+// isModuleParsing checks if a module is currently being parsed
+func (c *CompilerContext) isModuleParsing(importPath string) bool {
+	if c._parsingModules == nil {
 		return false
 	}
-	return c.ParsingModules[importPath]
+	return c._parsingModules[importPath]
 }
 
-// GetCyclePath returns the cycle path if the given module is already being parsed
-// Returns the complete path from the entry point, showing the full import chain
-func (c *CompilerContext) GetCyclePath(importPath string) ([]string, bool) {
-	if !c.IsModuleParsing(importPath) {
-		return nil, false
+// DetectCycle detects if adding an edge from 'from' to 'to' would create a cycle
+// Returns the cycle path starting from the original module if a cycle is detected
+func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
+	// Normalize paths to handle forward/backward slash inconsistency
+	from = filepath.ToSlash(from)
+	to = filepath.ToSlash(to)
+
+	colors.CYAN.Printf("DetectCycle: %s → %s\n", filepath.Base(from), filepath.Base(to))
+
+	// Initialize DepGraph if needed
+	if c.DepGraph == nil {
+		c.DepGraph = make(map[string][]string)
 	}
 
-	// Find the first occurrence of the module that creates the cycle
-	cycleStartIndex := -1
-	for i, stackModule := range c.ParsingStack {
-		if stackModule == importPath {
-			cycleStartIndex = i
-			break
+	// Check if this edge would create a cycle by doing a DFS from 'to' to see if we can reach 'from'
+	visited := make(map[string]bool)
+	path := make([]string, 0)
+
+	if cycle := c.findCyclePath(to, from, visited, path); cycle != nil {
+		// Found a cycle, return it WITHOUT adding the edge
+		colors.RED.Printf("CYCLE DETECTED: %v\n", cycle)
+		return cycle, true
+	}
+
+	// No cycle found, add the edge (with normalized paths)
+	c.DepGraph[from] = append(c.DepGraph[from], to)
+	colors.GREEN.Printf("Edge added: %s → %s\n", filepath.Base(from), filepath.Base(to))
+	return nil, false
+} // findCyclePath uses DFS to find if there's a path from 'start' to 'target'
+// If found, returns the complete cycle path
+func (c *CompilerContext) findCyclePath(start, target string, visited map[string]bool, path []string) []string {
+	// Normalize paths
+	start = filepath.ToSlash(start)
+	target = filepath.ToSlash(target)
+
+	if start == target {
+		// Found the target, construct the cycle
+		cyclePath := make([]string, len(path)+2)
+		cyclePath[0] = target // Start the cycle from target
+		copy(cyclePath[1:], path)
+		cyclePath[len(cyclePath)-1] = target // Close the cycle
+		return cyclePath
+	}
+
+	if visited[start] {
+		return nil // Already visited this node
+	}
+
+	visited[start] = true
+	path = append(path, start)
+
+	// Visit all neighbors
+	for _, neighbor := range c.DepGraph[start] {
+		neighbor = filepath.ToSlash(neighbor) // Normalize neighbor path
+		if cycle := c.findCyclePath(neighbor, target, visited, path); cycle != nil {
+			return cycle
 		}
 	}
 
-	if cycleStartIndex == -1 {
-		// This shouldn't happen, but handle it gracefully
-		return c.ParsingStack, true
-	}
-
-	// Return the current parsing stack which shows the complete path from entry point
-	// to where the cycle would occur (the unambiguous cycle path)
-	return c.ParsingStack, true
+	return nil
 }
 
 // StartParsing marks a module as currently being parsed
 func (c *CompilerContext) StartParsing(importPath string) {
-	if c.ParsingModules == nil {
-		c.ParsingModules = make(map[string]bool)
+	if c._parsingModules == nil {
+		c._parsingModules = make(map[string]bool)
 	}
-	if c.ParsingStack == nil {
-		c.ParsingStack = make([]string, 0)
+	if c._parsingStack == nil {
+		c._parsingStack = make([]string, 0)
 	}
 
-	c.ParsingModules[importPath] = true
-	c.ParsingStack = append(c.ParsingStack, importPath)
+	c._parsingModules[importPath] = true
+	c._parsingStack = append(c._parsingStack, importPath)
 }
 
 // FinishParsing marks a module as no longer being parsed
 func (c *CompilerContext) FinishParsing(importPath string) {
-	if c.ParsingModules != nil {
-		delete(c.ParsingModules, importPath)
+	if c._parsingModules != nil {
+		delete(c._parsingModules, importPath)
 	}
 
 	// Remove from stack (should be the last element)
-	if len(c.ParsingStack) > 0 && c.ParsingStack[len(c.ParsingStack)-1] == importPath {
-		c.ParsingStack = c.ParsingStack[:len(c.ParsingStack)-1]
+	if len(c._parsingStack) > 0 && c._parsingStack[len(c._parsingStack)-1] == importPath {
+		c._parsingStack = c._parsingStack[:len(c._parsingStack)-1]
 	}
 }
 
@@ -270,7 +328,7 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 
 	return &CompilerContext{
 		EntryPoint:    entryPoint,
-		Builtins:      semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)), // Initialize built-in symbols
+		Builtins:      AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
 		Modules:       make(map[string]*Module),
 		Reports:       report.Reports{},
 		CachePath:     cachePath,
@@ -293,94 +351,4 @@ func (c *CompilerContext) Destroy() {
 	if c.CachePath != "" {
 		os.RemoveAll(c.CachePath)
 	}
-}
-
-// AddDepEdge adds an edge from importer to imported in the dependency graph
-func (c *CompilerContext) AddDepEdge(importer, imported string) {
-	if c.DepGraph == nil {
-		c.DepGraph = make(map[string][]string)
-	}
-	colors.CYAN.Printf("Adding dependency edge: %s -> %s\n", importer, imported)
-	c.DepGraph[importer] = append(c.DepGraph[importer], imported)
-
-	// Debug: print current dependency graph
-	colors.YELLOW.Println("Current dependency graph:")
-	for from, tos := range c.DepGraph {
-		for _, to := range tos {
-			colors.YELLOW.Printf("  %s -> %s\n", from, to)
-		}
-	}
-}
-
-// DetectCycle checks for a cycle starting from the given module key string, returns the cycle path if found
-func (c *CompilerContext) DetectCycle(start string) ([]string, bool) {
-	colors.BLUE.Printf("Starting cycle detection from: %s\n", start)
-
-	state := make(map[string]int) // 0 = unvisited, 1 = visiting, 2 = visited
-	var stack []string
-
-	var visit func(string) ([]string, bool)
-
-	visit = func(node string) ([]string, bool) {
-		switch state[node] {
-		case 1:
-			// Cycle found
-			colors.RED.Printf("CYCLE DETECTED! Node %s is already in the recursion stack\n", node)
-			for i, n := range stack {
-				if n == node {
-					cycle := append(stack[i:], node)
-					colors.RED.Printf("Cycle path: %v\n", cycle)
-					return cycle, true
-				}
-			}
-			return []string{node}, true
-
-		case 2:
-			// Already visited
-			colors.GREEN.Printf("Node %s already processed, skipping\n", node)
-			return nil, false
-		}
-
-		// Mark as visiting
-		state[node] = 1
-		stack = append(stack, node)
-		colors.BLUE.Printf("Visiting node: %s (stack: %v)\n", node, stack)
-
-		// Visit neighbors
-		for _, neighbor := range c.DepGraph[node] {
-			if cycle, found := visit(neighbor); found {
-				return cycle, true
-			}
-		}
-
-		// Done processing
-		stack = stack[:len(stack)-1]
-		state[node] = 2
-		colors.GREEN.Printf("Completed processing node: %s\n", node)
-		return nil, false
-	}
-
-	cycle, found := visit(start)
-	colors.BLUE.Printf("Cycle detection result: found=%v, cycle=%v\n", found, cycle)
-	return cycle, found
-}
-
-func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
-	relPath = filepath.ToSlash(relPath)
-	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-	rootName := filepath.Base(c.ProjectRoot)
-	return rootName + "/" + moduleName
-}
-
-func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
-	filename := filepath.Base(fullPath)
-	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }

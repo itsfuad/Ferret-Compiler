@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 )
 
