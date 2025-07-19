@@ -16,8 +16,8 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) 
 	case *ast.IdentifierExpr:
 		resolveIdentifier(r, e, cm)
 	case *ast.BinaryExpr:
-		go resolveExpr(r, *e.Left, cm)
-		go resolveExpr(r, *e.Right, cm)
+		resolveExpr(r, *e.Left, cm)
+		resolveExpr(r, *e.Right, cm)
 	case *ast.UnaryExpr:
 		resolveExpr(r, *e.Operand, cm)
 	case *ast.PrefixExpr:
