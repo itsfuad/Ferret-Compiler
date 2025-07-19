@@ -7,7 +7,6 @@ import (
 	"compiler/internal/types"
 )
 
-
 // DeriveSemanticType converts an AST DataType to a semantic Type
 func DeriveSemanticType(astType ast.DataType, module *Module) (Type, error) {
 
