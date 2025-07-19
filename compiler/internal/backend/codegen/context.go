@@ -1,7 +1,7 @@
 package codegen
 
 import (
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"fmt"
 )
 

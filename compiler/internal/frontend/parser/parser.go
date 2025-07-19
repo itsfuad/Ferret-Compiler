@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"compiler/colors"
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
@@ -15,14 +15,13 @@ import (
 )
 
 type Parser struct {
-	tokens                 []lexer.Token
-	tokenNo                int
-	fullPath               string
-	importPath             string
-	modulename             string            // module name derived from full path
-	modulenameToImportpath map[string]string // import alias -> full path
-	ctx                    *ctx.CompilerContext
-	debug                  bool // debug mode for additional logging
+	tokens     []lexer.Token
+	tokenNo    int
+	fullPath   string
+	importPath string
+	modulename string // module name derived from full path
+	ctx        *ctx.CompilerContext
+	debug      bool // debug mode for additional logging
 }
 
 func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
@@ -47,14 +46,13 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
-		tokens:                 tokens,
-		tokenNo:                0,
-		ctx:                    ctxx,
-		fullPath:               filePath,
-		importPath:             importPath,
-		modulename:             modulename,
-		modulenameToImportpath: make(map[string]string), // Initialize alias map
-		debug:                  debug,
+		tokens:     tokens,
+		tokenNo:    0,
+		ctx:        ctxx,
+		fullPath:   filePath,
+		importPath: importPath,
+		modulename: modulename,
+		debug:      debug,
 	}
 }
 
@@ -287,12 +285,11 @@ func (p *Parser) Parse() *ast.Program {
 	}
 
 	program := &ast.Program{
-		Nodes:                  nodes,
-		FullPath:               p.fullPath,
-		ImportPath:             p.importPath,
-		Modulename:             p.modulename,
-		ModulenameToImportpath: p.modulenameToImportpath,
-		Location:               *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
+		Nodes:      nodes,
+		FullPath:   p.fullPath,
+		ImportPath: p.importPath,
+		Modulename: p.modulename,
+		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 
 	// Add the module to the context

@@ -5,11 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"compiler/ctx"
 	"compiler/internal/config"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 	"compiler/internal/testutil"
 )
 
@@ -48,7 +47,7 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 
 	return &ctx.CompilerContext{
 		EntryPoint:    entryPoint,
-		Builtins:      semantic.AddPreludeSymbols(semantic.NewSymbolTable(nil)),
+		Builtins:      ctx.AddPreludeSymbols(ctx.NewSymbolTable(nil)),
 		Modules:       make(map[string]*ctx.Module),
 		Reports:       report.Reports{},
 		CachePath:     filepath.ToSlash(cachePath),

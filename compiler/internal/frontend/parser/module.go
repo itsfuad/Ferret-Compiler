@@ -87,8 +87,6 @@ func parseImport(p *Parser) ast.Node {
 		}
 	}
 
-	p.modulenameToImportpath[moduleName] = importpath
-
 	return stmt
 }
 

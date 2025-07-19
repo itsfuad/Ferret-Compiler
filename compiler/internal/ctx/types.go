@@ -1,10 +1,11 @@
-package semantic
+package ctx
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
+	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/types"
 )
@@ -183,61 +184,101 @@ func (f *FunctionType) Equals(other Type) bool {
 }
 
 // ASTToSemanticType converts an AST DataType to a semantic Type
-func ASTToSemanticType(astType ast.DataType) Type {
+func ASTToSemanticType(astType ast.DataType, module *Module) (Type, error) {
 	if astType == nil {
-		return nil
+		return nil, fmt.Errorf("nil AST type provided")
 	}
 
 	switch t := astType.(type) {
 	case *ast.IntType:
-		return &PrimitiveType{Name: t.TypeName}
+		return &PrimitiveType{Name: t.TypeName}, nil
 	case *ast.FloatType:
-		return &PrimitiveType{Name: t.TypeName}
+		return &PrimitiveType{Name: t.TypeName}, nil
 	case *ast.StringType:
-		return &PrimitiveType{Name: t.TypeName}
+		return &PrimitiveType{Name: t.TypeName}, nil
 	case *ast.BoolType:
-		return &PrimitiveType{Name: t.TypeName}
+		return &PrimitiveType{Name: t.TypeName}, nil
 	case *ast.ByteType:
-		return &PrimitiveType{Name: t.TypeName}
-	case *ast.UserDefinedType:
-		return &UserType{Name: t.TypeName}
+		return &PrimitiveType{Name: t.TypeName}, nil
 	case *ast.ArrayType:
-		elementType := ASTToSemanticType(t.ElementType)
+		elementType, err := ASTToSemanticType(t.ElementType, module)
+		if err != nil {
+			return nil, err
+		}
 		return &ArrayType{
 			ElementType: elementType,
 			Name:        t.TypeName,
-		}
+		}, nil
 	case *ast.StructType:
 		fields := make(map[string]Type)
 		for _, field := range t.Fields {
 			if field.FieldType != nil {
 				fieldName := field.FieldIdentifier.Name
-				fieldType := ASTToSemanticType(field.FieldType)
+				fieldType, err := ASTToSemanticType(field.FieldType, module)
+				if err != nil {
+					return nil, err
+				}
 				fields[fieldName] = fieldType
 			}
 		}
 		return &StructType{
 			Name:   t.TypeName,
 			Fields: fields,
-		}
+		}, nil
 	case *ast.FunctionType:
 		var params []Type
 		for _, param := range t.Parameters {
-			params = append(params, ASTToSemanticType(param))
+			paramType, err := ASTToSemanticType(param, module)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, paramType)
 		}
 		var returns []Type
 		for _, ret := range t.ReturnTypes {
-			returns = append(returns, ASTToSemanticType(ret))
+			returnType, err := ASTToSemanticType(ret, module)
+			if err != nil {
+				return nil, err
+			}
+			returns = append(returns, returnType)
 		}
 		return &FunctionType{
 			Parameters:  params,
 			ReturnTypes: returns,
 			Name:        t.TypeName,
+		}, nil
+
+	case *ast.TypeScopeResolution:
+		// Handle type scope resolution (e.g., module::TypeName)
+		moduleName := t.Module.Name
+		typeName := t.TypeNode.Type()
+		symbolTable, found := module.SymbolTable.Imports[moduleName]
+		if !found {
+			return nil, fmt.Errorf("module '%s' is not imported", moduleName)
 		}
-	default:
-		// For unknown AST types, create a user type
-		return &UserType{Name: astType.Type()}
+		// Look up the type in the imported module's symbol table
+		if symbol, ok := symbolTable.Lookup(string(typeName)); ok {
+			if symbol.Type != nil {
+				colors.AQUA.Printf("Found type '%s' in imported module '%s'\n", symbol.Name, moduleName)
+				return symbol.Type, nil
+			}
+			colors.RED.Printf("Warning: Type '%s' found in imported module '%s' but has no type information\n", symbol.Name, moduleName)
+			return &UserType{Name: symbol.Type.TypeName(), Definition: nil}, nil // No definition available
+		}
+		colors.RED.Printf("Error: Type '%s' not found in imported module '%s'\n", typeName, moduleName)
+		return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 	}
+	//user-defined types or aliases
+	if tt, ok := module.SymbolTable.Lookup(string(astType.Type())); ok {
+		if tt.Type != nil {
+			colors.AQUA.Printf("Found type '%s' in symbol table\n", tt.Name)
+			return tt.Type, nil
+		}
+		colors.RED.Printf("Warning: Type '%s' found in symbol table but has no type information\n", tt.Name)
+		return &UserType{Name: tt.Type.TypeName(), Definition: nil}, nil // No definition available
+	}
+	colors.RED.Printf("Error: Type '%s' not found in symbol table\n", astType.Type())
+	return nil, fmt.Errorf("type '%s' not found in symbol table", astType.Type())
 }
 
 // IsStringType checks if a type is string

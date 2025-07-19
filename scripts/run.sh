@@ -2,4 +2,4 @@
 
 clear
 cd ../compiler/cmd
-go run . "./../../app/cmd/main.fer" --debug
+go run . "./../../app/cmd/start.fer" -debug
