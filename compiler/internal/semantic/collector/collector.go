@@ -2,15 +2,13 @@ package collector
 
 import (
 	"compiler/colors"
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
-	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 )
 
 func CollectSymbols(c *analyzer.AnalyzerNode) {
-
 	currentModule, err := c.Ctx.GetModule(c.Program.ImportPath)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "Failed to get current module: "+err.Error(), report.COLLECTOR_PHASE)
@@ -62,7 +60,7 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *c
 	}
 
 	// declare the function symbol
-	symbol := semantic.NewSymbolWithLocation(fn.Identifier.Name, semantic.SymbolFunc, nil, fn.Loc())
+	symbol := ctx.NewSymbolWithLocation(fn.Identifier.Name, ctx.SymbolFunc, nil, fn.Loc())
 	err := cm.SymbolTable.Declare(fn.Identifier.Name, symbol)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)

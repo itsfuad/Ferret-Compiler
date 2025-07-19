@@ -3,6 +3,7 @@ package ast
 import (
 	"compiler/internal/source"
 	"compiler/internal/types"
+	"fmt"
 )
 
 type Node interface {
@@ -60,10 +61,7 @@ func (t *TypeScopeResolution) Loc() *source.Location {
 	return &t.Location
 }
 func (t *TypeScopeResolution) Type() types.TYPE_NAME {
-	if userType, ok := t.TypeNode.(*UserDefinedType); ok {
-		return userType.TypeName
-	}
-	return types.UNKNOWN_TYPE
+	return types.TYPE_NAME(fmt.Sprintf("%s::%s", t.Module.Name, t.TypeNode.Type()))
 }
 
 // VarScopeResolution represents scope resolution for variables (e.g., module::variableName)

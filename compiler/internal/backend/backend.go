@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"compiler/ctx"
 	"compiler/internal/backend/codegen"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 )
 

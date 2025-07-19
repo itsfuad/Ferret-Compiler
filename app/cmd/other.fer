@@ -1,3 +1,4 @@
 
+type String str;
 
 let sumOf4Int = 2 + 3 + 4 + 5; // sumOf4Int is inferred as i32

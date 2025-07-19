@@ -1,19 +1,18 @@
 package typecheck
 
 import (
-	"testing"
-
-	"compiler/internal/semantic"
+	"compiler/internal/ctx"
 	"compiler/internal/types"
+	"testing"
 )
 
 // TestNumericTypeHierarchy tests numeric type promotions
 func TestNumericTypeHierarchy(t *testing.T) {
-	int8Type := &semantic.PrimitiveType{Name: types.INT8}
-	int16Type := &semantic.PrimitiveType{Name: types.INT16}
-	int32Type := &semantic.PrimitiveType{Name: types.INT32}
-	float32Type := &semantic.PrimitiveType{Name: types.FLOAT32}
-	float64Type := &semantic.PrimitiveType{Name: types.FLOAT64}
+	int8Type := &ctx.PrimitiveType{Name: types.INT8}
+	int16Type := &ctx.PrimitiveType{Name: types.INT16}
+	int32Type := &ctx.PrimitiveType{Name: types.INT32}
+	float32Type := &ctx.PrimitiveType{Name: types.FLOAT32}
+	float64Type := &ctx.PrimitiveType{Name: types.FLOAT64}
 
 	// Test integer promotions
 	if !IsAssignableFrom(int16Type, int8Type) {
@@ -40,10 +39,10 @@ func TestNumericTypeHierarchy(t *testing.T) {
 
 // TestCommonNumericType tests finding common types for operations
 func TestCommonNumericType(t *testing.T) {
-	int32Type := &semantic.PrimitiveType{Name: types.INT32}
-	int64Type := &semantic.PrimitiveType{Name: types.INT64}
-	float32Type := &semantic.PrimitiveType{Name: types.FLOAT32}
-	float64Type := &semantic.PrimitiveType{Name: types.FLOAT64}
+	int32Type := &ctx.PrimitiveType{Name: types.INT32}
+	int64Type := &ctx.PrimitiveType{Name: types.INT64}
+	float32Type := &ctx.PrimitiveType{Name: types.FLOAT32}
+	float64Type := &ctx.PrimitiveType{Name: types.FLOAT64}
 
 	// Test same types
 	result := getCommonNumericType(int32Type, int32Type)
@@ -72,11 +71,11 @@ func TestCommonNumericType(t *testing.T) {
 
 // TestArrayCompatibility tests array type compatibility
 func TestArrayCompatibility(t *testing.T) {
-	int32Type := &semantic.PrimitiveType{Name: types.INT32}
-	int64Type := &semantic.PrimitiveType{Name: types.INT64}
+	int32Type := &ctx.PrimitiveType{Name: types.INT32}
+	int64Type := &ctx.PrimitiveType{Name: types.INT64}
 
-	int32ArrayType := &semantic.ArrayType{ElementType: int32Type, Name: types.ARRAY}
-	int64ArrayType := &semantic.ArrayType{ElementType: int64Type, Name: types.ARRAY}
+	int32ArrayType := &ctx.ArrayType{ElementType: int32Type, Name: types.ARRAY}
+	int64ArrayType := &ctx.ArrayType{ElementType: int64Type, Name: types.ARRAY}
 
 	// Arrays are compatible if element types are assignable
 	if !IsAssignableFrom(int64ArrayType, int32ArrayType) {

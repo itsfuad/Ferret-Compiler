@@ -2,7 +2,7 @@ package typecheck
 
 import (
 	"compiler/colors"
-	"compiler/ctx"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
@@ -26,7 +26,11 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 			}
 		} else if variable.ExplicitType != nil && typeToAdd != nil {
 			//both explicit type and initializer are provided. they must match
-			explicitType := getDatatype(variable.ExplicitType)
+			explicitType, err := ctx.ASTToSemanticType(variable.ExplicitType, cm)
+			if err != nil {
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.TYPECHECK_PHASE)
+				return
+			}
 			if IsAssignableFrom(explicitType, typeToAdd) {
 				colors.CYAN.Printf("Variable '%s' type matches explicit type: %s\n", variable.Identifier.Name, typeToAdd)
 			} else {
