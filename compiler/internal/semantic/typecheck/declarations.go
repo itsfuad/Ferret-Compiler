@@ -10,36 +10,50 @@ import (
 )
 
 func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt, cm *ctx.Module) {
-	for i, variable := range varDecl.Variables {
+	// If no initializers, skip inference
+	if len(varDecl.Initializers) == 0 {
+		return
+	}
 
-		//if initializer not provided, skip type inference
-		if len(varDecl.Initializers) == 0 {
+	for i, variable := range varDecl.Variables {
+		variableInModule, _ := cm.SymbolTable.Lookup(variable.Identifier.Name)
+		initializer := varDecl.Initializers[i]
+		inferredType := evaluateExpressionType(r, initializer, cm)
+
+		// Case: no explicit type → just infer
+		if variable.ExplicitType == nil {
+			variableInModule.Type = inferredType
+			if r.Debug {
+				colors.CYAN.Printf("Inferred type for variable '%s': %s\n", variable.Identifier.Name, inferredType)
+			}
+			continue
+		}
+
+		// Case: both explicit type and initializer → validate compatibility
+		explicitType, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
+		if err != nil {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				variable.ExplicitType.Loc(),
+				"Invalid explicit type for variable declaration: "+err.Error(),
+				report.TYPECHECK_PHASE,
+			)
 			return
 		}
 
-		variableInModule, _ := cm.SymbolTable.Lookup(variable.Identifier.Name)
-		initializer := varDecl.Initializers[i]
-		typeToAdd := evaluateExpressionType(r, initializer, cm)
-
-		if variable.ExplicitType == nil {
-			variableInModule.Type = typeToAdd
-			if r.Debug {
-				colors.CYAN.Printf("Inferred type for variable '%s': %s\n", variable.Identifier.Name, typeToAdd)
-			}
-		} else if variable.ExplicitType != nil && typeToAdd != nil {
-			//both explicit type and initializer are provided. they must match
-			explicitType, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
-			if err != nil {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.TYPECHECK_PHASE)
-				return
-			}
-			if !IsAssignableFrom(explicitType, typeToAdd) {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, initializer.Loc(), fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'", typeToAdd.String(), variable.Identifier.Name, explicitType.String()), report.TYPECHECK_PHASE)
-				return
-			}
+		if !IsAssignableFrom(explicitType, inferredType) {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				initializer.Loc(),
+				fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'",
+					inferredType.String(), variable.Identifier.Name, explicitType.String()),
+				report.TYPECHECK_PHASE,
+			)
+			return
 		}
 	}
 }
+
 
 func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
 	// Check that we have both left and right hand sides
