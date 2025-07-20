@@ -99,48 +99,39 @@ func parseParameters(p *Parser) []ast.Parameter {
 	return params
 }
 
-func parseReturnTypes(p *Parser) []ast.DataType {
+func parseReturnType(p *Parser) ast.DataType {
 	p.advance()
-	// Check for multiple return types in parentheses
-	if p.peek().Kind != lexer.OPEN_PAREN {
-		// Single return type
-		returnType, ok := parseType(p)
-		if !ok {
-			token := p.previous()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
-			return nil
-		}
-		return []ast.DataType{returnType}
-	}
 
-	p.advance() // consume '('
-	returnTypes := make([]ast.DataType, 0)
-
-	for !p.match(lexer.CLOSE_PAREN) {
-		returnType, ok := parseType(p)
-		if !ok {
-			token := p.previous()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
-			return nil
-		}
-		returnTypes = append(returnTypes, returnType)
-
-		if p.match(lexer.CLOSE_PAREN) {
-			break
-		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
-			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma")
-				break
+	// Check if user is trying to use multiple return types (parentheses)
+	if p.peek().Kind == lexer.OPEN_PAREN {
+		token := p.peek()
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Multiple return types are not supported", report.PARSING_PHASE).AddHint("Functions can only return a single type")
+		// Skip the entire parentheses expression to continue parsing
+		p.advance() // consume '('
+		parenCount := 1
+		for parenCount > 0 && !p.isAtEnd() {
+			if p.peek().Kind == lexer.OPEN_PAREN {
+				parenCount++
+			} else if p.peek().Kind == lexer.CLOSE_PAREN {
+				parenCount--
 			}
+			p.advance()
 		}
+		return nil
 	}
 
-	p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
-	return returnTypes
+	// Parse single return type
+	returnType, ok := parseType(p)
+	if !ok {
+		token := p.previous()
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
+		return nil
+	}
+
+	return returnType
 }
 
-func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
+func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, ast.DataType) {
 
 	if len(params) == 0 && parseNewParams {
 		params = parseParameters(p)
@@ -148,8 +139,8 @@ func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]
 
 	// Parse return type if present
 	if p.match(lexer.ARROW_TOKEN) {
-		returnTypes := parseReturnTypes(p)
-		return params, returnTypes
+		returnType := parseReturnType(p)
+		return params, returnType
 	}
 
 	return params, nil
@@ -157,7 +148,7 @@ func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]
 
 func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
 
-	params, returnTypes := parseSignature(p, parseNewParams, params...)
+	params, returnType := parseSignature(p, parseNewParams, params...)
 
 	block := parseBlock(p)
 
@@ -165,7 +156,7 @@ func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseN
 
 	return &ast.FunctionLiteral{
 		Params:     params,
-		ReturnType: returnTypes,
+		ReturnType: returnType,
 		Body:       block,
 		Location:   location,
 	}

@@ -128,9 +128,9 @@ func (a *ArrayType) Equals(other Type) bool {
 
 // FunctionType represents function types
 type FunctionType struct {
-	Parameters  []Type
-	ReturnTypes []Type
-	Name        types.TYPE_NAME
+	Parameters []Type
+	ReturnType Type
+	Name       types.TYPE_NAME
 }
 
 func (f *FunctionType) TypeName() types.TYPE_NAME {
@@ -138,45 +138,45 @@ func (f *FunctionType) TypeName() types.TYPE_NAME {
 }
 
 func (f *FunctionType) String() string {
-	var paramStrs []string
-	for _, param := range f.Parameters {
-		paramStrs = append(paramStrs, param.String())
+	var params strings.Builder
+	params.WriteString("(")
+	for i, param := range f.Parameters {
+		if i > 0 {
+			params.WriteString(", ")
+		}
+		params.WriteString(param.String())
+	}
+	params.WriteString(")")
+
+	if f.ReturnType != nil {
+		params.WriteString(" -> ")
+		params.WriteString(f.ReturnType.String())
 	}
 
-	var returnStrs []string
-	for _, ret := range f.ReturnTypes {
-		returnStrs = append(returnStrs, ret.String())
-	}
-
-	paramStr := strings.Join(paramStrs, ", ")
-	returnStr := strings.Join(returnStrs, ", ")
-
-	if len(f.ReturnTypes) == 0 {
-		return fmt.Sprintf("fn(%s)", paramStr)
-	}
-	return fmt.Sprintf("fn(%s) -> %s", paramStr, returnStr)
+	return "fn" + params.String()
 }
 
 func (f *FunctionType) Equals(other Type) bool {
 	if otherFunc, ok := other.(*FunctionType); ok {
-		if len(f.Parameters) != len(otherFunc.Parameters) ||
-			len(f.ReturnTypes) != len(otherFunc.ReturnTypes) {
+		if len(f.Parameters) != len(otherFunc.Parameters) {
 			return false
 		}
 
+		// Compare parameters
 		for i, param := range f.Parameters {
 			if !param.Equals(otherFunc.Parameters[i]) {
 				return false
 			}
 		}
 
-		for i, ret := range f.ReturnTypes {
-			if !ret.Equals(otherFunc.ReturnTypes[i]) {
-				return false
-			}
+		// Compare return types
+		if f.ReturnType == nil && otherFunc.ReturnType == nil {
+			return true
 		}
-
-		return true
+		if f.ReturnType == nil || otherFunc.ReturnType == nil {
+			return false
+		}
+		return f.ReturnType.Equals(otherFunc.ReturnType)
 	}
 	return false
 }

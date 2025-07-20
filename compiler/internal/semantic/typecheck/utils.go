@@ -125,8 +125,7 @@ func isFunctionCompatible(target, source ctx.Type) bool {
 	}
 
 	// Parameter and return type counts must match
-	if len(targetFunc.Parameters) != len(sourceFunc.Parameters) ||
-		len(targetFunc.ReturnTypes) != len(sourceFunc.ReturnTypes) {
+	if len(targetFunc.Parameters) != len(sourceFunc.Parameters) {
 		return false
 	}
 
@@ -137,13 +136,15 @@ func isFunctionCompatible(target, source ctx.Type) bool {
 		}
 	}
 
-	for i := range targetFunc.ReturnTypes {
-		if !IsAssignableFrom(targetFunc.ReturnTypes[i], sourceFunc.ReturnTypes[i]) {
-			return false
-		}
+	// Compare return types
+	if targetFunc.ReturnType == nil && sourceFunc.ReturnType == nil {
+		return true
+	}
+	if targetFunc.ReturnType == nil || sourceFunc.ReturnType == nil {
+		return false
 	}
 
-	return true
+	return IsAssignableFrom(targetFunc.ReturnType, sourceFunc.ReturnType)
 }
 
 // isStructCompatible checks structural compatibility of structs
