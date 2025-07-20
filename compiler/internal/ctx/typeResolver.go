@@ -69,18 +69,18 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *Module) (*Fu
 		}
 		params = append(params, paramType)
 	}
-	var returns []Type
-	for _, ret := range function.ReturnTypes {
-		returnType, err := DeriveSemanticType(ret, module)
+	var returnType Type
+	if function.ReturnType != nil {
+		retType, err := DeriveSemanticType(function.ReturnType, module)
 		if err != nil {
 			return nil, err
 		}
-		returns = append(returns, returnType)
+		returnType = retType
 	}
 	return &FunctionType{
-		Parameters:  params,
-		ReturnTypes: returns,
-		Name:        function.TypeName,
+		Parameters: params,
+		ReturnType: returnType,
+		Name:       function.TypeName,
 	}, nil
 }
 

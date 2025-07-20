@@ -186,19 +186,34 @@ func parseReturnStmt(p *Parser) ast.Statement {
 
 	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
 	end := start
-	// Check if there's a values to return
-	var values ast.ExpressionList
+
+	// Check if there's a value to return
+	var value ast.Expression
 	if !p.match(lexer.SEMICOLON_TOKEN) {
-		values = parseExpressionList(p, parseExpression(p))
-		if values == nil {
+		value = parseExpression(p)
+		if value == nil {
 			token := p.peek()
 			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword")
+		} else {
+			end = *value.Loc().End
+
+			// Check if user is trying to return multiple values
+			if p.match(lexer.COMMA_TOKEN) {
+				comma := p.peek()
+				p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "Multiple return values are not supported", report.PARSING_PHASE).AddHint("Functions can only return a single value")
+				// Skip remaining expressions to continue parsing
+				for p.match(lexer.COMMA_TOKEN) {
+					p.advance() // consume comma
+					if expr := parseExpression(p); expr != nil {
+						end = *expr.Loc().End
+					}
+				}
+			}
 		}
-		end = *values.Loc().End
 	}
 
 	return &ast.ReturnStmt{
-		Values:   &values,
+		Value:    &value,
 		Location: *source.NewLocation(&start, &end),
 	}
 }

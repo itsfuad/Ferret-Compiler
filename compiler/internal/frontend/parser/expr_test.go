@@ -53,7 +53,7 @@ func TestExpressionParsing(t *testing.T) {
 		{"arr[0][1] = 42;", true, "Nested array element assignment"},
 		{"return a + b;", true, "Return statement with expression"},
 		{"return;", true, "Return statement with no expression"},
-		{"return a, b;", true, "Return statement with multiple expressions"},
+		{"return a, b;", false, "Return statement with multiple expressions should fail"},
 		{"return;", true, "Return statement with no expression"},
 	}
 	for _, tt := range tests {
