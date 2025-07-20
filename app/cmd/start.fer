@@ -7,22 +7,24 @@ let myVar : Integer = 42; // myVar is of type Integer, which is an alias for i32
 
 let expr : Integer = (10 + 22) * 3;
 
-let name : other::String = other::name; // name is of type String, which is an alias for str
+let myname : other::String = other::name; // name is of type String, which is an alias for str
 
-// let a: i32 = 10;
-// let b = 23.232;
+let a: i32 = 10;
+let b = 23.232;
 
-// let sum: f64 = a + b + other::sumOf4Int; // sum is inferred as f64
+let sum: f64 = a + b + other::sumOf4Int; // sum is inferred as f64
 
 // //other::sumOf4Int;
 
-// let p = other::sumOf4Int; // p is inferred as i32
+let p = other::sumOf4Int; // p is inferred as i32
 
-// let x, y, z : i32; // all three variables are of type i32
+let x, y, z : i32; // all three variables are of type i32
 
-// let name, age, height : str, i32, f64 = "Alice", 25, 5.5; // multiple variable declaration with types
+let name, age, height : str, i32, f64 = "Alice", 25, 5.5; // multiple variable declaration with types
 
-
+x = 10; // x is assigned an integer value
+y = 20; // y is assigned another integer value
+z = x + y; // z is assigned the sum of x and y
 // fn doSomething() {
 //     // This function does something
 // }
