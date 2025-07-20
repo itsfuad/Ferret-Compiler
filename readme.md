@@ -101,49 +101,11 @@ p, q = 10, "hello";             // Multiple variables
 p, q, r = 10, 20.0, "hello";    // Multiple variables with different types
 ```
 
-### Arrays
+### Type Declarations
 ```rs
-// Array declarations
-let arr1: []i32;                         // Integer array
-let arr2: []str = ["hello", "world"];    // String array with initialization
-let arr2d: [][]i32 = [[1, 2], [3, 4]];  // 2D array
-
-// Array operations
-arr1[0] = 10;      // Assignment
-a = arr1[0];       // Access
-```
-
-### Structs
-```rs
-// Named struct type declaration
-type Point struct {
-    x: i32,
-    y: i32
-};
-
-// Creating struct instances
-let point: Point = @Point{x: 10, y: 20};
-
-// Anonymous struct type
-let user = struct {
-    name: str,
-    age: i32
-};
-
-// Anonymous struct with initialization
-let person: struct {
-    name: str,
-    age: i32
-} = @struct{name: "John", age: 20};
-
-// Nested structs
-type User struct {
-    name: str,
-    address: struct {
-        street: str,
-        city: str
-    }
-};
+// Type aliases
+type Integer i32;
+type Text str;
 ```
 
 ### Operators
@@ -163,91 +125,48 @@ a /= b;            // Divide and assign
 a %= b;            // Modulo and assign
 ```
 
-#### Project Structure
-```
-Ferret-Compiler/
-├── compiler/              # Go-based compiler implementation
-│   ├── cmd/              # CLI entry point and argument parsing
-│   ├── colors/           # Terminal color output utilities
-│   ├── ctx/              # Compiler context management
-│   ├── internal/         # Internal compiler packages
-│   │   ├── config/       # Project configuration (.ferret.json)
-│   │   ├── frontend/     # Frontend compilation pipeline
-│   │   │   ├── ast/      # Abstract syntax tree definitions
-│   │   │   ├── lexer/    # Tokenization and lexical analysis
-│   │   │   └── parser/   # Syntax parsing and AST generation
-│   │   ├── semantic/     # Semantic analysis pipeline
-│   │   │   ├── analyzer/ # Semantic analysis orchestration
-│   │   │   ├── resolver/ # Symbol resolution and scope analysis
-│   │   │   └── typecheck/# Type checking and validation
-│   │   ├── source/       # Source code location tracking
-│   │   ├── report/       # Error reporting and diagnostics
-│   │   ├── types/        # Type system definitions
-│   │   ├── testutil/     # Testing utilities
-│   │   └── utils/        # General utility functions
-│   └── go.mod           # Go module definition
-│   
-├── app/                  # Sample Ferret programs and test files
-│   ├── cmd/             # Main application files
-│   ├── maths/           # Math utility modules
-│   ├── remote/          # Remote module examples
-│   ├── data.fer         # Data module example
-│   ├── test_*.fer       # Test files for language features
-│   └── .ferret.json     # Project configuration file
-├── bin/                  # Compiled executables
-├── scripts/              # Build and development scripts
-│   ├── build.*          # Compiler build scripts
-│   ├── test.*           # Test execution scripts
-│   ├── fmt.*            # Code formatting scripts
-│   ├── run.*            # Quick development test scripts
-│   ├── ci-check.*       # Local CI validation scripts
-│   ├── pack.*           # Extension packaging scripts
-│   └── README.md        # Script documentation
-└── .github/              # GitHub-specific files
-    ├── workflows/       # CI/CD pipeline definitions
-    ├── ISSUE_TEMPLATE/  # Issue templates
-    └── FUNDING.yml      # Funding information
-```
+## Compiler Architecture
 
-## Type Declarations
-```rs
-// Type aliases
-type Integer i32;
-type Text str;
+The Ferret compiler follows a multi-stage compilation pipeline designed for maintainability and extensibility:
 
-// Struct types
-type Point struct {
-    x: i32,
-    y: i32
-};
+### Frontend
+- **Lexer**: Converts source code into tokens for parsing
+- **Parser**: Transforms tokens into an Abstract Syntax Tree (AST)
+- **AST**: Represents the program structure in a tree format
 
-// Array types
-type IntArray []i32;
-type Matrix [][]f32;
-```
+### Semantic Analysis
+- **Collector**: Gathers symbols and builds symbol tables for scope resolution
+- **Resolver**: Resolves symbol references and validates module imports
+- **Type Checker**: Performs type inference and validates type compatibility
+
+### Backend
+- **Code Generator**: Translates the validated AST into target assembly code (currently x86-64)
 
 ## Roadmap
 - [x] Basic syntax
 - [x] Tokenizer
 - [x] Parser
 - [x] Variable declaration and assignment
+- [x] Simple assignments
+- [x] Multiple assignments
 - [x] Expressions
 - [x] Unary operators
 - [x] Increment/Decrement operators
 - [x] Assignment operators
 - [x] Grouping
-- [x] Arrays
-    - [x] Array indexing
-    - [x] Array assignment
-- [x] Structs
-    - [x] Anonymous structs
-    - [x] Struct literals
-    - [x] Struct field access
-    - [x] Struct field assignment
-- [x] Methods
+- [x] Type aliases
+- [ ] Arrays
+    - [ ] Array indexing
+    - [ ] Array assignment
+- [ ] Structs
+    - [ ] Anonymous structs
+    - [ ] Struct literals
+    - [ ] Struct field access
+    - [ ] Struct field assignment
+- [ ] Methods
 - [ ] Interfaces
-- [x] Functions
-- [x] Conditionals
+- [ ] Functions
+- [ ] Conditionals
 - [ ] Loops (for, while)
 - [ ] Switch statements
 - [ ] Type casting
@@ -260,10 +179,10 @@ type Matrix [][]f32;
 - [ ] Advanced code generation
 - [x] Rich error reporting
 - [ ] Branch analysis
-- [x] Collector (Implementing from scratch)
-- [x] Resolver (Re-implementing from scratch)
-- [x] Type checking (Re-implementing from scratch)
-- [x] Code generation (x86-64 assembly) (Re-implimenting from scratch)
+- [x] Collector (Symbol collection and scope building)
+- [x] Resolver (Symbol resolution and reference binding)
+- [x] Type checking (Type inference and validation)
+- [x] Code generation (x86-64 assembly - basic implementation)
 
 ## Future Plans
 [ ] Clean dependency with 'ferret clean'

@@ -117,3 +117,23 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*ctx.UserType).Definition, decl.Alias.Loc().String())
 	}
 }
+
+func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
+	// Resolve left-hand side expressions (assignees)
+	if assign.Left != nil {
+		for _, lhs := range *assign.Left {
+			resolveExpr(r, lhs, cm)
+		}
+	}
+
+	// Resolve right-hand side expressions (values)
+	if assign.Right != nil {
+		for _, rhs := range *assign.Right {
+			resolveExpr(r, rhs, cm)
+		}
+	}
+
+	if r.Debug {
+		colors.TEAL.Printf("Resolved assignment statement at %s\n", assign.Loc().String())
+	}
+}
