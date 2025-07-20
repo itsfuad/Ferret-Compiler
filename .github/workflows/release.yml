@@ -6,7 +6,7 @@ on:
     types:
       - completed
     branches:
-      - main
+      - release
   # Also allow manual triggering for releases
   workflow_dispatch:
 
