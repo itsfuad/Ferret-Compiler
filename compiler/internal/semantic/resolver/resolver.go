@@ -11,14 +11,35 @@ import (
 
 // ResolveProgram is the main entry point for the resolver phase
 func ResolveProgram(r *analyzer.AnalyzerNode) {
-	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
+	importPath := r.Program.ImportPath
+
+	// Check if this module can be processed for resolution phase
+	if !r.Ctx.CanProcessPhase(importPath, ctx.PhaseResolved) {
+		currentPhase := r.Ctx.GetModulePhase(importPath)
+		if currentPhase >= ctx.PhaseResolved {
+			// Already processed or in a later phase, skip
+			if r.Debug {
+				colors.GREEN.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
+			}
+			return
+		}
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Module not ready for resolution phase", report.RESOLVER_PHASE)
+		return
+	}
+
+	currentModule, err := r.Ctx.GetModule(importPath)
 	if err != nil {
 		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
+
 	for _, node := range r.Program.Nodes {
 		resolveNode(r, node, currentModule)
 	}
+
+	// Mark module as resolved
+	r.Ctx.SetModulePhase(importPath, ctx.PhaseResolved)
+
 	if r.Debug {
 		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)
 	}
