@@ -33,6 +33,8 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 		checkVariableDeclaration(r, n, cm)
 	case *ast.TypeDeclStmt:
 		// No type checking for type declarations, they are resolved in the resolver phase
+	case *ast.AssignmentStmt:
+		checkAssignmentStmt(r, n, cm)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for type checking", n), report.TYPECHECK_PHASE)
 	}

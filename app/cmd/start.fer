@@ -25,6 +25,9 @@ let name, age, height : str, i32, f64 = "Alice", 25, 5.5; // multiple variable d
 x = 10; // x is assigned an integer value
 y = 20; // y is assigned another integer value
 z = x + y; // z is assigned the sum of x and y
+
+x, y, z = 1, 2, 3; // multiple assignment in a single line
+
 // fn doSomething() {
 //     // This function does something
 // }
