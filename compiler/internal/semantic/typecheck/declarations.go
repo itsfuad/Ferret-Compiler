@@ -54,7 +54,6 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 	}
 }
 
-
 func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
 	// Check that we have both left and right hand sides
 	if assign.Left == nil || assign.Right == nil {
