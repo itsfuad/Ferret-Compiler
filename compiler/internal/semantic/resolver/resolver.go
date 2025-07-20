@@ -36,6 +36,8 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 		resolveVariableDeclaration(r, n, cm)
 	case *ast.TypeDeclStmt:
 		resolveTypeDeclaration(r, n, cm)
+	case *ast.AssignmentStmt:
+		resolveAssignmentStmt(r, n, cm)
 	case *ast.ExpressionStmt:
 		colors.CYAN.Printf("Resolving expression statement: %v\n", n.Expressions)
 		panic(":)")
