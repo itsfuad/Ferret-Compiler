@@ -15,9 +15,38 @@ import (
 
 var contextCreated = false
 
+// ModulePhase represents the current processing phase of a module
+type ModulePhase int
+
+const (
+	PhaseNotStarted  ModulePhase = iota
+	PhaseParsed                  // Module has been parsed into AST
+	PhaseCollected               // Symbols have been collected
+	PhaseResolved                // Symbols have been resolved
+	PhaseTypeChecked             // Type checking completed
+)
+
+func (p ModulePhase) String() string {
+	switch p {
+	case PhaseNotStarted:
+		return "Not Started"
+	case PhaseParsed:
+		return "Parsed"
+	case PhaseCollected:
+		return "Collected"
+	case PhaseResolved:
+		return "Resolved"
+	case PhaseTypeChecked:
+		return "Type Checked"
+	default:
+		return "Unknown"
+	}
+}
+
 type Module struct {
 	AST         *ast.Program
 	SymbolTable *SymbolTable
+	Phase       ModulePhase // Current processing phase
 }
 
 type CompilerContext struct {
@@ -189,6 +218,46 @@ func (c *CompilerContext) HasModule(importPath string) bool {
 	return exists
 }
 
+// IsModuleParsed checks if a module has been parsed (at least PhaseParsed)
+func (c *CompilerContext) IsModuleParsed(importPath string) bool {
+	if c.Modules == nil {
+		return false
+	}
+	module, exists := c.Modules[importPath]
+	return exists && module.Phase >= PhaseParsed
+}
+
+// GetModulePhase returns the current processing phase of a module
+func (c *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+	if c.Modules == nil {
+		return PhaseNotStarted
+	}
+	module, exists := c.Modules[importPath]
+	if !exists {
+		return PhaseNotStarted
+	}
+	return module.Phase
+}
+
+// SetModulePhase updates the processing phase of a module
+func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+	if c.Modules == nil {
+		return
+	}
+	module, exists := c.Modules[importPath]
+	if !exists {
+		return
+	}
+	module.Phase = phase
+}
+
+// CanProcessPhase checks if a module is ready for a specific phase
+func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+	currentPhase := c.GetModulePhase(importPath)
+	// Can only process the next phase in sequence
+	return currentPhase == requiredPhase-1
+}
+
 func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	if c.Modules == nil {
 		c.Modules = make(map[string]*Module)
@@ -199,7 +268,11 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	if module == nil {
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
-	c.Modules[importPath] = &Module{AST: module, SymbolTable: NewSymbolTable(c.Builtins)}
+	c.Modules[importPath] = &Module{
+		AST:         module,
+		SymbolTable: NewSymbolTable(c.Builtins),
+		Phase:       PhaseParsed, // Module is parsed when added
+	}
 }
 
 // isModuleParsing checks if a module is currently being parsed

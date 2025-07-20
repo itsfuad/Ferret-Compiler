@@ -10,14 +10,35 @@ import (
 )
 
 func CheckProgram(r *analyzer.AnalyzerNode) {
-	currentModule, err := r.Ctx.GetModule(r.Program.ImportPath)
-	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.RESOLVER_PHASE)
+	importPath := r.Program.ImportPath
+
+	// Check if this module can be processed for type checking phase
+	if !r.Ctx.CanProcessPhase(importPath, ctx.PhaseTypeChecked) {
+		currentPhase := r.Ctx.GetModulePhase(importPath)
+		if currentPhase >= ctx.PhaseTypeChecked {
+			// Already processed, skip
+			if r.Debug {
+				colors.GREEN.Printf("Skipping type checking for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
+			}
+			return
+		}
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Module not ready for type checking phase", report.TYPECHECK_PHASE)
 		return
 	}
+
+	currentModule, err := r.Ctx.GetModule(importPath)
+	if err != nil {
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.TYPECHECK_PHASE)
+		return
+	}
+
 	for _, node := range r.Program.Nodes {
 		checkNode(r, node, currentModule)
 	}
+
+	// Mark module as type checked
+	r.Ctx.SetModulePhase(importPath, ctx.PhaseTypeChecked)
+
 	if r.Debug {
 		colors.GREEN.Printf("Type checked '%s'\n", r.Program.FullPath)
 	}

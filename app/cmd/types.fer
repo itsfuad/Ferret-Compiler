@@ -1,6 +1,7 @@
 //import "app/cmd/start";
 
 type String str;
+type Int i32;
 
 const name = "Fuad";
 
