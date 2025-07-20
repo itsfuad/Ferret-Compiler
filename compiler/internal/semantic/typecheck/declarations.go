@@ -11,6 +11,11 @@ import (
 
 func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt, cm *ctx.Module) {
 	for i, variable := range varDecl.Variables {
+		
+		//if initializer not provided, skip type inference
+		if len(varDecl.Initializers) == 0 {
+			return
+		}
 
 		variableInModule, _ := cm.SymbolTable.Lookup(variable.Identifier.Name)
 		initializer := varDecl.Initializers[i]
