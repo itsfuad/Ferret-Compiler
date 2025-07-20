@@ -21,7 +21,6 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	var paramTypes []ctx.Type
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
-			resolveNode(r, param.Type, cm)
 			paramType, err := ctx.DeriveSemanticType(param.Type, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
@@ -31,17 +30,14 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 		}
 	}
 
-	var returnTypes []ctx.Type
+	var returnType ctx.Type
 	if fn.Function.ReturnType != nil {
-		for _, ret := range fn.Function.ReturnType {
-			resolveNode(r, ret, cm)
-			retType, err := ctx.DeriveSemanticType(ret, cm)
-			if err != nil {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, ret.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
-				return
-			}
-			returnTypes = append(returnTypes, retType)
+		retType, err := ctx.DeriveSemanticType(fn.Function.ReturnType, cm)
+		if err != nil {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Function.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
+			return
 		}
+		returnType = retType
 	}
 
 	// Resolve function body
@@ -51,8 +47,8 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 
 	// Create function type and symbol
 	functionType := ctx.FunctionType{
-		Parameters:  paramTypes,
-		ReturnTypes: returnTypes,
+		Parameters: paramTypes,
+		ReturnType: returnType,
 	}
 
 	symbol.Type = &functionType

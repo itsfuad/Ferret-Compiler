@@ -27,3 +27,15 @@ y = 20; // y is assigned another integer value
 z = x + y; // z is assigned the sum of x and y
 
 x, y, z = 1, 2, 3; // multiple assignment in a single line
+
+fn add(a: i32, b: i32) -> i32 {
+    return a + b; // returns the sum of a and b
+}
+
+fn multiply(a: i32, b: i32) -> i32 {
+    return a * b; // returns the product of a and b
+}
+
+let result = 0;
+
+sum, result = add(5, 10), multiply(2, 3); // calling functions and assigning results

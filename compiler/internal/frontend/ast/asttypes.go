@@ -140,7 +140,7 @@ func (s *StructType) Loc() *source.Location { return &s.Location }
 type InterfaceMethod struct {
 	Name       *IdentifierExpr
 	Params     []Parameter
-	ReturnType []DataType
+	ReturnType DataType
 	source.Location
 }
 
@@ -156,9 +156,9 @@ func (i *InterfaceType) Type() types.TYPE_NAME { return i.TypeName }
 func (i *InterfaceType) Loc() *source.Location { return &i.Location }
 
 type FunctionType struct {
-	Parameters  []DataType
-	ReturnTypes []DataType
-	TypeName    types.TYPE_NAME
+	Parameters []DataType
+	ReturnType DataType
+	TypeName   types.TYPE_NAME
 	source.Location
 }
 

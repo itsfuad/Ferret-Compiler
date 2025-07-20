@@ -41,6 +41,8 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 		resultType = checkIndexableType(r, e, cm)
 	case *ast.VarScopeResolution:
 		resultType = checkImportedSymbolType(r, e, cm)
+	case *ast.FunctionCallExpr:
+		resultType = checkFunctionCallType(r, e, cm)
 
 	default:
 		// Unknown expression type
@@ -54,4 +56,59 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 	}
 
 	return resultType
+}
+
+func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *ctx.Module) ctx.Type {
+	// Get the type of the function being called
+	functionType := evaluateExpressionType(r, *call.Caller, cm)
+	if functionType == nil {
+		return nil
+	}
+
+	// Verify it's a function type
+	funcType, ok := functionType.(*ctx.FunctionType)
+	if !ok {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			call.Loc(),
+			"cannot call non-function type: "+functionType.String(),
+			report.TYPECHECK_PHASE,
+		)
+		return nil
+	}
+
+	// Check argument count
+	expectedCount := len(funcType.Parameters)
+	actualCount := len(call.Arguments)
+
+	if expectedCount != actualCount {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			call.Loc(),
+			fmt.Sprintf("function expects %d arguments, but %d were provided", expectedCount, actualCount),
+			report.TYPECHECK_PHASE,
+		)
+		return funcType.ReturnType // Return the expected return type even with wrong arg count
+	}
+
+	// Check argument types
+	for i, arg := range call.Arguments {
+		argType := evaluateExpressionType(r, arg, cm)
+		if argType == nil {
+			continue // Skip if we can't determine argument type
+		}
+
+		expectedType := funcType.Parameters[i]
+		if !IsAssignableFrom(expectedType, argType) {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				call.Loc(),
+				fmt.Sprintf("argument %d: cannot use %s as %s", i+1, argType.String(), expectedType.String()),
+				report.TYPECHECK_PHASE,
+			)
+		}
+	}
+
+	// Return the function's return type (single return type now)
+	return funcType.ReturnType
 }
