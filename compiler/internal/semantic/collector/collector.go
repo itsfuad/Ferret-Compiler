@@ -9,7 +9,23 @@ import (
 )
 
 func CollectSymbols(c *analyzer.AnalyzerNode) {
-	currentModule, err := c.Ctx.GetModule(c.Program.ImportPath)
+	importPath := c.Program.ImportPath
+
+	// Check if this module can be processed for collection phase
+	if !c.Ctx.CanProcessPhase(importPath, ctx.PhaseCollected) {
+		currentPhase := c.Ctx.GetModulePhase(importPath)
+		if currentPhase >= ctx.PhaseCollected {
+			// Already processed or in a later phase, skip
+			if c.Debug {
+				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase.String())
+			}
+			return
+		}
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "Module not ready for symbol collection phase", report.COLLECTOR_PHASE)
+		return
+	}
+
+	currentModule, err := c.Ctx.GetModule(importPath)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "Failed to get current module: "+err.Error(), report.COLLECTOR_PHASE)
 		return
@@ -18,6 +34,9 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	for _, node := range c.Program.Nodes {
 		collectSymbols(c, node, currentModule)
 	}
+
+	// Mark module as collected
+	c.Ctx.SetModulePhase(importPath, ctx.PhaseCollected)
 
 	if c.Debug {
 		colors.BLUE.Printf("Collected symbols for '%s'\n", c.Program.FullPath)

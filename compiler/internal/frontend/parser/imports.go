@@ -75,8 +75,8 @@ func parseImport(p *Parser) ast.Node {
 		return stmt
 	}
 
-	// Check if the module is already cached
-	if !p.ctx.HasModule(importpath) {
+	// Check if the module is already parsed
+	if !p.ctx.IsModuleParsed(importpath) {
 		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
 		if module == nil {
 			p.ctx.Reports.AddSemanticError(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE)
