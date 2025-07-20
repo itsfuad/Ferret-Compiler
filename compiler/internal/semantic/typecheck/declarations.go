@@ -48,84 +48,44 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 		return
 	}
 
-	leftExprs := *assign.Left
-	rightExprs := *assign.Right
-
 	// Check that the number of assignees matches the number of values
-	if len(leftExprs) != len(rightExprs) {
+	if len(*assign.Left) != len(*assign.Right) {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(),
-			fmt.Sprintf("assignment mismatch: %d variables but %d values", len(leftExprs), len(rightExprs)),
+			fmt.Sprintf("assignment mismatch: %d variables but %d values", len(*assign.Left), len(*assign.Right)),
 			report.TYPECHECK_PHASE)
 		return
 	}
 
-	// Type check each assignment pair
-	for i := 0; i < len(leftExprs); i++ {
-		lhs := leftExprs[i]
-		rhs := rightExprs[i]
+	leftTypes := checkExprListType(r, assign.Left, cm)
+	rightTypes := checkExprListType(r, assign.Right, cm)
 
-		// Get the type of the right-hand side expression
-		rhsType := evaluateExpressionType(r, rhs, cm)
-		if rhsType == nil {
-			continue // Error already reported in evaluateExpressionType
+	for i, lhs := range *assign.Left {
+		rhsType := rightTypes[i]
+		lhsType := leftTypes[i]
+		if lhsType == nil || rhsType == nil {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), "Failed to determine type for assignment", report.TYPECHECK_PHASE)
+			continue
 		}
-
-		// For left-hand side, we need to check if it's a valid assignee
-		switch lhsExpr := lhs.(type) {
-		case *ast.IdentifierExpr:
-			// Check if the identifier exists and get its type
-			symbol, found := cm.SymbolTable.Lookup(lhsExpr.Name)
-			if !found {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhsExpr.Loc(),
-					fmt.Sprintf("undefined variable: %s", lhsExpr.Name),
-					report.TYPECHECK_PHASE)
-				continue
-			}
-
-			// Check if the variable type is compatible with the assigned value
-			if symbol.Type != nil && !IsAssignableFrom(symbol.Type, rhsType) {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(),
-					fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'",
-						rhsType.String(), lhsExpr.Name, symbol.Type.String()),
-					report.TYPECHECK_PHASE)
-				continue
-			}
-
-			if r.Debug {
-				colors.CYAN.Printf("Assignment type check: variable '%s' (%s) = %s\n",
-					lhsExpr.Name, symbol.Type, rhsType)
-			}
-
-		case *ast.IndexableExpr:
-			// Handle array/slice element assignment
-			lhsType := evaluateExpressionType(r, lhs, cm)
-			if lhsType != nil && !IsAssignableFrom(lhsType, rhsType) {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(),
-					fmt.Sprintf("cannot assign value of type '%s' to indexable element of type '%s'",
-						rhsType.String(), lhsType.String()),
-					report.TYPECHECK_PHASE)
-				continue
-			}
-
-		case *ast.FieldAccessExpr:
-			// Handle struct field assignment
-			lhsType := evaluateExpressionType(r, lhs, cm)
-			if lhsType != nil && !IsAssignableFrom(lhsType, rhsType) {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(),
-					fmt.Sprintf("cannot assign value of type '%s' to field of type '%s'",
-						rhsType.String(), lhsType.String()),
-					report.TYPECHECK_PHASE)
-				continue
-			}
-
-		default:
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(),
-				fmt.Sprintf("invalid left-hand side in assignment: %T", lhsExpr),
-				report.TYPECHECK_PHASE)
+		if !IsAssignableFrom(lhsType, rhsType) {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
+			continue
 		}
 	}
 
 	if r.Debug {
 		colors.TEAL.Printf("Type checked assignment statement at %s\n", assign.Loc().String())
 	}
+}
+
+func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module) []ctx.Type {
+	var types []ctx.Type
+	for _, expr := range *exprs {
+		exprType := evaluateExpressionType(r, expr, cm)
+		if exprType == nil {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, expr.Loc(), "Failed to determine expression type", report.TYPECHECK_PHASE)
+			continue
+		}
+		types = append(types, exprType)
+	}
+	return types
 }
