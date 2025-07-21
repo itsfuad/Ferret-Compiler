@@ -1,15 +1,15 @@
 package semantic
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/ctx"
-	atype "compiler/internal/types"
-	"compiler/internal/semantic/types"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/semantic/stype"
+	atype "ferret/compiler/internal/types"
 	"fmt"
 )
 
-// DeriveSemanticType converts an AST DataType to a semantic types.Type
-func DeriveSemanticType(astType ast.DataType, module *ctx.Module) (types.Type, error) {
+// DeriveSemanticType converts an AST DataType to a semantic stype.Type
+func DeriveSemanticType(astType ast.DataType, module *ctx.Module) (stype.Type, error) {
 
 	if astType == nil {
 		return nil, fmt.Errorf("nil AST type provided")
@@ -33,13 +33,13 @@ func DeriveSemanticType(astType ast.DataType, module *ctx.Module) (types.Type, e
 	}
 }
 
-func derivePrimitiveTypeFromAst(astType ast.DataType) (*types.PrimitiveType, error) {
-	return &types.PrimitiveType{
+func derivePrimitiveTypeFromAst(astType ast.DataType) (*stype.PrimitiveType, error) {
+	return &stype.PrimitiveType{
 		Name: astType.Type(),
 	}, nil
 }
 
-func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (types.Type, error) {
+func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (stype.Type, error) {
 	symbol, found := module.SymbolTable.Lookup(string(userType.TypeName))
 	if !found {
 		return nil, fmt.Errorf("user-defined type '%s' not found", userType.TypeName)
@@ -50,7 +50,7 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (
 	return symbol.Type, nil
 }
 
-func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *ctx.Module) (types.Type, error) {
+func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *ctx.Module) (stype.Type, error) {
 	// Handle type scope resolution (e.g., module::TypeName)
 	moduleName := res.Module.Name
 	typeName := res.TypeNode.Type()
@@ -63,13 +63,13 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *ctx.Modul
 		if symbol.Type != nil {
 			return symbol.Type, nil
 		}
-		return &types.UserType{Name: symbol.Type.TypeName(), Definition: nil}, nil // No definition available
+		return &stype.UserType{Name: symbol.Type.TypeName(), Definition: nil}, nil // No definition available
 	}
 	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 }
 
-func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) (*types.FunctionType, error) {
-	var params []types.Type
+func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) (*stype.FunctionType, error) {
+	var params []stype.Type
 	for _, param := range function.Parameters {
 		paramType, err := DeriveSemanticType(param, module)
 		if err != nil {
@@ -77,7 +77,7 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) 
 		}
 		params = append(params, paramType)
 	}
-	var returnType types.Type
+	var returnType stype.Type
 	if function.ReturnType != nil {
 		retType, err := DeriveSemanticType(function.ReturnType, module)
 		if err != nil {
@@ -85,15 +85,15 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) 
 		}
 		returnType = retType
 	}
-	return &types.FunctionType{
+	return &stype.FunctionType{
 		Parameters: params,
 		ReturnType: returnType,
 		Name:       function.TypeName,
 	}, nil
 }
 
-func deriveSemanticStructFromAst(structType *ast.StructType, module *ctx.Module) (*types.StructType, error) {
-	fields := make(map[string]types.Type)
+func deriveSemanticStructFromAst(structType *ast.StructType, module *ctx.Module) (*stype.StructType, error) {
+	fields := make(map[string]stype.Type)
 	for _, field := range structType.Fields {
 		if field.FieldType != nil {
 			fieldName := field.FieldIdentifier.Name
@@ -104,74 +104,51 @@ func deriveSemanticStructFromAst(structType *ast.StructType, module *ctx.Module)
 			fields[fieldName] = fieldType
 		}
 	}
-	return &types.StructType{
+	return &stype.StructType{
 		Name:   structType.TypeName,
 		Fields: fields,
 	}, nil
 }
 
-func deriveSemanticArrayType(array *ast.ArrayType, module *ctx.Module) (types.Type, error) {
+func deriveSemanticArrayType(array *ast.ArrayType, module *ctx.Module) (stype.Type, error) {
 	elementType, err := DeriveSemanticType(array.ElementType, module)
 	if err != nil {
 		return nil, err
 	}
-	return &types.ArrayType{
+	return &stype.ArrayType{
 		ElementType: elementType,
 		Name:        array.TypeName,
 	}, nil
 }
 
 // IsStringType checks if a type is string
-func IsStringType(t types.Type) bool {
-	if prim, ok := t.(*types.PrimitiveType); ok {
+func IsStringType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
 		return prim.Name == atype.STRING
 	}
 	return false
 }
 
 // IsBoolType checks if a type is boolean
-func IsBoolType(t types.Type) bool {
-	if prim, ok := t.(*types.PrimitiveType); ok {
+func IsBoolType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
 		return prim.Name == atype.BOOL
 	}
 	return false
 }
 
 // IsNumericType checks if a type is numeric
-func IsNumericType(t types.Type) bool {
-	if prim, ok := t.(*types.PrimitiveType); ok {
-		return IsNumericTypeName(prim.Name)
+func IsNumericType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return atype.IsNumericTypeName(prim.Name)
 	}
 	return false
 }
 
 // IsIntegerType checks if a type is an integer type
-func IsIntegerType(t types.Type) bool {
-	if prim, ok := t.(*types.PrimitiveType); ok {
-		return IsIntegerTypeName(prim.Name)
+func IsIntegerType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return atype.IsIntegerTypeName(prim.Name)
 	}
 	return false
-}
-
-// IsNumericTypeName checks if a type name is numeric
-func IsNumericTypeName(typeName atype.TYPE_NAME) bool {
-	switch typeName {
-	case atype.INT8, atype.INT16, atype.INT32, atype.INT64,
-		atype.UINT8, atype.UINT16, atype.UINT32, atype.UINT64,
-		atype.FLOAT32, atype.FLOAT64, atype.BYTE:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsIntegerTypeName checks if a type name is an integer type
-func IsIntegerTypeName(typeName atype.TYPE_NAME) bool {
-	switch typeName {
-	case atype.INT8, atype.INT16, atype.INT32, atype.INT64,
-		atype.UINT8, atype.UINT16, atype.UINT32, atype.UINT64, atype.BYTE:
-		return true
-	default:
-		return false
-	}
 }

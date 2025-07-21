@@ -1,0 +1,9 @@
+   # Leading spaces before comment
+key1 = "value1"
+
+# Normal comment
+   key2   =   "value2"   
+
+# Another comment with spaces
+   
+key3 = 42

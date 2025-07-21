@@ -1,0 +1,3 @@
+url = "https://example.com:8080/path?param=value&another=test"
+connection_string = "server=localhost;database=test;user=admin;password=secret123"
+equals_in_value = "key=value=another=more"

@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
-	"compiler/internal/source"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/source"
 )
 
 // parseIfStatement parses an if statement with optional else and else-if branches

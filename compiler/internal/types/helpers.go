@@ -32,3 +32,28 @@ func IsUnsigned(kind TYPE_NAME) bool {
 		return false
 	}
 }
+
+// IsNumericTypeName checks if a type name is numeric
+func IsNumericTypeName(typeName TYPE_NAME) bool {
+	return IsIntegerTypeName(typeName) || IsFloatTypeName(typeName)
+}
+
+// IsIntegerTypeName checks if a type name is an integer type
+func IsIntegerTypeName(typeName TYPE_NAME) bool {
+	switch typeName {
+	case INT8, INT16, INT32, INT64,
+		UINT8, UINT16, UINT32, UINT64, BYTE:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsFloatTypeName(typeName TYPE_NAME) bool {
+	switch typeName {
+	case FLOAT32, FLOAT64:
+		return true
+	default:
+		return false
+	}
+}

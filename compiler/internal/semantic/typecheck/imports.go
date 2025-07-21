@@ -1,12 +1,12 @@
 package typecheck
 
 import (
-	"compiler/colors"
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/types"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
 	"fmt"
 )
 
@@ -29,7 +29,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Modu
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
 }
 
-func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) types.Type {
+func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) stype.Type {
 
 	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
 	if !ok {

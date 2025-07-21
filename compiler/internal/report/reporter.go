@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"compiler/colors"
-	"compiler/internal/source"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/source"
 
-	//"compiler/internal/symboltable"
-	_strings "compiler/internal/utils/strings"
+	//"ferret/compiler/internal/symboltable"
+	_strings "ferret/compiler/internal/utils/strings"
 )
 
-type REPORT_TYPE string
+type PROBLEM_TYPE string
 
 type COMPILATION_PHASE string
 
@@ -26,18 +26,18 @@ const (
 )
 
 const (
-	NULL           REPORT_TYPE = ""
-	SEMANTIC_ERROR REPORT_TYPE = "semantic error" // Semantic error
-	CRITICAL_ERROR REPORT_TYPE = "critical error" // Stops compilation immediately
-	SYNTAX_ERROR   REPORT_TYPE = "syntax error"   // Syntax error, also stops compilation
-	NORMAL_ERROR   REPORT_TYPE = "error"          // Regular error that doesn't halt compilation
+	NULL           PROBLEM_TYPE = ""
+	SEMANTIC_ERROR PROBLEM_TYPE = "semantic error" // Semantic error
+	CRITICAL_ERROR PROBLEM_TYPE = "critical error" // Stops compilation immediately
+	SYNTAX_ERROR   PROBLEM_TYPE = "syntax error"   // Syntax error, also stops compilation
+	NORMAL_ERROR   PROBLEM_TYPE = "error"          // Regular error that doesn't halt compilation
 
-	WARNING REPORT_TYPE = "warning" // Indicates potential issues
-	INFO    REPORT_TYPE = "info"    // Informational message
+	WARNING PROBLEM_TYPE = "warning" // Indicates potential issues
+	INFO    PROBLEM_TYPE = "info"    // Informational message
 )
 
-// var colorMap = make(map[REPORT_TYPE]utils.COLOR)
-var colorMap = map[REPORT_TYPE]colors.COLOR{
+// var colorMap = make(map[PROBLEM_TYPE]utils.COLOR)
+var colorMap = map[PROBLEM_TYPE]colors.COLOR{
 	CRITICAL_ERROR: colors.BOLD_RED,
 	SYNTAX_ERROR:   colors.RED,
 	SEMANTIC_ERROR: colors.RED,
@@ -87,7 +87,7 @@ type Report struct {
 	Location *source.Location
 	Message  string
 	Hints    HintContainer
-	Level    REPORT_TYPE
+	Level    PROBLEM_TYPE
 	Phase    COMPILATION_PHASE
 }
 
@@ -241,7 +241,7 @@ func (r *Reports) createNew(filePath string, location *source.Location, msg stri
 	return report
 }
 
-func (e *Report) setLevel(level REPORT_TYPE) {
+func (e *Report) setLevel(level PROBLEM_TYPE) {
 	if level == NULL {
 		panic("call SetLevel() method with valid Error level")
 	}

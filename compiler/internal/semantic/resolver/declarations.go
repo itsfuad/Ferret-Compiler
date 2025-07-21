@@ -1,14 +1,14 @@
 package resolver
 
 import (
-	"compiler/colors"
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	atype "compiler/internal/types"
-	"compiler/internal/semantic/types"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	atype "ferret/compiler/internal/types"
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
@@ -20,7 +20,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	}
 
 	//add the type information to the symbol
-	var paramTypes []types.Type
+	var paramTypes []stype.Type
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
 			paramType, err := ctx.DeriveSemanticType(param.Type, cm)
@@ -32,7 +32,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 		}
 	}
 
-	var returnType types.Type
+	var returnType stype.Type
 	if fn.Function.ReturnType != nil {
 		retType, err := ctx.DeriveSemanticType(fn.Function.ReturnType, cm)
 		if err != nil {
@@ -48,7 +48,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	}
 
 	// Create function type and symbol
-	functionType := types.FunctionType{
+	functionType := stype.FunctionType{
 		Parameters: paramTypes,
 		ReturnType: returnType,
 	}
@@ -59,7 +59,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *ctx.Module) {
 	for i, variable := range decl.Variables {
 
-		var expType types.Type
+		var expType stype.Type
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
@@ -100,7 +100,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 
-	symbolType := &types.UserType{
+	symbolType := &stype.UserType{
 		Name:       atype.TYPE_NAME(aliasName),
 		Definition: typeToDeclare,
 	}
@@ -112,7 +112,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 	if r.Debug {
-		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*types.UserType).Definition, decl.Alias.Loc().String())
+		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc().String())
 	}
 }
 
