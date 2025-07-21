@@ -1,14 +1,15 @@
-package ctx
+package semantic
 
 import (
 	"compiler/internal/frontend/ast"
-	"compiler/internal/semantic/types"
+	"compiler/internal/ctx"
 	atype "compiler/internal/types"
+	"compiler/internal/semantic/types"
 	"fmt"
 )
 
-// DeriveSemanticType converts an AST DataType to a semantic Type
-func DeriveSemanticType(astType ast.DataType, module *Module) (types.Type, error) {
+// DeriveSemanticType converts an AST DataType to a semantic types.Type
+func DeriveSemanticType(astType ast.DataType, module *ctx.Module) (types.Type, error) {
 
 	if astType == nil {
 		return nil, fmt.Errorf("nil AST type provided")
@@ -38,7 +39,7 @@ func derivePrimitiveTypeFromAst(astType ast.DataType) (*types.PrimitiveType, err
 	}, nil
 }
 
-func resolveUserDefinedType(userType *ast.UserDefinedType, module *Module) (types.Type, error) {
+func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (types.Type, error) {
 	symbol, found := module.SymbolTable.Lookup(string(userType.TypeName))
 	if !found {
 		return nil, fmt.Errorf("user-defined type '%s' not found", userType.TypeName)
@@ -49,19 +50,7 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *Module) (type
 	return symbol.Type, nil
 }
 
-// UnwrapType resolves user types to their underlying types A -> B -> C(not user type), return C
-// Note: This function requires access to symbol tables to properly resolve type aliases.
-// For now, it only checks the Definition field. For full resolution, use resolveTypeAlias instead.
-func UnwrapType(t types.Type) types.Type {
-	if userType, ok := t.(*types.UserType); ok {
-		if userType.Definition != nil {
-			return UnwrapType(userType.Definition)
-		}
-	}
-	return t
-}
-
-func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *Module) (types.Type, error) {
+func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *ctx.Module) (types.Type, error) {
 	// Handle type scope resolution (e.g., module::TypeName)
 	moduleName := res.Module.Name
 	typeName := res.TypeNode.Type()
@@ -79,7 +68,7 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *Module) (
 	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 }
 
-func deriveSemanticFunctionType(function *ast.FunctionType, module *Module) (*types.FunctionType, error) {
+func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) (*types.FunctionType, error) {
 	var params []types.Type
 	for _, param := range function.Parameters {
 		paramType, err := DeriveSemanticType(param, module)
@@ -103,7 +92,7 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *Module) (*ty
 	}, nil
 }
 
-func deriveSemanticStructFromAst(structType *ast.StructType, module *Module) (*types.StructType, error) {
+func deriveSemanticStructFromAst(structType *ast.StructType, module *ctx.Module) (*types.StructType, error) {
 	fields := make(map[string]types.Type)
 	for _, field := range structType.Fields {
 		if field.FieldType != nil {
@@ -121,7 +110,7 @@ func deriveSemanticStructFromAst(structType *ast.StructType, module *Module) (*t
 	}, nil
 }
 
-func deriveSemanticArrayType(array *ast.ArrayType, module *Module) (types.Type, error) {
+func deriveSemanticArrayType(array *ast.ArrayType, module *ctx.Module) (types.Type, error) {
 	elementType, err := DeriveSemanticType(array.ElementType, module)
 	if err != nil {
 		return nil, err
@@ -132,7 +121,7 @@ func deriveSemanticArrayType(array *ast.ArrayType, module *Module) (types.Type, 
 	}, nil
 }
 
-// IsStringType checks if a types.Type is string
+// IsStringType checks if a type is string
 func IsStringType(t types.Type) bool {
 	if prim, ok := t.(*types.PrimitiveType); ok {
 		return prim.Name == atype.STRING
@@ -140,7 +129,7 @@ func IsStringType(t types.Type) bool {
 	return false
 }
 
-// IsBoolType checks if a types.Type is boolean
+// IsBoolType checks if a type is boolean
 func IsBoolType(t types.Type) bool {
 	if prim, ok := t.(*types.PrimitiveType); ok {
 		return prim.Name == atype.BOOL
@@ -148,7 +137,7 @@ func IsBoolType(t types.Type) bool {
 	return false
 }
 
-// IsNumericType checks if a types.Type is numeric
+// IsNumericType checks if a type is numeric
 func IsNumericType(t types.Type) bool {
 	if prim, ok := t.(*types.PrimitiveType); ok {
 		return IsNumericTypeName(prim.Name)
@@ -156,7 +145,7 @@ func IsNumericType(t types.Type) bool {
 	return false
 }
 
-// IsIntegerType checks if a types.Type is an integer types.Type
+// IsIntegerType checks if a type is an integer type
 func IsIntegerType(t types.Type) bool {
 	if prim, ok := t.(*types.PrimitiveType); ok {
 		return IsIntegerTypeName(prim.Name)

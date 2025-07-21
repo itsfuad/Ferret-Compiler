@@ -5,7 +5,9 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/types"
 	"fmt"
 )
 
@@ -30,7 +32,7 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 		}
 
 		// Case: both explicit type and initializer → validate compatibility
-		explicitType, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
+		explicitType, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 		if err != nil {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
@@ -90,8 +92,8 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 	}
 }
 
-func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module) []ctx.Type {
-	var types []ctx.Type
+func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module) []types.Type {
+	var types []types.Type
 	for _, expr := range *exprs {
 		exprType := evaluateExpressionType(r, expr, cm)
 		if exprType == nil {
