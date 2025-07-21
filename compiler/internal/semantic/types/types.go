@@ -1,4 +1,4 @@
-package ctx
+package types
 
 import (
 	"fmt"
@@ -99,13 +99,7 @@ func (s *StructType) GetFieldType(fieldName string) Type {
 	return s.Fields[fieldName]
 }
 
-// HasField checks if the struct has a field with the given name
-func (s *StructType) HasField(fieldName string) bool {
-	_, exists := s.Fields[fieldName]
-	return exists
-}
-
-// ArrayType represents array types
+// ArrayType represents array types with element type and size
 type ArrayType struct {
 	ElementType Type
 	Name        types.TYPE_NAME
@@ -126,10 +120,10 @@ func (a *ArrayType) Equals(other Type) bool {
 	return false
 }
 
-// FunctionType represents function types
+// FunctionType represents function types with parameters and return type
 type FunctionType struct {
 	Parameters []Type
-	ReturnType Type
+	ReturnType Type // Single return type (multiple returns removed)
 	Name       types.TYPE_NAME
 }
 
@@ -138,45 +132,74 @@ func (f *FunctionType) TypeName() types.TYPE_NAME {
 }
 
 func (f *FunctionType) String() string {
-	var params strings.Builder
-	params.WriteString("(")
-	for i, param := range f.Parameters {
-		if i > 0 {
-			params.WriteString(", ")
-		}
-		params.WriteString(param.String())
-	}
-	params.WriteString(")")
-
-	if f.ReturnType != nil {
-		params.WriteString(" -> ")
-		params.WriteString(f.ReturnType.String())
+	var paramStrs []string
+	for _, param := range f.Parameters {
+		paramStrs = append(paramStrs, param.String())
 	}
 
-	return "fn" + params.String()
+	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType.String())
 }
 
 func (f *FunctionType) Equals(other Type) bool {
 	if otherFunc, ok := other.(*FunctionType); ok {
+		// Check parameter count
 		if len(f.Parameters) != len(otherFunc.Parameters) {
 			return false
 		}
 
-		// Compare parameters
+		// Check each parameter type
 		for i, param := range f.Parameters {
 			if !param.Equals(otherFunc.Parameters[i]) {
 				return false
 			}
 		}
 
-		// Compare return types
-		if f.ReturnType == nil && otherFunc.ReturnType == nil {
-			return true
-		}
-		if f.ReturnType == nil || otherFunc.ReturnType == nil {
-			return false
-		}
+		// Check return type
 		return f.ReturnType.Equals(otherFunc.ReturnType)
 	}
 	return false
+}
+
+// InterfaceType represents interface types with method signatures
+type InterfaceType struct {
+	Name    types.TYPE_NAME
+	Methods map[string]*FunctionType // method name -> method signature
+}
+
+func (i *InterfaceType) TypeName() types.TYPE_NAME {
+	return i.Name
+}
+
+func (i *InterfaceType) String() string {
+	if len(i.Methods) == 0 {
+		return fmt.Sprintf("interface %s {}", i.Name)
+	}
+
+	// Collect method names and sort them for consistent output
+	var methodNames []string
+	for methodName := range i.Methods {
+		methodNames = append(methodNames, methodName)
+	}
+	sort.Strings(methodNames)
+
+	// Build method strings in alphabetical order
+	var methodStrs []string
+	for _, methodName := range methodNames {
+		methodType := i.Methods[methodName]
+		methodStrs = append(methodStrs, fmt.Sprintf("%s%s", methodName, methodType.String()[2:])) // Remove "fn" prefix
+	}
+
+	return fmt.Sprintf("interface %s { %s }", i.Name, strings.Join(methodStrs, "; "))
+}
+
+func (i *InterfaceType) Equals(other Type) bool {
+	if otherInterface, ok := other.(*InterfaceType); ok {
+		return i.Name == otherInterface.Name
+	}
+	return false
+}
+
+// GetMethod returns the method signature for a given method name, or nil if not found
+func (i *InterfaceType) GetMethod(methodName string) *FunctionType {
+	return i.Methods[methodName]
 }

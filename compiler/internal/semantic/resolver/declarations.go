@@ -5,8 +5,10 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
-	"compiler/internal/types"
+	atype "compiler/internal/types"
+	"compiler/internal/semantic/types"
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
@@ -18,7 +20,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	}
 
 	//add the type information to the symbol
-	var paramTypes []ctx.Type
+	var paramTypes []types.Type
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
 			paramType, err := ctx.DeriveSemanticType(param.Type, cm)
@@ -30,7 +32,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 		}
 	}
 
-	var returnType ctx.Type
+	var returnType types.Type
 	if fn.Function.ReturnType != nil {
 		retType, err := ctx.DeriveSemanticType(fn.Function.ReturnType, cm)
 		if err != nil {
@@ -46,7 +48,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	}
 
 	// Create function type and symbol
-	functionType := ctx.FunctionType{
+	functionType := types.FunctionType{
 		Parameters: paramTypes,
 		ReturnType: returnType,
 	}
@@ -57,7 +59,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *ctx.Module) {
 	for i, variable := range decl.Variables {
 
-		var expType ctx.Type
+		var expType types.Type
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
@@ -92,14 +94,14 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 
-	typeToDeclare, err := ctx.DeriveSemanticType(decl.BaseType, cm)
+	typeToDeclare, err := semantic.DeriveSemanticType(decl.BaseType, cm)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.BaseType.Loc(), "Invalid base type for type declaration: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
-	symbolType := &ctx.UserType{
-		Name:       types.TYPE_NAME(aliasName),
+	symbolType := &types.UserType{
+		Name:       atype.TYPE_NAME(aliasName),
 		Definition: typeToDeclare,
 	}
 	symbol := ctx.NewSymbolWithLocation(aliasName, ctx.SymbolType, symbolType, decl.Alias.Loc())
@@ -110,7 +112,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 	if r.Debug {
-		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*ctx.UserType).Definition, decl.Alias.Loc().String())
+		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*types.UserType).Definition, decl.Alias.Loc().String())
 	}
 }
 

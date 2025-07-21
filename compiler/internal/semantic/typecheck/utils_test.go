@@ -1,18 +1,18 @@
 package typecheck
 
 import (
-	"compiler/internal/ctx"
-	"compiler/internal/types"
+	"compiler/internal/semantic/types"
+	atype "compiler/internal/types"
 	"testing"
 )
 
 // TestNumericTypeHierarchy tests numeric type promotions
 func TestNumericTypeHierarchy(t *testing.T) {
-	int8Type := &ctx.PrimitiveType{Name: types.INT8}
-	int16Type := &ctx.PrimitiveType{Name: types.INT16}
-	int32Type := &ctx.PrimitiveType{Name: types.INT32}
-	float32Type := &ctx.PrimitiveType{Name: types.FLOAT32}
-	float64Type := &ctx.PrimitiveType{Name: types.FLOAT64}
+	int8Type := &types.PrimitiveType{Name: atype.INT8}
+	int16Type := &types.PrimitiveType{Name: atype.INT16}
+	int32Type := &types.PrimitiveType{Name: atype.INT32}
+	float32Type := &types.PrimitiveType{Name: atype.FLOAT32}
+	float64Type := &types.PrimitiveType{Name: atype.FLOAT64}
 
 	// Test integer promotions
 	if !IsAssignableFrom(int16Type, int8Type) {
@@ -39,10 +39,10 @@ func TestNumericTypeHierarchy(t *testing.T) {
 
 // TestCommonNumericType tests finding common types for operations
 func TestCommonNumericType(t *testing.T) {
-	int32Type := &ctx.PrimitiveType{Name: types.INT32}
-	int64Type := &ctx.PrimitiveType{Name: types.INT64}
-	float32Type := &ctx.PrimitiveType{Name: types.FLOAT32}
-	float64Type := &ctx.PrimitiveType{Name: types.FLOAT64}
+	int32Type := &types.PrimitiveType{Name: atype.INT32}
+	int64Type := &types.PrimitiveType{Name: atype.INT64}
+	float32Type := &types.PrimitiveType{Name: atype.FLOAT32}
+	float64Type := &types.PrimitiveType{Name: atype.FLOAT64}
 
 	// Test same types
 	result := getCommonNumericType(int32Type, int32Type)
@@ -71,11 +71,11 @@ func TestCommonNumericType(t *testing.T) {
 
 // TestArrayCompatibility tests array type compatibility
 func TestArrayCompatibility(t *testing.T) {
-	int32Type := &ctx.PrimitiveType{Name: types.INT32}
-	int64Type := &ctx.PrimitiveType{Name: types.INT64}
+	int32Type := &types.PrimitiveType{Name: atype.INT32}
+	int64Type := &types.PrimitiveType{Name: atype.INT64}
 
-	int32ArrayType := &ctx.ArrayType{ElementType: int32Type, Name: types.ARRAY}
-	int64ArrayType := &ctx.ArrayType{ElementType: int64Type, Name: types.ARRAY}
+	int32ArrayType := &types.ArrayType{ElementType: int32Type, Name: atype.ARRAY}
+	int64ArrayType := &types.ArrayType{ElementType: int64Type, Name: atype.ARRAY}
 
 	// Arrays are compatible if element types are assignable
 	if !IsAssignableFrom(int64ArrayType, int32ArrayType) {

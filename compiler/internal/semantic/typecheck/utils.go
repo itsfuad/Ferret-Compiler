@@ -5,8 +5,10 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
-	"compiler/internal/types"
+	"compiler/internal/semantic/types"
+	atype "compiler/internal/types"
 )
 
 // ===== CORE ASSIGNABILITY CHECK =====
@@ -14,15 +16,15 @@ import (
 // IsAssignableFrom checks if a value of type 'source' can be assigned to 'target'
 // Note: This function has limited type resolution capability. For full alias resolution,
 // the type checker should use resolveTypeAlias with analyzer context.
-func IsAssignableFrom(target, source ctx.Type) bool {
+func IsAssignableFrom(target, source types.Type) bool {
 	// Exact type match
 	if target.Equals(source) {
 		return true
 	}
 
 	// Handle user types (aliases) - limited resolution without symbol table access
-	resolvedTarget := ctx.UnwrapType(target)
-	resolvedSource := ctx.UnwrapType(source)
+	resolvedTarget := types.UnwrapType(target)
+	resolvedSource := types.UnwrapType(source)
 
 	colors.MAGENTA.Printf("Checking assignability: %v → %v\n", resolvedSource, resolvedTarget)
 
@@ -56,27 +58,27 @@ func IsAssignableFrom(target, source ctx.Type) bool {
 // ===== HELPER FUNCTIONS =====
 
 // isNumericPromotion checks if source can be promoted to target (implicit conversion)
-func isNumericPromotion(target, source ctx.Type) bool {
-	targetPrim, targetOk := target.(*ctx.PrimitiveType)
-	sourcePrim, sourceOk := source.(*ctx.PrimitiveType)
+func isNumericPromotion(target, source types.Type) bool {
+	targetPrim, targetOk := target.(*types.PrimitiveType)
+	sourcePrim, sourceOk := source.(*types.PrimitiveType)
 
 	if !targetOk || !sourceOk {
 		return false
 	}
 
 	// Define promotion rules
-	promotions := map[types.TYPE_NAME][]types.TYPE_NAME{
+	promotions := map[atype.TYPE_NAME][]atype.TYPE_NAME{
 		// Integer promotions (smaller -> larger)
-		types.INT16:  {types.INT8},
-		types.INT32:  {types.INT8, types.INT16},
-		types.INT64:  {types.INT8, types.INT16, types.INT32},
-		types.UINT16: {types.UINT8, types.BYTE},
-		types.UINT32: {types.UINT8, types.UINT16, types.BYTE},
-		types.UINT64: {types.UINT8, types.UINT16, types.UINT32, types.BYTE},
+		atype.INT16:  {atype.INT8},
+		atype.INT32:  {atype.INT8, atype.INT16},
+		atype.INT64:  {atype.INT8, atype.INT16, atype.INT32},
+		atype.UINT16: {atype.UINT8, atype.BYTE},
+		atype.UINT32: {atype.UINT8, atype.UINT16, atype.BYTE},
+		atype.UINT64: {atype.UINT8, atype.UINT16, atype.UINT32, atype.BYTE},
 
 		// Float promotions (int -> float, smaller float -> larger float)
-		types.FLOAT32: {types.INT8, types.INT16, types.UINT8, types.UINT16, types.BYTE},
-		types.FLOAT64: {types.INT8, types.INT16, types.INT32, types.UINT8, types.UINT16, types.UINT32, types.BYTE, types.FLOAT32},
+		atype.FLOAT32: {atype.INT8, atype.INT16, atype.UINT8, atype.UINT16, atype.BYTE},
+		atype.FLOAT64: {atype.INT8, atype.INT16, atype.INT32, atype.UINT8, atype.UINT16, atype.UINT32, atype.BYTE, atype.FLOAT32},
 	}
 
 	if allowedSources, exists := promotions[targetPrim.Name]; exists {
@@ -91,9 +93,9 @@ func isNumericPromotion(target, source ctx.Type) bool {
 }
 
 // isArrayCompatible checks array type compatibility
-func isArrayCompatible(target, source ctx.Type) bool {
-	targetArray, targetOk := target.(*ctx.ArrayType)
-	sourceArray, sourceOk := source.(*ctx.ArrayType)
+func isArrayCompatible(target, source types.Type) bool {
+	targetArray, targetOk := target.(*types.ArrayType)
+	sourceArray, sourceOk := source.(*types.ArrayType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -103,9 +105,9 @@ func isArrayCompatible(target, source ctx.Type) bool {
 }
 
 // isFunctionCompatible checks function type compatibility
-func isFunctionCompatible(target, source ctx.Type) bool {
-	targetFunc, targetOk := target.(*ctx.FunctionType)
-	sourceFunc, sourceOk := source.(*ctx.FunctionType)
+func isFunctionCompatible(target, source types.Type) bool {
+	targetFunc, targetOk := target.(*types.FunctionType)
+	sourceFunc, sourceOk := source.(*types.FunctionType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -135,9 +137,9 @@ func isFunctionCompatible(target, source ctx.Type) bool {
 }
 
 // isStructCompatible checks structural compatibility of structs
-func isStructCompatible(target, source ctx.Type) bool {
-	targetStruct, targetOk := target.(*ctx.StructType)
-	sourceStruct, sourceOk := source.(*ctx.StructType)
+func isStructCompatible(target, source types.Type) bool {
+	targetStruct, targetOk := target.(*types.StructType)
+	sourceStruct, sourceOk := source.(*types.StructType)
 
 	if !targetOk || !sourceOk {
 		return false
@@ -157,7 +159,7 @@ func isStructCompatible(target, source ctx.Type) bool {
 // ===== EXPRESSION TYPE INFERENCE HELPERS =====
 
 // checkIdentifierType gets the type of an identifier from the symbol table
-func checkIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) ctx.Type {
+func checkIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) types.Type {
 	if sym, found := cm.SymbolTable.Lookup(e.Name); found {
 		return sym.Type
 	}
@@ -165,7 +167,7 @@ func checkIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) ctx.Type {
 }
 
 // checkBinaryExprType infers the result type of binary expressions
-func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) ctx.Type {
+func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) types.Type {
 	leftType := evaluateExpressionType(r, *e.Left, cm)
 	rightType := evaluateExpressionType(r, *e.Right, cm)
 
@@ -187,7 +189,7 @@ func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Mo
 }
 
 // getBinaryOperationResultType determines the result type of binary operations
-func getBinaryOperationResultType(operator string, left, right ctx.Type) ctx.Type {
+func getBinaryOperationResultType(operator string, left, right types.Type) types.Type {
 	switch operator {
 	case "+", "-", "*", "/", "%":
 		return getArithmeticResultType(operator, left, right)
@@ -203,14 +205,14 @@ func getBinaryOperationResultType(operator string, left, right ctx.Type) ctx.Typ
 }
 
 // getArithmeticResultType handles arithmetic operations
-func getArithmeticResultType(operator string, left, right ctx.Type) ctx.Type {
+func getArithmeticResultType(operator string, left, right types.Type) types.Type {
 	// String concatenation
-	if operator == "+" && ctx.IsStringType(left) && ctx.IsStringType(right) {
-		return &ctx.PrimitiveType{Name: types.STRING}
+	if operator == "+" && semantic.IsStringType(left) && semantic.IsStringType(right) {
+		return &types.PrimitiveType{Name: atype.STRING}
 	}
 
 	// Numeric operations
-	if ctx.IsNumericType(left) && ctx.IsNumericType(right) {
+	if semantic.IsNumericType(left) && semantic.IsNumericType(right) {
 		return getCommonNumericType(left, right)
 	}
 
@@ -218,23 +220,23 @@ func getArithmeticResultType(operator string, left, right ctx.Type) ctx.Type {
 }
 
 // getComparisonResultType handles comparison operations
-func getComparisonResultType(left, right ctx.Type) ctx.Type {
+func getComparisonResultType(left, right types.Type) types.Type {
 	if IsAssignableFrom(left, right) || IsAssignableFrom(right, left) {
-		return &ctx.PrimitiveType{Name: types.BOOL}
+		return &types.PrimitiveType{Name: atype.BOOL}
 	}
 	return nil
 }
 
 // getLogicalResultType handles logical operations
-func getLogicalResultType(left, right ctx.Type) ctx.Type {
-	if ctx.IsBoolType(left) && ctx.IsBoolType(right) {
-		return &ctx.PrimitiveType{Name: types.BOOL}
+func getLogicalResultType(left, right types.Type) types.Type {
+	if semantic.IsBoolType(left) && semantic.IsBoolType(right) {
+		return &types.PrimitiveType{Name: atype.BOOL}
 	}
 	return nil
 }
 
 // getBitwiseResultType handles bitwise operations
-func getBitwiseResultType(left, right ctx.Type) ctx.Type {
+func getBitwiseResultType(left, right types.Type) types.Type {
 	if ctx.IsIntegerType(left) && ctx.IsIntegerType(right) {
 		return getCommonNumericType(left, right)
 	}
@@ -242,25 +244,25 @@ func getBitwiseResultType(left, right ctx.Type) ctx.Type {
 }
 
 // getCommonNumericType finds the common type for numeric operations
-func getCommonNumericType(left, right ctx.Type) ctx.Type {
+func getCommonNumericType(left, right types.Type) types.Type {
 	if left.Equals(right) {
 		return left
 	}
 
-	leftPrim, leftOk := left.(*ctx.PrimitiveType)
-	rightPrim, rightOk := right.(*ctx.PrimitiveType)
+	leftPrim, leftOk := left.(*types.PrimitiveType)
+	rightPrim, rightOk := right.(*types.PrimitiveType)
 
 	if !leftOk || !rightOk {
 		return nil
 	}
 
 	// Promotion hierarchy: higher numbers win
-	hierarchy := map[types.TYPE_NAME]int{
-		types.INT8: 1, types.UINT8: 1, types.BYTE: 1,
-		types.INT16: 2, types.UINT16: 2,
-		types.INT32: 3, types.UINT32: 3,
-		types.INT64: 4, types.UINT64: 4,
-		types.FLOAT32: 5, types.FLOAT64: 6,
+	hierarchy := map[atype.TYPE_NAME]int{
+		atype.INT8:  1, atype.UINT8:  1, atype.BYTE:  1,
+		atype.INT16: 2, atype.UINT16: 2,
+		atype.INT32: 3, atype.UINT32: 3,
+		atype.INT64: 4, atype.UINT64: 4,
+		atype.FLOAT32: 5, atype.FLOAT64: 6,
 	}
 
 	leftLevel, leftExists := hierarchy[leftPrim.Name]
@@ -277,7 +279,7 @@ func getCommonNumericType(left, right ctx.Type) ctx.Type {
 }
 
 // checkArrayLiteralType infers array literal types
-func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) ctx.Type {
+func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) types.Type {
 	if len(e.Elements) == 0 {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -317,18 +319,18 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 		}
 	}
 
-	return &ctx.ArrayType{ElementType: elementType, Name: types.ARRAY}
+	return &types.ArrayType{ElementType: elementType, Name: atype.ARRAY}
 }
 
 // checkIndexableType infers types for array/map indexing
-func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) ctx.Type {
+func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) types.Type {
 	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
 	if indexableType == nil {
 		return nil
 	}
 
 	// Check if it's an array
-	if arrayType, ok := indexableType.(*ctx.ArrayType); ok {
+	if arrayType, ok := indexableType.(*types.ArrayType); ok {
 		indexType := evaluateExpressionType(r, *e.Index, cm)
 		if indexType == nil {
 			return nil
