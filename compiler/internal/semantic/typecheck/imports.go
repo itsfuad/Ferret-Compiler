@@ -6,6 +6,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/types"
 	"fmt"
 )
 
@@ -28,7 +29,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Modu
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
 }
 
-func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) ctx.Type {
+func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) types.Type {
 
 	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
 	if !ok {
