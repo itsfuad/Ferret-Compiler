@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"ferret/compiler/internal/types"
+	"compiler/internal/types"
 )
 
 // Type represents a semantic type in the type system (without location information)

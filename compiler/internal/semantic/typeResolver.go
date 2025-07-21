@@ -1,10 +1,10 @@
 package semantic
 
 import (
-	"ferret/compiler/internal/ctx"
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/semantic/stype"
-	atype "ferret/compiler/internal/types"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/semantic/stype"
+	atype "compiler/internal/types"
 	"fmt"
 )
 

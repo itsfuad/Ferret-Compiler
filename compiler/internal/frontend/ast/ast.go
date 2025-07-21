@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/types"
+	"compiler/internal/source"
+	"compiler/internal/types"
 	"fmt"
 )
 

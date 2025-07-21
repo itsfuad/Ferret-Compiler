@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/source"
+	"compiler/colors"
+	"compiler/internal/source"
 
-	//"ferret/compiler/internal/symboltable"
-	_strings "ferret/compiler/internal/utils/strings"
+	//"compiler/internal/symboltable"
+	_strings "compiler/internal/utils/strings"
 )
 
 type PROBLEM_TYPE string

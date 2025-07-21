@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/source"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/source"
 )
 
 func parseIdentifier(p *Parser) *ast.IdentifierExpr {

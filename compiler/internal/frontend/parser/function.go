@@ -1,11 +1,11 @@
 package parser
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/utils/lists"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/report"
+	"compiler/internal/source"
+	"compiler/internal/utils/lists"
 )
 
 // detect if it's a function or a method

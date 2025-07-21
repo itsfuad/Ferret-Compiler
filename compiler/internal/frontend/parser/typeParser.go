@@ -1,12 +1,12 @@
 package parser
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/types"
-	"ferret/compiler/internal/utils/lists"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/report"
+	"compiler/internal/source"
+	"compiler/internal/types"
+	"compiler/internal/utils/lists"
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {

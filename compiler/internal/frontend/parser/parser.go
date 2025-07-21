@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"slices"
 
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/ctx"
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/utils/fs"
+	"compiler/colors"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/report"
+	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 )
 
 type Parser struct {
