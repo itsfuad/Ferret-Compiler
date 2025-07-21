@@ -38,6 +38,9 @@
         "aliases": [
           "Ferret Module"
         ],
+        "extensions": [
+          ".fer.ret"
+        ],
         "filenames": [
           "fer.ret"
         ],
