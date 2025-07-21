@@ -49,24 +49,24 @@ func CreateDefaultProjectConfig(projectRoot string) error {
 	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 
 	// Create TOML content as a string (simpler than marshalling structs to TOML)
-	defaultContent := `name = "ferret_project"
-version = "0.1.0"
-optimize = false
+	defaultContent :=
+		`name = "ferret_project"
+	version = "0.1.0"
+	optimize = false
 
-[compiler]
-version = "0.1.0"
+	[compiler]
+	version = "0.1.0"
 
-[cache]
-path = ".ferret/modules"
+	[cache]
+	path = ".ferret/modules"
 
-[remote]
-enabled = true
-share = false
+	[remote]
+	enabled = true
+	share = false
 
-[dependencies]
-# Add your dependencies here
-# example_lib = "1.0.0"
-`
+	[dependencies]
+	# Your external dependencies go here
+	`
 
 	if err := os.WriteFile(configPath, []byte(defaultContent), 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)

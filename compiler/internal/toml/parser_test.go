@@ -21,7 +21,7 @@ func TestParseTOMLFile(t *testing.T) {
 	}{
 		{
 			name:     "basic key-value pairs",
-			filename: "basic.toml",
+			filename: "basic.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"name":   "test",
@@ -34,7 +34,7 @@ func TestParseTOMLFile(t *testing.T) {
 		},
 		{
 			name:     "with sections",
-			filename: "with_sections.toml",
+			filename: "with_sections.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"title": "Main Config",
@@ -53,7 +53,7 @@ func TestParseTOMLFile(t *testing.T) {
 		},
 		{
 			name:     "with comments and empty lines",
-			filename: "with_comments.toml",
+			filename: "with_comments.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"name": "test",
@@ -66,25 +66,25 @@ func TestParseTOMLFile(t *testing.T) {
 		},
 		{
 			name:     "empty file",
-			filename: "empty.toml",
+			filename: "empty.fer.ret",
 			want:     TOMLData{},
 			wantErr:  false,
 		},
 		{
 			name:     "only comments",
-			filename: "only_comments.toml",
+			filename: "only_comments.fer.ret",
 			want:     TOMLData{},
 			wantErr:  false,
 		},
 		{
 			name:     "invalid key-value pair",
-			filename: "invalid.toml",
+			filename: "invalid.fer.ret",
 			want:     nil,
 			wantErr:  true,
 		},
 		{
 			name:     "mixed value types",
-			filename: "mixed_types.toml",
+			filename: "mixed_types.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"string_val": "hello world",
@@ -99,7 +99,7 @@ func TestParseTOMLFile(t *testing.T) {
 		},
 		{
 			name:     "complex configuration",
-			filename: "complex.toml",
+			filename: "complex.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"app_name": "MyApp",
@@ -140,7 +140,7 @@ func TestParseTOMLFile(t *testing.T) {
 		},
 		{
 			name:     "multiple equals in values",
-			filename: "multiple_equals.toml",
+			filename: "multiple_equals.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"url":               "https://example.com:8080/path?param=value&another=test",
@@ -152,7 +152,7 @@ func TestParseTOMLFile(t *testing.T) {
 		},
 		{
 			name:     "whitespace handling",
-			filename: "whitespace_handling.toml",
+			filename: "whitespace_handling.fer.ret",
 			want: TOMLData{
 				"default": TOMLTable{
 					"key1": "value1",
@@ -184,7 +184,7 @@ func TestParseTOMLFile(t *testing.T) {
 
 func TestParseTOMLFileErrors(t *testing.T) {
 	t.Run("non-existent file", func(t *testing.T) {
-		_, err := ParseTOMLFile("non_existent_file.toml")
+		_, err := ParseTOMLFile("non_existent_file.fer.ret")
 		if err == nil {
 			t.Error("Expected error for non-existent file, got nil")
 		}
@@ -194,17 +194,17 @@ func TestParseTOMLFileErrors(t *testing.T) {
 // TestDataFileExistence verifies all test data files exist
 func TestDataFileExistence(t *testing.T) {
 	requiredFiles := []string{
-		"basic.toml",
-		"with_sections.toml",
-		"with_comments.toml",
-		"empty.toml",
-		"only_comments.toml",
-		"invalid.toml",
-		"mixed_types.toml",
-		"complex.toml",
-		"multiple_equals.toml",
-		"whitespace_handling.toml",
-		"benchmark.toml",
+		"basic.fer.ret",
+		"with_sections.fer.ret",
+		"with_comments.fer.ret",
+		"empty.fer.ret",
+		"only_comments.fer.ret",
+		"invalid.fer.ret",
+		"mixed_types.fer.ret",
+		"complex.fer.ret",
+		"multiple_equals.fer.ret",
+		"whitespace_handling.fer.ret",
+		"benchmark.fer.ret",
 	}
 
 	for _, filename := range requiredFiles {
@@ -500,7 +500,7 @@ func TestParseValue(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkParseTOMLFile(b *testing.B) {
-	testFile := getTestDataPath("benchmark.toml")
+	testFile := getTestDataPath("benchmark.fer.ret")
 
 	// Verify the test file exists
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {

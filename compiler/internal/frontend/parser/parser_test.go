@@ -32,5 +32,3 @@ func TestParserBasics(t *testing.T) {
 		})
 	}
 }
-
-
