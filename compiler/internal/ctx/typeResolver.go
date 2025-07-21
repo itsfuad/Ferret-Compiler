@@ -2,7 +2,6 @@ package ctx
 
 import (
 	"fmt"
-
 	"compiler/internal/frontend/ast"
 	"compiler/internal/types"
 )
@@ -25,21 +24,40 @@ func DeriveSemanticType(astType ast.DataType, module *Module) (Type, error) {
 		return deriveSemanticFunctionType(t, module)
 	case *ast.TypeScopeResolution:
 		return resolveTypeInImportedModule(t, module)
+	case *ast.UserDefinedType:
+		return resolveUserDefinedType(t, module)
+	default:
+		return nil, fmt.Errorf("unsupported AST type: %T", t)
 	}
-	//user-defined types or aliases
-	if tt, ok := module.SymbolTable.Lookup(string(astType.Type())); ok {
-		if tt.Type != nil {
-			return tt.Type, nil
-		}
-		return &UserType{Name: tt.Type.TypeName(), Definition: nil}, nil // No definition available
-	}
-	return nil, fmt.Errorf("type '%s' not found in symbol table", astType.Type())
 }
 
 func derivePrimitiveTypeFromAst(astType ast.DataType) (*PrimitiveType, error) {
 	return &PrimitiveType{
 		Name: astType.Type(),
 	}, nil
+}
+
+func resolveUserDefinedType(userType *ast.UserDefinedType, module *Module) (Type, error) {
+	symbol, found := module.SymbolTable.Lookup(string(userType.TypeName))
+	if !found {
+		return nil, fmt.Errorf("user-defined type '%s' not found", userType.TypeName)
+	}
+	if symbol.Type == nil {
+		return nil, fmt.Errorf("user-defined type '%s' has no associated type", userType.TypeName)
+	}
+	return symbol.Type, nil
+}
+
+// UnwrapType resolves user types to their underlying types A -> B -> C(not user type), return C
+// Note: This function requires access to symbol tables to properly resolve type aliases.
+// For now, it only checks the Definition field. For full resolution, use resolveTypeAlias instead.
+func UnwrapType(t Type) Type {
+	if userType, ok := t.(*UserType); ok {
+		if userType.Definition != nil {
+			return UnwrapType(userType.Definition)
+		}
+	}
+	return t
 }
 
 func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *Module) (Type, error) {

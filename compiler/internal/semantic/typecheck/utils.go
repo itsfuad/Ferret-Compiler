@@ -21,8 +21,8 @@ func IsAssignableFrom(target, source ctx.Type) bool {
 	}
 
 	// Handle user types (aliases) - limited resolution without symbol table access
-	resolvedTarget := resolveUserType(target)
-	resolvedSource := resolveUserType(source)
+	resolvedTarget := ctx.UnwrapType(target)
+	resolvedSource := ctx.UnwrapType(source)
 
 	colors.MAGENTA.Printf("Checking assignability: %v → %v\n", resolvedSource, resolvedTarget)
 
@@ -54,19 +54,6 @@ func IsAssignableFrom(target, source ctx.Type) bool {
 }
 
 // ===== HELPER FUNCTIONS =====
-
-// resolveUserType resolves user types to their underlying types A -> B -> C(not user type), return C
-// Note: This function requires access to symbol tables to properly resolve type aliases.
-// For now, it only checks the Definition field. For full resolution, use resolveTypeAlias instead.
-func resolveUserType(t ctx.Type) ctx.Type {
-	if userType, ok := t.(*ctx.UserType); ok {
-		colors.BRIGHT_BLUE.Printf("Resolving user type: `%s` → `%v`\n", userType.Name, userType.Definition)
-		if userType.Definition != nil {
-			return resolveUserType(userType.Definition)
-		}
-	}
-	return t
-}
 
 // isNumericPromotion checks if source can be promoted to target (implicit conversion)
 func isNumericPromotion(target, source ctx.Type) bool {
