@@ -1,11 +1,11 @@
-package types
+package stype
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
-	"compiler/internal/types"
+	"ferret/compiler/internal/types"
 )
 
 // Type represents a semantic type in the type system (without location information)

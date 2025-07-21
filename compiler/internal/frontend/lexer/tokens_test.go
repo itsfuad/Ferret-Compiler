@@ -3,7 +3,7 @@ package lexer
 import (
 	"testing"
 
-	"compiler/internal/source"
+	"ferret/compiler/internal/source"
 )
 
 func TestIsKeyword(t *testing.T) {

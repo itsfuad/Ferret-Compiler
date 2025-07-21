@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"compiler/internal/ctx"
+	"ferret/compiler/internal/ctx"
 )
 
 func TestIsRemote(t *testing.T) {

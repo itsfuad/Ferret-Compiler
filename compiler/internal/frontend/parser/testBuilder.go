@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"compiler/internal/config"
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
-	"compiler/internal/testutil"
+	"ferret/compiler/internal/config"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/testutil"
 )
 
 // createTestCompilerContext creates a minimal compiler context for parser testing
@@ -30,7 +30,7 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 			Share:   false,
 		},
 		Dependencies: config.DependencyConfig{
-			Modules: []string{},
+			Modules: make(map[string]string),
 		},
 		ProjectRoot: tempDir,
 	}

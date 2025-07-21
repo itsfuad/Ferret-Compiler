@@ -1,11 +1,11 @@
 package parser
 
 import (
-	"compiler/colors"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
-	"compiler/internal/source"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/source"
 )
 
 func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {
