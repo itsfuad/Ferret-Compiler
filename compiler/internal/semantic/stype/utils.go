@@ -1,4 +1,4 @@
-package types
+package stype
 
 // UnwrapType resolves user types to their underlying types A -> B -> C(not user type), return C
 // Note: This function requires access to symbol tables to properly resolve type aliases.

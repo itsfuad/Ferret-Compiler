@@ -1,35 +1,35 @@
 package typecheck
 
 import (
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/types"
-	atype "compiler/internal/types"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	atype "ferret/compiler/internal/types"
 	"fmt"
 )
 
 // evaluateExpressionType infers the semantic type from an AST expression
-func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) types.Type {
+func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) stype.Type {
 	if expr == nil {
 		return nil
 	}
 
-	var resultType types.Type
+	var resultType stype.Type
 
 	switch e := expr.(type) {
 	// Literals
 	case *ast.StringLiteral:
-		resultType = &types.PrimitiveType{Name: atype.STRING}
+		resultType = &stype.PrimitiveType{Name: atype.STRING}
 	case *ast.IntLiteral:
-		resultType = &types.PrimitiveType{Name: atype.INT32}
+		resultType = &stype.PrimitiveType{Name: atype.INT32}
 	case *ast.FloatLiteral:
-		resultType = &types.PrimitiveType{Name: atype.FLOAT64}
+		resultType = &stype.PrimitiveType{Name: atype.FLOAT64}
 	case *ast.BoolLiteral:
-		resultType = &types.PrimitiveType{Name: atype.BOOL}
+		resultType = &stype.PrimitiveType{Name: atype.BOOL}
 	case *ast.ByteLiteral:
-		resultType = &types.PrimitiveType{Name: atype.BYTE}
+		resultType = &stype.PrimitiveType{Name: atype.BYTE}
 
 	// Complex expressions
 	case *ast.IdentifierExpr:
@@ -59,7 +59,7 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 	return resultType
 }
 
-func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *ctx.Module) types.Type {
+func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *ctx.Module) stype.Type {
 	// Get the type of the function being called
 	functionType := evaluateExpressionType(r, *call.Caller, cm)
 	if functionType == nil {
@@ -67,7 +67,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 	}
 
 	// Verify it's a function type
-	funcType, ok := functionType.(*types.FunctionType)
+	funcType, ok := functionType.(*stype.FunctionType)
 	if !ok {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,

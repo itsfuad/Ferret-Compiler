@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"slices"
 
-	"compiler/colors"
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
-	"compiler/internal/source"
-	"compiler/internal/utils/fs"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/source"
+	"ferret/compiler/internal/utils/fs"
 )
 
 type Parser struct {
@@ -181,33 +181,51 @@ func parseBlock(p *Parser) *ast.Block {
 	}
 }
 
-// parseReturnStmt parses a return statement
 func parseReturnStmt(p *Parser) ast.Statement {
-
 	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
 	end := start
 
-	// Check if there's a value to return
-	var value ast.Expression
-	if !p.match(lexer.SEMICOLON_TOKEN) {
-		value = parseExpression(p)
-		if value == nil {
-			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword")
-		} else {
-			end = *value.Loc().End
+	// Return immediately if there's a semicolon (no return value)
+	if p.match(lexer.SEMICOLON_TOKEN) {
+		return &ast.ReturnStmt{
+			Value:    nil,
+			Location: *source.NewLocation(&start, &end),
+		}
+	}
 
-			// Check if user is trying to return multiple values
-			if p.match(lexer.COMMA_TOKEN) {
-				comma := p.peek()
-				p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "Multiple return values are not supported", report.PARSING_PHASE).AddHint("Functions can only return a single value")
-				// Skip remaining expressions to continue parsing
-				for p.match(lexer.COMMA_TOKEN) {
-					p.advance() // consume comma
-					if expr := parseExpression(p); expr != nil {
-						end = *expr.Loc().End
-					}
-				}
+	// Parse the return expression
+	value := parseExpression(p)
+	if value == nil {
+		token := p.peek()
+		p.ctx.Reports.AddSyntaxError(
+			p.fullPath,
+			source.NewLocation(&token.Start, &token.End),
+			report.INVALID_EXPRESSION,
+			report.PARSING_PHASE,
+		).AddHint("Add an expression after the return keyword")
+
+		return &ast.ReturnStmt{
+			Value:    nil,
+			Location: *source.NewLocation(&start, &end),
+		}
+	}
+
+	end = *value.Loc().End
+
+	// Check for unsupported multiple return values
+	if p.match(lexer.COMMA_TOKEN) {
+		comma := p.peek()
+		p.ctx.Reports.AddSyntaxError(
+			p.fullPath,
+			source.NewLocation(&comma.Start, &comma.End),
+			"Multiple return values are not supported",
+			report.PARSING_PHASE,
+		).AddHint("Functions can only return a single value")
+
+		for p.match(lexer.COMMA_TOKEN) {
+			p.advance() // consume comma
+			if expr := parseExpression(p); expr != nil {
+				end = *expr.Loc().End
 			}
 		}
 	}

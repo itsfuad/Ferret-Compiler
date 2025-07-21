@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"compiler/internal/source"
-	"compiler/internal/types"
+	"ferret/compiler/internal/source"
+	"ferret/compiler/internal/types"
 )
 
 type DataType interface {

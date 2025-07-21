@@ -1,13 +1,13 @@
 package typecheck
 
 import (
-	"compiler/colors"
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/types"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
 	"fmt"
 )
 
@@ -92,8 +92,8 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 	}
 }
 
-func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module) []types.Type {
-	var types []types.Type
+func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module) []stype.Type {
+	var types []stype.Type
 	for _, expr := range *exprs {
 		exprType := evaluateExpressionType(r, expr, cm)
 		if exprType == nil {

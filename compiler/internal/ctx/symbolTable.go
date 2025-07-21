@@ -2,7 +2,6 @@ package ctx
 
 import (
 	"fmt"
-
 )
 
 // SymbolTable manages scoped symbols (variables, constants, etc.)

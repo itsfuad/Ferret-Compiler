@@ -1,8 +1,8 @@
 package ctx
 
 import (
-	"compiler/internal/source"
-	"compiler/internal/semantic/types"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/source"
 )
 
 // SymbolKind represents the kind of symbol (variable, constant, function, type, etc.)
@@ -21,12 +21,12 @@ const (
 type Symbol struct {
 	Name     string
 	Kind     SymbolKind
-	Type     types.Type             // Now uses semantic.Type instead of ast.DataType
-	Location *source.Location // Optional, only when needed for error reporting
+	Type     stype.Type
+	Location *source.Location
 }
 
 // NewSymbol creates a new symbol with the given properties
-func NewSymbol(name string, kind SymbolKind, semanticType types.Type) *Symbol {
+func NewSymbol(name string, kind SymbolKind, semanticType stype.Type) *Symbol {
 	return &Symbol{
 		Name: name,
 		Kind: kind,
@@ -35,7 +35,7 @@ func NewSymbol(name string, kind SymbolKind, semanticType types.Type) *Symbol {
 }
 
 // NewSymbolWithLocation creates a new symbol with location information
-func NewSymbolWithLocation(name string, kind SymbolKind, semanticType types.Type, loc *source.Location) *Symbol {
+func NewSymbolWithLocation(name string, kind SymbolKind, semanticType stype.Type, loc *source.Location) *Symbol {
 	return &Symbol{
 		Name:     name,
 		Kind:     kind,
