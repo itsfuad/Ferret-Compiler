@@ -3,7 +3,7 @@ package ctx
 import (
 	"testing"
 
-	"ferret/compiler/internal/frontend/ast"
+	"compiler/internal/frontend/ast"
 )
 
 func TestModuleFunctions(t *testing.T) {

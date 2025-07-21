@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ferret/compiler/internal/ctx"
+	"compiler/internal/ctx"
 )
 
 const EXT = ".fer"

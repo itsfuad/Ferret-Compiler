@@ -1,8 +1,8 @@
 package ctx
 
 import (
-	"ferret/compiler/internal/semantic/stype"
-	atype "ferret/compiler/internal/types"
+	"compiler/internal/semantic/stype"
+	atype "compiler/internal/types"
 )
 
 func AddPreludeSymbols(table *SymbolTable) *SymbolTable {

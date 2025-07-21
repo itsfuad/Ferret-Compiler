@@ -1,8 +1,8 @@
 package ctx
 
 import (
-	"ferret/compiler/internal/semantic/stype"
-	"ferret/compiler/internal/source"
+	"compiler/internal/semantic/stype"
+	"compiler/internal/source"
 )
 
 // SymbolKind represents the kind of symbol (variable, constant, function, type, etc.)

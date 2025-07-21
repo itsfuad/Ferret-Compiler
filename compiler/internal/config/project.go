@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"ferret/compiler/internal/toml"
+	"compiler/toml"
 )
 
 const CONFIG_FILE = "fer.ret"

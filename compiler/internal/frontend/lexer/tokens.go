@@ -3,9 +3,9 @@ package lexer
 import (
 	"fmt"
 
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/types"
+	"compiler/colors"
+	"compiler/internal/source"
+	"compiler/internal/types"
 )
 
 type TOKEN string

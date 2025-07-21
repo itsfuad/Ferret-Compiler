@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/config"
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/report"
+	"compiler/colors"
+	"compiler/internal/config"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/report"
 )
 
 var contextCreated = false
