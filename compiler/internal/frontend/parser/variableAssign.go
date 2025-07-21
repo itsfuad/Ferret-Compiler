@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/report"
+	"compiler/internal/source"
 )
 
 func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {

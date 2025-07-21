@@ -1,9 +1,9 @@
 package ctx
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/semantic/stype"
-	atype "ferret/compiler/internal/types"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/semantic/stype"
+	atype "compiler/internal/types"
 	"fmt"
 )
 

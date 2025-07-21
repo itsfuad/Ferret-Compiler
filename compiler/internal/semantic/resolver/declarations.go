@@ -1,14 +1,14 @@
 package resolver
 
 import (
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/ctx"
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/semantic"
-	"ferret/compiler/internal/semantic/analyzer"
-	"ferret/compiler/internal/semantic/stype"
-	atype "ferret/compiler/internal/types"
+	"compiler/colors"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/report"
+	"compiler/internal/semantic"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/stype"
+	atype "compiler/internal/types"
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {

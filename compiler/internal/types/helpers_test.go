@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"ferret/compiler/internal/utils/numeric"
+	"compiler/internal/utils/numeric"
 )
 
 func TestIsInteger(t *testing.T) {

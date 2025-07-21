@@ -1,10 +1,10 @@
 package resolver
 
 import (
-	"ferret/compiler/internal/ctx"
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/semantic/analyzer"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/report"
+	"compiler/internal/semantic/analyzer"
 	"fmt"
 )
 
