@@ -53,7 +53,7 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 			)
 
 			if isCastValid(inferredType, explicitType) {
-				rp.AddHint("Want to cast😐 ? Use the 'as' operator to explicitly cast the value")
+				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType.String()))
 			}
 
 			return
@@ -90,7 +90,7 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
 
 			if isCastValid(rhsType, lhsType) {
-				rp.AddHint("Want to cast😐 ? Use the 'as' operator to explicitly cast the value")
+				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType.String()))
 			}
 
 			continue
