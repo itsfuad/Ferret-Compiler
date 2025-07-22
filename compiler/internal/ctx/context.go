@@ -384,13 +384,20 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 
 	projectConfig, err := config.LoadProjectConfig(root)
 	if err != nil {
-		panic(fmt.Errorf("failed to load project config: %w", err))
+		colors.RED.Printf("Failed to load project config: %s\n", err)
+		os.Exit(1)
+	}
+
+	if err = config.ValidateProjectConfig(projectConfig); err != nil {
+		colors.RED.Printf("Invalid project configuration: %s\n", err)
+		os.Exit(1)
 	}
 
 	//get the entry point relative to the project root
 	entryPoint, err := filepath.Rel(root, entrypointFullpath)
 	if err != nil {
-		panic(fmt.Errorf("failed to get relative path for entry point: %w", err))
+		colors.RED.Printf("Failed to get relative path for entry point: %s\n", err)
+		os.Exit(1)
 	}
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
