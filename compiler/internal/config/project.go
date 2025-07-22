@@ -1,9 +1,11 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"compiler/toml"
 )
@@ -19,9 +21,8 @@ type ProjectConfig struct {
 	ProjectRoot  string
 
 	// Top-level project metadata
-	Name     string `toml:"name"`
-	Version  string `toml:"version"`
-	Optimize bool   `toml:"optimize"`
+	Name    string `toml:"name"`
+	Version string `toml:"version"`
 }
 
 // CompilerConfig contains compiler-specific settings
@@ -48,28 +49,141 @@ type DependencyConfig struct {
 func CreateDefaultProjectConfig(projectRoot string) error {
 	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 
-	// Create TOML content as a string (simpler than marshalling structs to TOML)
-	defaultContent :=
-		`name = "ferret_project"
-	version = "0.1.0"
-	optimize = false
+	// Generate config content using strings
+	configContent := generateDefaultConfig()
 
-	[compiler]
-	version = "0.1.0"
-
-	[cache]
-	path = ".ferret/modules"
-
-	[remote]
-	enabled = true
-	share = false
-
-	[dependencies]
-	# Your external dependencies go here
-	`
-
-	if err := os.WriteFile(configPath, []byte(defaultContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	fmt.Printf("✓ Created %s successfully!\n", CONFIG_FILE)
+	return nil
+}
+
+func ReadFromPrompt(prompt string, defaultValue string) (string, error) {
+	fmt.Print(prompt)
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		value := strings.TrimSpace(scanner.Text())
+		if value == "" {
+			return defaultValue, nil // Use default if empty input
+		}
+		return value, nil // Use provided input
+	}
+	if err := scanner.Err(); err != nil {
+		return defaultValue, fmt.Errorf("error reading input: %w", err)
+	}
+	return defaultValue, nil
+}
+
+// ReadBoolFromPrompt reads a boolean value from user input with validation
+func ReadBoolFromPrompt(prompt string, defaultValue bool) (bool, error) {
+	defaultStr := "false"
+	if defaultValue {
+		defaultStr = "true"
+	}
+
+	for {
+		value, err := ReadFromPrompt(prompt, defaultStr)
+		if err != nil {
+			return defaultValue, err
+		}
+
+		switch strings.ToLower(value) {
+		case "true", "yes", "y":
+			return true, nil
+		case "false", "no", "n":
+			return false, nil
+		default:
+			fmt.Printf("Invalid input '%s'. Please enter true/false, yes/no, or y/n: ", value)
+			continue
+		}
+	}
+}
+
+// generateDefaultConfig creates the default configuration content
+func generateDefaultConfig() string {
+	var sb strings.Builder
+
+	// Get project name
+	projectName, err := ReadFromPrompt("Enter project name (press enter for default: main): ", "main")
+	if err != nil {
+		fmt.Printf("Error reading project name: %v\n", err)
+		projectName = "main" // Fallback to default
+	}
+
+	// Validate project name (basic validation)
+	if strings.TrimSpace(projectName) == "" {
+		projectName = "main"
+	}
+
+	// Get remote enabled setting
+	remoteEnabled, err := ReadBoolFromPrompt("Enable remote module import/export (press enter for default: false)? ", false)
+	if err != nil {
+		fmt.Printf("Error reading remote setting: %v\n", err)
+		remoteEnabled = false // Fallback to default
+	}
+
+	// Get share enabled setting
+	shareEnabled, err := ReadBoolFromPrompt("Enable sharing of remote modules (press enter for default: false)? ", false)
+	if err != nil {
+		fmt.Printf("Error reading share setting: %v\n", err)
+		shareEnabled = false // Fallback to default
+	}
+
+	// Build configuration content
+	sb.WriteString("[default]\n")
+	sb.WriteString(fmt.Sprintf("name = \"%s\"\n", projectName))
+	sb.WriteString("version = \"1.0.0\"\n\n")
+
+	sb.WriteString("[compiler]\n")
+	sb.WriteString("version = \"0.1.0\"\n\n")
+
+	sb.WriteString("[cache]\n")
+	sb.WriteString("path = \".ferret/cache\"\n\n")
+
+	sb.WriteString("[remote]\n")
+	if remoteEnabled {
+		sb.WriteString("enabled = true\n")
+	} else {
+		sb.WriteString("enabled = false\n")
+	}
+	if shareEnabled {
+		sb.WriteString("share = true\n\n")
+	} else {
+		sb.WriteString("share = false\n\n")
+	}
+
+	sb.WriteString("[dependencies]\n")
+	sb.WriteString("# Add your dependencies here\n")
+	sb.WriteString("# example = \"1.0.0\"\n")
+
+	return sb.String()
+}
+
+func ValidateProjectConfig(config *ProjectConfig) error {
+	if config == nil {
+		return fmt.Errorf("project configuration is nil")
+	}
+
+	if config.Name == "" {
+		return fmt.Errorf("project name is required in the configuration file")
+	}
+
+	if config.Version == "" {
+		return fmt.Errorf("project version is required in the configuration file")
+	}
+
+	if config.Compiler.Version == "" {
+		return fmt.Errorf("compiler version is required in the configuration file")
+	}
+
+	if config.Cache.Path == "" {
+		return fmt.Errorf("cache path is required in the configuration file")
+	}
+
+	if config.ProjectRoot == "" {
+		return fmt.Errorf("project root is required in the configuration file")
 	}
 
 	return nil
@@ -113,9 +227,6 @@ func parseDefaultSection(tomlData toml.TOMLData, config *ProjectConfig) {
 		}
 		if version, ok := defaultSection["version"].(string); ok {
 			config.Version = version
-		}
-		if optimize, ok := defaultSection["optimize"].(bool); ok {
-			config.Optimize = optimize
 		}
 	}
 }
