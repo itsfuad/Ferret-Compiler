@@ -96,11 +96,27 @@
     }
   },
   "main": "./out/lsp.js",
+  "scripts": {
+    "bundle": "esbuild src/lsp.ts --bundle --platform=node --outfile=out/lsp.js --external:vscode",
+    "vscode:prepublish": "npm run compile && npm run bundle",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.7",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^4.9.5"
+  },
   "keywords": [
-    "ferret",
+    "Walrus",
     "Programming",
     "Language"
   ],
   "author": "Fuad Hasan",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
 }
