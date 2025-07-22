@@ -44,13 +44,18 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 		}
 
 		if !IsAssignableFrom(explicitType, inferredType) {
-			r.Ctx.Reports.AddSemanticError(
+			rp := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				initializer.Loc(),
 				fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'",
 					inferredType.String(), variable.Identifier.Name, explicitType.String()),
 				report.TYPECHECK_PHASE,
 			)
+
+			if isCastValid(inferredType, explicitType) {
+				rp.AddHint("Want to cast😐 ? Use the 'as' operator to explicitly cast the value")
+			}
+
 			return
 		}
 	}
@@ -82,7 +87,12 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			continue
 		}
 		if !IsAssignableFrom(lhsType, rhsType) {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
+			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
+
+			if isCastValid(rhsType, lhsType) {
+				rp.AddHint("Want to cast😐 ? Use the 'as' operator to explicitly cast the value")
+			}
+
 			continue
 		}
 	}

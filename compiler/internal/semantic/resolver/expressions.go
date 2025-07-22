@@ -51,6 +51,10 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) 
 		resolveExpr(r, *e.Index, cm)
 	case *ast.FunctionLiteral:
 		//add later
+	case *ast.CastExpr:
+		// Resolve the value being cast
+		resolveExpr(r, *e.Value, cm)
+		// Target type doesn't need resolution as it's a type declaration
 	default:
 		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, expr.Loc(), fmt.Sprintf("Expression <%T> is not implemented yet", e), report.RESOLVER_PHASE)
 	}
