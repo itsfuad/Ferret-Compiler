@@ -173,7 +173,29 @@ func parseUnary(p *Parser) ast.Expression {
 		}
 	}
 
-	return parsePostfix(p)
+	return parseCast(p)
+}
+
+// parseCast handles type cast expressions (value as Type)
+func parseCast(p *Parser) ast.Expression {
+	expr := parsePostfix(p)
+
+	if p.match(lexer.AS_TOKEN) {
+		asToken := p.advance()
+		targetType, ok := parseType(p)
+		if !ok || targetType == nil {
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&asToken.Start, &asToken.End), "Expected type after 'as' keyword", report.PARSING_PHASE)
+			return expr
+		}
+
+		return &ast.CastExpr{
+			Value:      &expr,
+			TargetType: targetType,
+			Location:   *source.NewLocation(expr.Loc().Start, targetType.Loc().End),
+		}
+	}
+
+	return expr
 }
 
 // parseIndexing handles array/map indexing operations
