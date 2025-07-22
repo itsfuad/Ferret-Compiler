@@ -77,5 +77,5 @@ func (v *VarScopeResolution) Loc() *source.Location {
 	return &v.Location
 }
 func (v *VarScopeResolution) Type() types.TYPE_NAME {
-	return types.TYPE_NAME(v.Identifier.Name)
+	return types.TYPE_NAME(fmt.Sprintf("%s::%s", v.Module.Name, v.Identifier.Name))
 }
