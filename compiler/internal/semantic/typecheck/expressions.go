@@ -4,6 +4,7 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
 	atype "compiler/internal/types"
@@ -44,6 +45,8 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 		resultType = checkImportedSymbolType(r, e, cm)
 	case *ast.FunctionCallExpr:
 		resultType = checkFunctionCallType(r, e, cm)
+	case *ast.CastExpr:
+		resultType = checkCastExprType(r, e, cm)
 
 	default:
 		// Unknown expression type
@@ -112,4 +115,71 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 
 	// Return the function's return type (single return type now)
 	return funcType.ReturnType
+}
+
+// checkCastExprType validates type cast expressions and returns the target type
+func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *ctx.Module) stype.Type {
+	// Evaluate the source expression type
+	sourceType := evaluateExpressionType(r, *cast.Value, cm)
+	if sourceType == nil {
+		return nil
+	}
+
+	// Convert AST target type to semantic type
+	targetType, err := semantic.DeriveSemanticType(cast.TargetType, cm)
+	if err != nil || targetType == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			cast.Loc(),
+			fmt.Sprintf("invalid target type in cast expression: %v", err),
+			report.TYPECHECK_PHASE,
+		)
+		return nil
+	}
+
+	// Check if the cast is valid
+	if !isCastValid(sourceType, targetType) {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			cast.Loc(),
+			fmt.Sprintf("cannot cast from '%s' to '%s'", sourceType.String(), targetType.String()),
+			report.TYPECHECK_PHASE,
+		)
+		return targetType // Still return target type for further analysis
+	}
+
+	return targetType
+}
+
+// isCastValid determines if a cast from sourceType to targetType is valid
+func isCastValid(sourceType, targetType stype.Type) bool {
+	// Allow casting between same types (no-op cast)
+	if sourceType.String() == targetType.String() {
+		return true
+	}
+
+	sourcePrim, sourceOk := sourceType.(*stype.PrimitiveType)
+	targetPrim, targetOk := targetType.(*stype.PrimitiveType)
+
+	// Both types must be primitive types for casting
+	if !sourceOk || !targetOk {
+		return false
+	}
+
+	// Allow ALL numeric to numeric casting with explicit "as" keyword
+	// The developer explicitly requests the conversion, so allow both widening and narrowing
+	if atype.IsNumericTypeName(sourcePrim.Name) && atype.IsNumericTypeName(targetPrim.Name) {
+		return true
+	}
+
+	// Special case: byte can be cast to/from u8 and i8
+	if sourcePrim.Name == atype.BYTE {
+		return targetPrim.Name == atype.UINT8 || targetPrim.Name == atype.INT8
+	}
+	if targetPrim.Name == atype.BYTE {
+		return sourcePrim.Name == atype.UINT8 || sourcePrim.Name == atype.INT8
+	}
+
+	// No valid cast found
+	return false
 }
