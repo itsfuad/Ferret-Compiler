@@ -30,7 +30,7 @@ x, y, z = 1, 2, 3; // multiple assignment in a single line
 
 let largeNumber: i64 = 1_000_000_000; // largeNumber is of type i64 with a value of 1 billion
 
-x = largeNumber as i32; // narrowing cast - now allowed
+x = largeNumber; // narrowing cast - now allowed
 
 fn add(a: i32, b: i32) -> i32 {
     return a + b; // returns the sum of a and b
