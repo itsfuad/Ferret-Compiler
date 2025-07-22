@@ -1,12 +1,12 @@
-name = "ferret_test_app"
-version = "0.1.0"
-optimize = false
+[default]
+name = "myapp"
+version = "1.0.0"
 
 [compiler]
 version = "0.1.0"
 
 [cache]
-path = ".ferret/modules"
+path = ".ferret/cache"
 
 [remote]
 enabled = false
@@ -14,4 +14,4 @@ share = false
 
 [dependencies]
 # Add your dependencies here
-# example_lib = "1.0.0"
+# example = "1.0.0"
