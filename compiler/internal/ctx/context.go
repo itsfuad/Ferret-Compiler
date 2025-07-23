@@ -1,7 +1,6 @@
 package ctx
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -60,8 +59,6 @@ type CompilerContext struct {
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
 	ModulesPath   string // Path to system built-in modules
-
-	remoteConfigs map[string]bool
 
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
@@ -144,71 +141,6 @@ func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
 	}
 	filename := filepath.Base(fullPath)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
-}
-
-func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectConfig {
-	if c.remoteConfigs == nil {
-		return nil
-	}
-	_, exists := c.remoteConfigs[configFilepath]
-	if !exists {
-		return nil
-	}
-	cacheFile, err := os.ReadFile(filepath.FromSlash(configFilepath))
-	if err != nil {
-		return nil
-	}
-	var projectConfig config.ProjectConfig
-	if err := json.Unmarshal(cacheFile, &projectConfig); err != nil {
-		return nil
-	}
-	return &projectConfig
-}
-
-func (c *CompilerContext) SetRemoteConfig(configFilepath string, data []byte) error {
-	if c.remoteConfigs == nil {
-		c.remoteConfigs = make(map[string]bool)
-	}
-	c.remoteConfigs[configFilepath] = true
-	err := os.MkdirAll(filepath.Dir(configFilepath), 0755)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(configFilepath, data, 0644)
-	if err != nil {
-		return err
-	}
-	colors.GREEN.Printf("Cached remote config for %s\n", configFilepath)
-	return nil
-}
-
-func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.ProjectConfig {
-
-	logicalPath = filepath.ToSlash(logicalPath)
-
-	if c.remoteConfigs == nil {
-		return nil
-	}
-
-	logicalPath = filepath.ToSlash(logicalPath)
-	parts := strings.Split(logicalPath, "/")
-
-	// Start from full path, walk up to github.com/user/repo
-	for i := len(parts); i >= 3; i-- {
-		prefix := strings.Join(parts[:i], "/")
-		if _, exists := c.remoteConfigs[prefix]; exists {
-			data, err := os.ReadFile(filepath.FromSlash(prefix))
-			if err != nil {
-				continue
-			}
-			var cfg config.ProjectConfig
-			if err := json.Unmarshal(data, &cfg); err != nil {
-				continue
-			}
-			return &cfg
-		}
-	}
-	return nil
 }
 
 func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
