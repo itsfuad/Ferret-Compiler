@@ -33,19 +33,9 @@ type GitHubRelease struct {
 
 // DownloadRemoteModule downloads a remote module from GitHub releases
 func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersion string) error {
-	// Check if we have a locked version first
-	lockedVersion, err := GetLockedVersion(context.ProjectRoot, repoPath)
+	version, err := resolveVersionToUse(context, repoPath, requestedVersion)
 	if err != nil {
-		return fmt.Errorf("failed to read lock file: %w", err)
-	}
-
-	// Use locked version if available, otherwise resolve the requested version
-	var version string
-	if lockedVersion != "" && requestedVersion == "latest" {
-		version = lockedVersion
-		colors.CYAN.Printf("Using locked version %s for %s\n", version, repoPath)
-	} else {
-		version = requestedVersion
+		return err
 	}
 
 	if context.IsRemoteModuleCached(repoPath, version) {
@@ -53,61 +43,94 @@ func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersi
 		return nil
 	}
 
+	actualVersion, err := downloadAndExtractModule(context, repoPath, version)
+	if err != nil {
+		return err
+	}
+
+	return updateProjectFiles(context, repoPath, requestedVersion, actualVersion)
+}
+
+// resolveVersionToUse determines which version to use based on locked version and requested version
+func resolveVersionToUse(context *ctx.CompilerContext, repoPath, requestedVersion string) (string, error) {
+	lockedVersion, err := GetLockedVersion(context.ProjectRoot, repoPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read lock file: %w", err)
+	}
+
+	if lockedVersion != "" && requestedVersion == "latest" {
+		colors.CYAN.Printf("Using locked version %s for %s\n", lockedVersion, repoPath)
+		return lockedVersion, nil
+	}
+
+	return requestedVersion, nil
+}
+
+// downloadAndExtractModule handles the download and extraction process
+func downloadAndExtractModule(context *ctx.CompilerContext, repoPath, version string) (string, error) {
 	colors.BLUE.Printf("Downloading %s@%s...\n", repoPath, version)
 
-	// Get the download URL from GitHub API
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, version)
 	if err != nil {
-		return fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, version, err)
+		return "", fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, version, err)
 	}
 
 	colors.CYAN.Printf("Downloading from: %s\n", downloadURL)
 
+	tempFile, err := downloadToTempFile(downloadURL)
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tempFile)
+
+	cachePath := context.GetRemoteModuleCachePath(repoPath, actualVersion)
+	err = extractZip(tempFile, cachePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract archive: %w", err)
+	}
+
+	return actualVersion, nil
+}
+
+// downloadToTempFile downloads content from URL to a temporary file and returns the file path
+func downloadToTempFile(downloadURL string) (string, error) {
 	resp, err := http.Get(downloadURL)
 	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", downloadURL, err)
+		return "", fmt.Errorf("failed to download %s: %w", downloadURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download %s: HTTP %d", downloadURL, resp.StatusCode)
+		return "", fmt.Errorf("failed to download %s: HTTP %d", downloadURL, resp.StatusCode)
 	}
 
-	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "ferret-module-*.zip")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Download to temp file
 	_, err = io.Copy(tmpFile, resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to save download: %w", err)
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to save download: %w", err)
 	}
 
-	// Extract to cache directory using the actual version
-	cachePath := context.GetRemoteModuleCachePath(repoPath, actualVersion)
-	err = extractZip(tmpFile.Name(), cachePath)
-	if err != nil {
-		return fmt.Errorf("failed to extract archive: %w", err)
-	}
+	return tmpFile.Name(), nil
+}
 
+// updateProjectFiles updates lockfile and fer.ret after successful download
+func updateProjectFiles(context *ctx.CompilerContext, repoPath, requestedVersion, actualVersion string) error {
 	// Update lockfile
-	err = UpdateLockEntry(context.ProjectRoot, repoPath, actualVersion, downloadURL)
+	downloadURL, _, _ := getGitHubDownloadURL(repoPath, actualVersion)
+	err := UpdateLockEntry(context.ProjectRoot, repoPath, actualVersion, downloadURL)
 	if err != nil {
 		colors.YELLOW.Printf("Warning: Failed to update lock file: %v\n", err)
 	}
 
 	// Update fer.ret dependencies (only if this was a manual install, not from fer.ret)
-	if requestedVersion != "latest" || lockedVersion == "" {
-		versionConstraint := actualVersion
-		if strings.HasPrefix(actualVersion, "v") {
-			versionConstraint = "^" + actualVersion // Use semver constraint
-		}
-
-		err = UpdateFerRetDependencies(context.ProjectRoot, repoPath, versionConstraint)
+	if shouldUpdateFerRet(context.ProjectRoot, repoPath, requestedVersion) {
+		err = updateFerRetWithNewDependency(context.ProjectRoot, repoPath, actualVersion)
 		if err != nil {
 			colors.YELLOW.Printf("Warning: Failed to update fer.ret: %v\n", err)
 		}
@@ -115,6 +138,22 @@ func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersi
 
 	colors.GREEN.Printf("Successfully cached %s@%s\n", repoPath, actualVersion)
 	return nil
+}
+
+// shouldUpdateFerRet determines if fer.ret should be updated based on the request
+func shouldUpdateFerRet(projectRoot, repoPath, requestedVersion string) bool {
+	lockedVersion, _ := GetLockedVersion(projectRoot, repoPath)
+	return requestedVersion != "latest" || lockedVersion == ""
+}
+
+// updateFerRetWithNewDependency adds the dependency to fer.ret with appropriate version constraint
+func updateFerRetWithNewDependency(projectRoot, repoPath, actualVersion string) error {
+	versionConstraint := actualVersion
+	if strings.HasPrefix(actualVersion, "v") {
+		versionConstraint = "^" + actualVersion // Use semver constraint
+	}
+
+	return UpdateFerRetDependencies(projectRoot, repoPath, versionConstraint)
 }
 
 // getGitHubDownloadURL gets the download URL for a GitHub repository release
