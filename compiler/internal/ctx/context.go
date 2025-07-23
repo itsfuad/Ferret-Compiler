@@ -48,6 +48,7 @@ type Module struct {
 	SymbolTable *SymbolTable
 	Phase       ModulePhase // Current processing phase
 	IsBuiltin   bool        // Whether this is a builtin module
+	Type        string      // Module type: "LOCAL", "BUILTIN", or "REMOTE"
 }
 
 type CompilerContext struct {
@@ -321,9 +322,22 @@ func (c *CompilerContext) PrintModules() {
 	colors.BLUE.Println("Modules in cache:")
 	for _, name := range modules {
 		module, exists := c.Modules[name]
-		if exists && module.IsBuiltin {
+		if exists {
 			colors.PURPLE.Printf("- %s ", name)
-			colors.LIGHT_BLUE.Println("(built-in)")
+
+			// Color-code by module type
+			switch module.Type {
+			case "BUILTIN":
+				colors.LIGHT_BLUE.Printf("(%s)", module.Type)
+			case "REMOTE":
+				colors.GREEN.Printf("(%s)", module.Type)
+			case "LOCAL":
+				colors.YELLOW.Printf("(%s)", module.Type)
+			default:
+				colors.WHITE.Printf("(%s)", module.Type)
+			}
+
+			fmt.Println() // New line
 		} else {
 			colors.PURPLE.Printf("- %s\n", name)
 		}
@@ -399,11 +413,23 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 	if module == nil {
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
+
+	// Determine module type
+	var moduleType string
+	if isBuiltin {
+		moduleType = "BUILTIN"
+	} else if strings.HasPrefix(importPath, "github.com/") {
+		moduleType = "REMOTE"
+	} else {
+		moduleType = "LOCAL"
+	}
+
 	c.Modules[importPath] = &Module{
 		AST:         module,
 		SymbolTable: NewSymbolTable(c.Builtins),
 		Phase:       PhaseParsed, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
+		Type:        moduleType,
 	}
 }
 

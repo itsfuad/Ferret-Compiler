@@ -1,12 +1,12 @@
 {
   "version": "1.0",
-  "generated_at": "2025-07-23T17:52:49Z",
+  "generated_at": "2025-07-23T18:58:10Z",
   "packages": {
     "github.com/itsfuad/ferret-mod": {
       "version": "v0",
-      "resolved_url": "https://api.github.com/repos/itsfuad/ferret-mod/zipball/v0",
+      "resolved_url": "https://github.com/itsfuad/ferret-mod/archive/refs/tags/v0.zip",
       "checksum": "a07a9e7e794e6fedbf9abede725ead12474677f4e609f2de3eda915d8eb5263f",
-      "downloaded_at": "2025-07-23T17:52:49Z"
+      "downloaded_at": "2025-07-23T18:58:10Z"
     }
   }
 }
