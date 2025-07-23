@@ -152,10 +152,6 @@ func generateDefaultConfig() string {
 		sb.WriteString("share = false\n\n")
 	}
 
-	sb.WriteString("[dependencies]\n")
-	sb.WriteString("# Add your dependencies here\n")
-	sb.WriteString("# example = \"1.0.0\"\n")
-
 	return sb.String()
 }
 

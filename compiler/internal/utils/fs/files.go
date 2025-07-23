@@ -95,7 +95,7 @@ func LastPart(path string) string {
 func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerContext) (string, error) {
 
 	if IsRemote(importPath) {
-		return "", fmt.Errorf("remote imports are not supported yet: %s", importPath)
+		return resolveRemoteModule(importPath, ctxx)
 	}
 
 	//the first part of the import path is the root
@@ -135,4 +135,85 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 	}
 
 	return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
+}
+
+// resolveRemoteModule resolves a remote module import by checking local cache
+func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, error) {
+	repoPath, version, subPath := ctxx.ParseRemoteImport(importPath)
+
+	if repoPath == "" {
+		return "", fmt.Errorf("invalid remote import path: %s", importPath)
+	}
+
+	// Resolve the version to the actual cached version
+	actualVersion, err := resolveVersionForCache(repoPath, version, ctxx)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if module is cached locally with the resolved version
+	if !ctxx.IsRemoteModuleCached(repoPath, actualVersion) {
+		return "", fmt.Errorf("remote module not found in cache: %s@%s\nRun: ferret get %s", repoPath, version, repoPath)
+	}
+
+	// Construct path to the cached module file
+	cachePath := ctxx.GetRemoteModuleCachePath(repoPath, actualVersion)
+	var modulePath string
+
+	if subPath != "" {
+		modulePath = filepath.Join(cachePath, subPath+EXT)
+	} else {
+		// If no subpath, look for main module file (could be index.fer, main.fer, etc.)
+		// Try common entry point names
+		possibleFiles := []string{"index.fer", "main.fer", "mod.fer"}
+		for _, fileName := range possibleFiles {
+			candidatePath := filepath.Join(cachePath, fileName)
+			if IsValidFile(candidatePath) {
+				modulePath = candidatePath
+				break
+			}
+		}
+
+		if modulePath == "" {
+			return "", fmt.Errorf("no entry point found in cached module: %s@%s", repoPath, actualVersion)
+		}
+	}
+
+	if !IsValidFile(modulePath) {
+		return "", fmt.Errorf("module file not found in cache: %s", modulePath)
+	}
+
+	return modulePath, nil
+}
+
+// resolveVersionForCache resolves version like "latest" to actual cached version
+func resolveVersionForCache(repoPath, version string, ctxx *ctx.CompilerContext) (string, error) {
+	if version != "latest" {
+		return version, nil
+	}
+
+	// For "latest", we need to find what version was actually cached
+	// List all cached versions for this repo
+	cacheDir := filepath.Join(ctxx.RemoteCachePath, strings.TrimPrefix(repoPath, "github.com/"))
+
+	// Look for directories that match the pattern reponame@version
+	parentDir := filepath.Dir(cacheDir)
+	repoName := filepath.Base(cacheDir)
+
+	entries, err := os.ReadDir(parentDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to read cache directory: %w", err)
+	}
+
+	// Find directories that start with repoName@
+	prefix := repoName + "@"
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) {
+			// Extract version from directory name
+			actualVersion := strings.TrimPrefix(entry.Name(), prefix)
+			return actualVersion, nil
+		}
+	}
+
+	return "", fmt.Errorf("no cached version found for %s", repoPath)
 }
