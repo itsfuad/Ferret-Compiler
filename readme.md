@@ -53,22 +53,26 @@ ferret
 ```
 
 ### Project Configuration
-The `.ferret.json` file contains project-specific settings:
+The `fer.ret` file contains project-specific settings:
 
-```json
-{
-  "compiler": {
-    "version": "0.1.0"
-  },
-  "cache": {
-    "path": ".ferret/modules"
-  },
-  "remote": {
-    "enabled": true,
-    "share": false
-  },
-  "dependencies": {}
-}
+```toml
+[default]
+name = "myapp"
+version = "1.0.0"
+
+[compiler]
+version = "0.1.0"
+
+[cache]
+path = ".ferret/cache"
+
+[remote]
+enabled = false
+share = false
+
+[dependencies]
+# Add your dependencies here
+# example = "1.0.0"
 ```
 
 ## Key Features
@@ -125,6 +129,13 @@ a /= b;            // Divide and assign
 a %= b;            // Modulo and assign
 ```
 
+### Type casting
+```rs
+// Type casting
+let a: i32 = 10;
+let b: f32 = a as f32; // Cast i32 to f32
+```
+
 ## Compiler Architecture
 
 The Ferret compiler follows a multi-stage compilation pipeline designed for maintainability and extensibility:
@@ -169,7 +180,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [ ] Conditionals
 - [ ] Loops (for, while)
 - [ ] Switch statements
-- [ ] Type casting
+- [x] Type casting
 - [ ] Maps
 - [ ] Range expressions
 - [ ] Error handling
