@@ -106,29 +106,30 @@ func generateDefaultConfig() string {
 	var sb strings.Builder
 
 	// Get project name
-	projectName, err := ReadFromPrompt("Enter project name (press enter for default: main): ", "main")
+	projectName, err := ReadFromPrompt("Enter project name (press enter for default: app): ", "app")
 	if err != nil {
 		fmt.Printf("Error reading project name: %v\n", err)
-		projectName = "main" // Fallback to default
+		os.Exit(1)
 	}
 
-	// Validate project name (basic validation)
-	if strings.TrimSpace(projectName) == "" {
-		projectName = "main"
+	//must not contain spaces or special characters in the middle
+	if strings.ContainsAny(projectName, " \t\n\r") || strings.ContainsAny(projectName, "!@#$%^&*()+=[]{}|;:'\",.<>?/\\") {
+		fmt.Println("Project name must not contain spaces or special characters.")
+		os.Exit(1)
 	}
 
 	// Get remote enabled setting
 	remoteEnabled, err := ReadBoolFromPrompt("Enable remote module import/export (press enter for default: false)? ", false)
 	if err != nil {
 		fmt.Printf("Error reading remote setting: %v\n", err)
-		remoteEnabled = false // Fallback to default
+		os.Exit(1)
 	}
 
 	// Get share enabled setting
 	shareEnabled, err := ReadBoolFromPrompt("Enable sharing of remote modules (press enter for default: false)? ", false)
 	if err != nil {
 		fmt.Printf("Error reading share setting: %v\n", err)
-		shareEnabled = false // Fallback to default
+		os.Exit(1)
 	}
 
 	// Build configuration content

@@ -77,8 +77,18 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	}
 	relPath = filepath.ToSlash(relPath)
 	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-	rootName := filepath.Base(c.ProjectRoot)
-	return rootName + "/" + moduleName
+
+	// Use project name from configuration instead of folder name
+	projectName := ""
+	if c.ProjectConfig != nil {
+		projectName = c.ProjectConfig.Name
+	}
+	if projectName == "" {
+		// Fallback to folder name if project name is not available
+		projectName = filepath.Base(c.ProjectRoot)
+	}
+
+	return projectName + "/" + moduleName
 }
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
