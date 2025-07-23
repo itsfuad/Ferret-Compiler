@@ -32,7 +32,7 @@ ferret init
 ferret init /path/to/project
 ```
 
-This creates a `.ferret.json` configuration file with default settings.
+This creates a `fer.ret` configuration file with default settings.
 
 #### Compile and run Ferret code
 ```bash

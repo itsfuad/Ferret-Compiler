@@ -119,14 +119,14 @@ func generateDefaultConfig() string {
 	}
 
 	// Get remote enabled setting
-	remoteEnabled, err := ReadBoolFromPrompt("Enable remote module import/export (press enter for default: false)? ", false)
+	remoteEnabled, err := ReadBoolFromPrompt("Do you want to allow remote module import ([Yes|No|Y|N] default: no)? ", false)
 	if err != nil {
 		fmt.Printf("Error reading remote setting: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Get share enabled setting
-	shareEnabled, err := ReadBoolFromPrompt("Enable sharing of remote modules (press enter for default: false)? ", false)
+	shareEnabled, err := ReadBoolFromPrompt("Do you want to allow sharing your modules to others as remote modules ([Yes|No|Y|N] default: no)? ", false)
 	if err != nil {
 		fmt.Printf("Error reading share setting: %v\n", err)
 		os.Exit(1)
@@ -139,9 +139,6 @@ func generateDefaultConfig() string {
 
 	sb.WriteString("[compiler]\n")
 	sb.WriteString("version = \"0.1.0\"\n\n")
-
-	sb.WriteString("[cache]\n")
-	sb.WriteString("path = \".ferret/cache\"\n\n")
 
 	sb.WriteString("[remote]\n")
 	if remoteEnabled {
