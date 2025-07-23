@@ -193,12 +193,11 @@ func resolveVersionForCache(repoPath, version string, ctxx *ctx.CompilerContext)
 	}
 
 	// For "latest", we need to find what version was actually cached
-	// List all cached versions for this repo
-	cacheDir := filepath.Join(ctxx.RemoteCachePath, strings.TrimPrefix(repoPath, "github.com/"))
-
-	// Look for directories that match the pattern reponame@version
-	parentDir := filepath.Dir(cacheDir)
-	repoName := filepath.Base(cacheDir)
+	// The cache structure is: .ferret/modules/github.com/user/repo@version
+	// So we need to look in the directory containing all versions of this repo
+	baseRepoPath := filepath.Join(ctxx.RemoteCachePath, repoPath)
+	parentDir := filepath.Dir(baseRepoPath)
+	repoName := filepath.Base(repoPath) // e.g., "ferret-mod"
 
 	entries, err := os.ReadDir(parentDir)
 	if err != nil {
