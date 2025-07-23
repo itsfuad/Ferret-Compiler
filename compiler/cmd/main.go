@@ -108,7 +108,7 @@ func handleGetCommand(module string) {
 	// Get current working directory to find project root
 	cwd, err := os.Getwd()
 	if err != nil {
-		colors.RED.Println("Failed to get current working directory:", err)
+		colors.RED.Println(err)
 		os.Exit(1)
 	}
 
@@ -154,7 +154,7 @@ func handleRemoveCommand(module string) {
 	// Get current working directory as project root
 	projectRoot, err := os.Getwd()
 	if err != nil {
-		colors.RED.Println("Failed to get current working directory:", err)
+		colors.RED.Println(err)
 		os.Exit(1)
 	}
 
@@ -226,7 +226,7 @@ func main() {
 		if projectRoot == "" {
 			cwd, err := os.Getwd()
 			if err != nil {
-				colors.RED.Println("Failed to get current working directory:", err)
+				colors.RED.Println(err)
 				os.Exit(1)
 			}
 			projectRoot = cwd
