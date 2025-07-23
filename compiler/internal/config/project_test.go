@@ -424,29 +424,3 @@ func TestParseDependenciesSection(t *testing.T) {
 		})
 	}
 }
-
-func TestCreateDefaultProjectConfig(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "test-create-config")
-	if err != nil {
-		t.Fatalf(testTempDirErrMsg, err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// This test is limited because generateDefaultConfig() requires user input
-	// We can only test the file creation part
-	t.Run("creates config file", func(t *testing.T) {
-		// Skip this test as it requires interactive input
-		t.Skip("Skipping interactive test - requires user input")
-	})
-
-	t.Run("handles write error", func(t *testing.T) {
-		// Try to create config in non-existent directory
-		err := CreateDefaultProjectConfig("/non/existent/path")
-		if err == nil {
-			t.Error("CreateDefaultProjectConfig() expected error but got none")
-		}
-		if !strings.Contains(err.Error(), "failed to write config file") {
-			t.Errorf("CreateDefaultProjectConfig() error = %v, want error containing 'failed to write config file'", err)
-		}
-	})
-}

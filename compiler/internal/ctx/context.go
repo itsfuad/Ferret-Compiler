@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"compiler/colors"
@@ -47,6 +48,7 @@ type Module struct {
 	AST         *ast.Program
 	SymbolTable *SymbolTable
 	Phase       ModulePhase // Current processing phase
+	IsBuiltin   bool        // Whether this is a builtin module
 }
 
 type CompilerContext struct {
@@ -58,6 +60,7 @@ type CompilerContext struct {
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
+	ModulesPath   string // Path to system built-in modules
 
 	remoteConfigs map[string]bool
 
@@ -71,6 +74,11 @@ type CompilerContext struct {
 }
 
 func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
+	// Check if this is a built-in module file
+	if c.isBuiltinModuleFile(fullPath) {
+		return c.getBuiltinModuleImportPath(fullPath)
+	}
+
 	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
 		return ""
@@ -89,6 +97,45 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	}
 
 	return projectName + "/" + moduleName
+}
+
+// IsBuiltinModuleFile checks if the given file path is within the built-in modules directory
+func (c *CompilerContext) IsBuiltinModuleFile(fullPath string) bool {
+	return c.isBuiltinModuleFile(fullPath)
+}
+
+// isBuiltinModuleFile checks if the given file path is within the built-in modules directory
+func (c *CompilerContext) isBuiltinModuleFile(fullPath string) bool {
+	if c.ModulesPath == "" {
+		return false
+	}
+
+	absModulesPath, _ := filepath.Abs(c.ModulesPath)
+	absFilePath, _ := filepath.Abs(fullPath)
+
+	relPath, err := filepath.Rel(absModulesPath, absFilePath)
+	return err == nil && !strings.HasPrefix(relPath, "..")
+}
+
+// getBuiltinModuleImportPath generates the import path for built-in module files
+func (c *CompilerContext) getBuiltinModuleImportPath(fullPath string) string {
+	if c.ModulesPath == "" {
+		return ""
+	}
+
+	absModulesPath, _ := filepath.Abs(c.ModulesPath)
+	absFilePath, _ := filepath.Abs(fullPath)
+
+	relPath, err := filepath.Rel(absModulesPath, absFilePath)
+	if err != nil {
+		return ""
+	}
+
+	// Convert to forward slashes and remove extension
+	relPath = filepath.ToSlash(relPath)
+	importPath := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+
+	return importPath
 }
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
@@ -203,9 +250,19 @@ func (c *CompilerContext) PrintModules() {
 		colors.YELLOW.Println("No modules in cache")
 		return
 	}
+
+	//sort
+	sort.Strings(modules)
+
 	colors.BLUE.Println("Modules in cache:")
 	for _, name := range modules {
-		colors.PURPLE.Printf("- %s\n", name)
+		module, exists := c.Modules[name]
+		if exists && module.IsBuiltin {
+			colors.PURPLE.Printf("- %s ", name)
+			colors.LIGHT_BLUE.Println("(built-in)")
+		} else {
+			colors.PURPLE.Printf("- %s\n", name)
+		}
 	}
 }
 
@@ -268,7 +325,7 @@ func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase Modul
 	return currentPhase == requiredPhase-1
 }
 
-func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
+func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBuiltin bool) {
 	if c.Modules == nil {
 		c.Modules = make(map[string]*Module)
 	}
@@ -282,6 +339,7 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 		AST:         module,
 		SymbolTable: NewSymbolTable(c.Builtins),
 		Phase:       PhaseParsed, // Module is parsed when added
+		IsBuiltin:   isBuiltin,
 	}
 }
 
@@ -380,6 +438,43 @@ func (c *CompilerContext) FinishParsing(importPath string) {
 	}
 }
 
+// getModulesPath determines the path to the system built-in modules
+// It looks for a 'modules' directory relative to the compiler binary location
+func getModulesPath() string {
+	// Get the executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		// Fallback to current working directory if we can't get executable path
+		cwd, _ := os.Getwd()
+		return filepath.Join(cwd, "modules")
+	}
+
+	// Get the directory containing the executable
+	execDir := filepath.Dir(execPath)
+
+	// Look for modules directory relative to the executable
+	// This handles both development and production scenarios
+	modulesPath := filepath.Join(execDir, "..", "modules")
+
+	// Check if the modules directory exists
+	if _, err := os.Stat(modulesPath); err == nil {
+		absPath, _ := filepath.Abs(modulesPath)
+		return filepath.ToSlash(absPath)
+	}
+
+	// Fallback: look in the same directory as the executable
+	modulesPath = filepath.Join(execDir, "modules")
+	if _, err := os.Stat(modulesPath); err == nil {
+		absPath, _ := filepath.Abs(modulesPath)
+		return filepath.ToSlash(absPath)
+	}
+
+	// Last resort: return the expected path even if it doesn't exist
+	// This allows for future module installation
+	absPath, _ := filepath.Abs(filepath.Join(execDir, "..", "modules"))
+	return filepath.ToSlash(absPath)
+}
+
 func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
@@ -416,6 +511,14 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	cachePath = filepath.ToSlash(cachePath)
 	os.MkdirAll(cachePath, 0755)
 
+	// Determine modules path relative to compiler binary
+	modulesPath := getModulesPath()
+
+	// Debug: print modules path for troubleshooting
+	if len(os.Args) > 1 && strings.Contains(strings.Join(os.Args, " "), "--debug") {
+		colors.YELLOW.Printf("Modules path: %s\n", modulesPath)
+	}
+
 	return &CompilerContext{
 		EntryPoint:    entryPoint,
 		Builtins:      AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
@@ -424,6 +527,7 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 		CachePath:     cachePath,
 		ProjectConfig: projectConfig,
 		ProjectRoot:   root,
+		ModulesPath:   modulesPath,
 	}
 }
 

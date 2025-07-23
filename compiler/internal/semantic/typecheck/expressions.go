@@ -13,6 +13,7 @@ import (
 
 // evaluateExpressionType infers the semantic type from an AST expression
 func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) stype.Type {
+
 	if expr == nil {
 		return nil
 	}
@@ -153,8 +154,8 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *ctx.Mod
 // isCastValid determines if a cast from sourceType to targetType is valid
 func isCastValid(sourceType, targetType stype.Type) bool {
 
-	sourceType = ctx.UnwrapType(sourceType) // Unwrap any type aliases
-	targetType = ctx.UnwrapType(targetType) // Unwrap any type aliases
+	sourceType = semantic.UnwrapType(sourceType) // Unwrap any type aliases
+	targetType = semantic.UnwrapType(targetType) // Unwrap any type aliases
 
 	// Allow casting between same types (no-op cast)
 	if sourceType.String() == targetType.String() {

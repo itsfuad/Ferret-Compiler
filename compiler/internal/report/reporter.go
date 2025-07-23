@@ -243,7 +243,7 @@ func (r *Reports) createNew(filePath string, location *source.Location, msg stri
 
 func (e *Report) setLevel(level PROBLEM_TYPE) {
 	if level == NULL {
-		panic("call SetLevel() method with valid Error level")
+		panic("invalid Error level")
 	}
 	e.Level = level
 	if level == CRITICAL_ERROR || level == SYNTAX_ERROR {

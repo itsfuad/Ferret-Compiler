@@ -237,7 +237,7 @@ func getLogicalResultType(left, right stype.Type) stype.Type {
 
 // getBitwiseResultType handles bitwise operations
 func getBitwiseResultType(left, right stype.Type) stype.Type {
-	if ctx.IsIntegerType(left) && ctx.IsIntegerType(right) {
+	if semantic.IsIntegerType(left) && semantic.IsIntegerType(right) {
 		return getCommonNumericType(left, right)
 	}
 	return nil
@@ -336,7 +336,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.
 			return nil
 		}
 
-		if !ctx.IsIntegerType(indexType) {
+		if !semantic.IsIntegerType(indexType) {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				(*e.Index).Loc(),

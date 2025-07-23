@@ -35,7 +35,7 @@ func TestModuleFunctions(t *testing.T) {
 
 	// Test with a mock AST program
 	mockAST := &ast.Program{FullPath: "test/path.fr"}
-	ctx.AddModule("test", mockAST)
+	ctx.AddModule("test", mockAST, false) // Test module is not builtin
 
 	// Test GetModule after adding
 	if module, _ := ctx.GetModule("test"); module == nil {
