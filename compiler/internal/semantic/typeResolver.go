@@ -8,6 +8,82 @@ import (
 	"fmt"
 )
 
+// UnwrapType resolves user types to their underlying types A -> B -> C(not user type), return C
+// Note: This function requires access to symbol tables to properly resolve type aliases.
+// For now, it only checks the Definition field. For full resolution, use resolveTypeAlias instead.
+func UnwrapType(t stype.Type) stype.Type {
+	if userType, ok := t.(*stype.UserType); ok {
+		if userType.Definition != nil {
+			return UnwrapType(userType.Definition)
+		}
+	}
+	return t
+}
+
+// IsStringType checks if a stype.Type is string
+func IsStringType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return prim.Name == atype.STRING
+	}
+	return false
+}
+
+// IsBoolType checks if a stype.Type is boolean
+func IsBoolType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return prim.Name == atype.BOOL
+	}
+	return false
+}
+
+// IsNumericType checks if a stype.Type is numeric
+func IsNumericType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return IsNumericTypeName(prim.Name)
+	}
+	return false
+}
+
+// IsIntegerType checks if a stype.Type is an integer stype.Type
+func IsIntegerType(t stype.Type) bool {
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return IsIntegerTypeName(prim.Name)
+	}
+	return false
+}
+
+// IsVoidType checks if a stype.Type is void
+func IsVoidType(t stype.Type) bool {
+	t = UnwrapType(t) // Unwrap any type aliases
+	if prim, ok := t.(*stype.PrimitiveType); ok {
+		return prim.Name == atype.VOID
+	}
+	return false
+}
+
+// IsNumericTypeName checks if a type name is numeric
+func IsNumericTypeName(typeName atype.TYPE_NAME) bool {
+	switch typeName {
+	case atype.INT8, atype.INT16, atype.INT32, atype.INT64,
+		atype.UINT8, atype.UINT16, atype.UINT32, atype.UINT64,
+		atype.FLOAT32, atype.FLOAT64, atype.BYTE:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsIntegerTypeName checks if a type name is an integer type
+func IsIntegerTypeName(typeName atype.TYPE_NAME) bool {
+	switch typeName {
+	case atype.INT8, atype.INT16, atype.INT32, atype.INT64,
+		atype.UINT8, atype.UINT16, atype.UINT32, atype.UINT64, atype.BYTE:
+		return true
+	default:
+		return false
+	}
+}
+
 // DeriveSemanticType converts an AST DataType to a semantic stype.Type
 func DeriveSemanticType(astType ast.DataType, module *ctx.Module) (stype.Type, error) {
 
@@ -42,10 +118,10 @@ func derivePrimitiveTypeFromAst(astType ast.DataType) (*stype.PrimitiveType, err
 func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (stype.Type, error) {
 	symbol, found := module.SymbolTable.Lookup(string(userType.TypeName))
 	if !found {
-		return nil, fmt.Errorf("user-defined type '%s' not found", userType.TypeName)
+		return nil, fmt.Errorf("type '%s' does not exist", userType.TypeName)
 	}
 	if symbol.Type == nil {
-		return nil, fmt.Errorf("user-defined type '%s' has no associated type", userType.TypeName)
+		return nil, fmt.Errorf("type '%s' has no associated type", userType.TypeName)
 	}
 	return symbol.Type, nil
 }
@@ -119,40 +195,4 @@ func deriveSemanticArrayType(array *ast.ArrayType, module *ctx.Module) (stype.Ty
 		ElementType: elementType,
 		Name:        array.TypeName,
 	}, nil
-}
-
-// IsStringType checks if a type is string
-func IsStringType(t stype.Type) bool {
-	t = ctx.UnwrapType(t) // Unwrap any type aliases
-	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == atype.STRING
-	}
-	return false
-}
-
-// IsBoolType checks if a type is boolean
-func IsBoolType(t stype.Type) bool {
-	t = ctx.UnwrapType(t) // Unwrap any type aliases
-	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == atype.BOOL
-	}
-	return false
-}
-
-// IsNumericType checks if a type is numeric
-func IsNumericType(t stype.Type) bool {
-	t = ctx.UnwrapType(t) // Unwrap any type aliases
-	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return atype.IsNumericTypeName(prim.Name)
-	}
-	return false
-}
-
-// IsIntegerType checks if a type is an integer type
-func IsIntegerType(t stype.Type) bool {
-	t = ctx.UnwrapType(t) // Unwrap any type aliases
-	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return atype.IsIntegerTypeName(prim.Name)
-	}
-	return false
 }

@@ -64,9 +64,9 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.Compi
 
 	resolver.ResolveProgram(anz)
 
-	if context.Reports.HasErrors() {
-		panic("Compilation stopped due to resolver errors")
-	}
+	// if context.Reports.HasErrors() {
+	// 	panic("Compilation stopped due to resolver errors")
+	// }
 
 	if isDebugEnabled {
 		colors.GREEN.Println("---------- [Resolver done] ----------")

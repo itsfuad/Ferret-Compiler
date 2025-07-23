@@ -10,6 +10,14 @@ import (
 	"compiler/internal/ctx"
 )
 
+const (
+	//use variables insted of string for files
+	BUILTIN_MODULES_DIR = "modules"
+	BUILTIN_MODULES_EXT = ".fer"
+	MATH_MODULE         = "math/geometry"
+	IO_MODULE           = "std/io"
+)
+
 func TestIsBuiltinModule(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -147,6 +155,64 @@ func TestLastPart(t *testing.T) {
 	}
 }
 
+func TestResolveModuleWithBuiltins(t *testing.T) {
+	// Create temporary project structure
+	tempDir := t.TempDir()
+	projectDir := tempDir
+
+	// Create temporary modules directory
+	modulesDir := filepath.Join(tempDir, "modules")
+	err := os.MkdirAll(filepath.Join(modulesDir, "std"), 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a built-in module file
+	builtinFile := filepath.Join(modulesDir, "std", "io.fer")
+	if err := os.WriteFile(builtinFile, []byte("// Built-in IO module"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name        string
+		projectName string
+		importPath  string
+		modulesPath string
+		wantErr     bool
+	}{
+		{"Valid built-in module", "testproject", IO_MODULE, modulesDir, false},
+		{"Non-existent built-in module", "testproject", "std/nonexistent", modulesDir, true},
+		{"Built-in module wrong path", "testproject", IO_MODULE, "/nonexistent", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctxx := &ctx.CompilerContext{
+				ProjectRoot: projectDir,
+				ModulesPath: tt.modulesPath,
+				ProjectConfig: &config.ProjectConfig{
+					Name: tt.projectName,
+				},
+			}
+
+			result, err := ResolveModule(tt.importPath, "", ctxx)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResolveModule(%q) error = %v, wantErr %v",
+					tt.importPath, err, tt.wantErr)
+			}
+
+			if !tt.wantErr && err == nil {
+				expectedPath := filepath.Join(tt.modulesPath, tt.importPath+".fer")
+				if result != expectedPath {
+					t.Errorf("ResolveModule(%q) = %q, want %q",
+						tt.importPath, result, expectedPath)
+				}
+			}
+		})
+	}
+}
+
 func TestResolveModule(t *testing.T) {
 	// Create temporary project structure
 	tempDir := t.TempDir()
@@ -173,8 +239,8 @@ func TestResolveModule(t *testing.T) {
 		{"Remote import", "testproject", "github.com/user/repo/module", true},
 		{"Empty import", "testproject", "", true},
 		{"Empty project name", "", "someproject/module", true},
-		{"Built-in std module", "testproject", "std/io", true},         // Should error with "not implemented yet"
-		{"Built-in math module", "testproject", "math/geometry", true}, // Should error with "not implemented yet"
+		{"Built-in std module", "testproject", IO_MODULE, true},    // Should error with "not implemented yet"
+		{"Built-in math module", "testproject", MATH_MODULE, true}, // Should error with "not implemented yet"
 		{"Non-existent local module", "testproject", "testproject/nonexistent", true},
 		{"Valid local module", "testproject", "testproject/module/test", false},
 		{"Unknown external module", "testproject", "unknownmodule/something", true}, // Should error with "module not found"

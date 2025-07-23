@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"compiler/colors"
 	"compiler/internal/ctx"
 )
 
@@ -105,8 +106,14 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 
 	// Check if it's a built-in module
 	if IsBuiltinModule(importRoot) {
-		// TODO: Implement built-in module resolution
-		return "", fmt.Errorf("built-in module '%s' is not implemented yet", importRoot)
+		// Search for the module in the system modules directory
+		// e.g., "std/io" becomes "modules/std/io.fer"
+		modulePath := filepath.Join(ctxx.ModulesPath, importPath+EXT)
+		colors.AQUA.Printf("Searching for built-in module: %s -> %s\n", importPath, modulePath)
+		if IsValidFile(modulePath) {
+			return modulePath, nil
+		}
+		return "", fmt.Errorf("built-in module not found: %s", importPath)
 	}
 
 	// Use project name from configuration instead of folder name

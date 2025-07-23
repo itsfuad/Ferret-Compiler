@@ -218,7 +218,8 @@ func (p *Parser) Parse() *ast.Program {
 	}
 
 	// Add the module to the context
-	p.ctx.AddModule(p.importPath, program)
+	isBuiltin := p.ctx.IsBuiltinModuleFile(p.fullPath)
+	p.ctx.AddModule(p.importPath, program, isBuiltin)
 
 	return program
 }

@@ -65,3 +65,9 @@ func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *ctx
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE)
 	}
 }
+
+func resolveExpressionList(r *analyzer.AnalyzerNode, exprList *ast.ExpressionList, cm *ctx.Module) {
+	for _, expr := range *exprList {
+		resolveExpr(r, expr, cm)
+	}
+}
