@@ -60,6 +60,9 @@ type CompilerContext struct {
 	ProjectRoot   string
 	ModulesPath   string // Path to system built-in modules
 
+	// Remote module cache path (.ferret/modules)
+	RemoteCachePath string
+
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 
@@ -141,6 +144,58 @@ func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
 	}
 	filename := filepath.Base(fullPath)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
+}
+
+// IsRemoteImport checks if an import path is a remote module (github.com/*, gitlab.com/*, etc.)
+func (c *CompilerContext) IsRemoteImport(importPath string) bool {
+	return strings.HasPrefix(importPath, "github.com/") ||
+		strings.HasPrefix(importPath, "gitlab.com/") ||
+		strings.HasPrefix(importPath, "bitbucket.org/")
+}
+
+// ParseRemoteImport parses a remote import path and extracts version information
+// Returns: modulePath, version, subpath
+// Example: "github.com/user/repo/folder/mod@v1.0.0" -> "github.com/user/repo", "v1.0.0", "folder/mod"
+func (c *CompilerContext) ParseRemoteImport(importPath string) (string, string, string) {
+	// Check for version specifier
+	atIndex := strings.LastIndex(importPath, "@")
+	var version string
+	var pathWithoutVersion string
+
+	if atIndex != -1 {
+		version = importPath[atIndex+1:]
+		pathWithoutVersion = importPath[:atIndex]
+	} else {
+		version = "latest"
+		pathWithoutVersion = importPath
+	}
+
+	// Parse the path to extract repo and subpath
+	parts := strings.Split(pathWithoutVersion, "/")
+	if len(parts) < 3 {
+		return "", "", ""
+	}
+
+	// For github.com/user/repo/folder/mod -> repo is "github.com/user/repo"
+	repoPath := strings.Join(parts[:3], "/")
+	var subPath string
+	if len(parts) > 3 {
+		subPath = strings.Join(parts[3:], "/")
+	}
+
+	return repoPath, version, subPath
+}
+
+// GetRemoteModuleCachePath returns the cache path for a remote module
+func (c *CompilerContext) GetRemoteModuleCachePath(repoPath, version string) string {
+	return filepath.Join(c.RemoteCachePath, repoPath+"@"+version)
+}
+
+// IsRemoteModuleCached checks if a remote module is already cached locally
+func (c *CompilerContext) IsRemoteModuleCached(repoPath, version string) bool {
+	cachePath := c.GetRemoteModuleCachePath(repoPath, version)
+	_, err := os.Stat(cachePath)
+	return err == nil
 }
 
 func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
@@ -440,19 +495,26 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	// Determine modules path relative to compiler binary
 	modulesPath := getModulesPath()
 
+	// Set up remote module cache path
+	remoteCachePath := filepath.Join(root, ".ferret", "modules")
+	remoteCachePath = filepath.ToSlash(remoteCachePath)
+	os.MkdirAll(remoteCachePath, 0755)
+
 	// Debug: print modules path for troubleshooting
 	if len(os.Args) > 1 && strings.Contains(strings.Join(os.Args, " "), "--debug") {
 		colors.YELLOW.Printf("Modules path: %s\n", modulesPath)
+		colors.YELLOW.Printf("Remote cache path: %s\n", remoteCachePath)
 	}
 
 	return &CompilerContext{
-		EntryPoint:    entryPoint,
-		Builtins:      AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:       make(map[string]*Module),
-		Reports:       report.Reports{},
-		ProjectConfig: projectConfig,
-		ProjectRoot:   root,
-		ModulesPath:   modulesPath,
+		EntryPoint:      entryPoint,
+		Builtins:        AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:         make(map[string]*Module),
+		Reports:         report.Reports{},
+		ProjectConfig:   projectConfig,
+		ProjectRoot:     root,
+		ModulesPath:     modulesPath,
+		RemoteCachePath: remoteCachePath,
 	}
 }
 
