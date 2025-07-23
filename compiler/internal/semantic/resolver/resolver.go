@@ -61,10 +61,19 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 		resolveAssignmentStmt(r, n, cm)
 	case *ast.Block:
 		//pass
+	case *ast.ExpressionList:
+		resolveExpressionList(r, n, cm)
 	case *ast.ExpressionStmt:
-		colors.CYAN.Printf("Resolving expression statement: %v\n", n.Expressions)
-		panic(":)")
+		resolveExpressionStmt(r, n, cm)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for resolution", n), report.RESOLVER_PHASE)
+	}
+}
+
+func resolveExpressionStmt(r *analyzer.AnalyzerNode, n *ast.ExpressionStmt, cm *ctx.Module) {
+	colors.CYAN.Printf("Resolving expression statement: %v\n", n.Expressions)
+
+	for _, expr := range *n.Expressions {
+		resolveExpr(r, expr, cm)
 	}
 }

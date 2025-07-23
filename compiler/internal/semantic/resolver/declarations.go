@@ -23,7 +23,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	var paramTypes []stype.Type
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
-			paramType, err := ctx.DeriveSemanticType(param.Type, cm)
+			paramType, err := semantic.DeriveSemanticType(param.Type, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -34,12 +34,14 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 
 	var returnType stype.Type
 	if fn.Function.ReturnType != nil {
-		retType, err := ctx.DeriveSemanticType(fn.Function.ReturnType, cm)
+		retType, err := semantic.DeriveSemanticType(fn.Function.ReturnType, cm)
 		if err != nil {
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Function.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
 			return
 		}
 		returnType = retType
+	} else {
+		returnType = &stype.PrimitiveType{Name: atype.VOID}
 	}
 
 	// Resolve function body
@@ -67,7 +69,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 		}
 
 		if variable.ExplicitType != nil {
-			got, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
+			got, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -119,16 +121,11 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
 	// Resolve left-hand side expressions (assignees)
 	if assign.Left != nil {
-		for _, lhs := range *assign.Left {
-			resolveExpr(r, lhs, cm)
-		}
+		resolveExpressionList(r, assign.Left, cm)
 	}
-
 	// Resolve right-hand side expressions (values)
 	if assign.Right != nil {
-		for _, rhs := range *assign.Right {
-			resolveExpr(r, rhs, cm)
-		}
+		resolveExpressionList(r, assign.Right, cm)
 	}
 
 	if r.Debug {

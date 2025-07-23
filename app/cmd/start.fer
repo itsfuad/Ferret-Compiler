@@ -1,7 +1,30 @@
 //import "github.com/itsfuad/ferret-mod/data/bigint";
 
+import "std/io";
+import "math/constants";
+import "math/geometry";
 import "myapp/cmd/expr";
 import "myapp/cmd/arrays";
+
+let valueOfPi = constants::PI;
+
+fn voidfn() {
+
+}
+
+fn nonVoidfn() -> i32 {
+    return 42;
+}
+
+//let vx :void = voidfn();
+//let vv = voidfn();
+
+//vv = 10;
+
+nonVoidfn();
+
+io::print("Hello, Ferret!");
+geometry::area_circle(5.0);
 
 // fn doSomething() {
 //     // This function does something
