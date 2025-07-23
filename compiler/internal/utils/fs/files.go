@@ -14,6 +14,28 @@ import (
 const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
 
+// ModuleType represents the category of a module
+type ModuleType int
+
+const (
+	LOCAL ModuleType = iota
+	BUILTIN
+	REMOTE
+)
+
+func (mt ModuleType) String() string {
+	switch mt {
+	case LOCAL:
+		return "LOCAL"
+	case BUILTIN:
+		return "BUILTIN"
+	case REMOTE:
+		return "REMOTE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // Built-in modules that are part of the standard library
 var BUILTIN_MODULES = map[string]bool{
 	"std":  true,
@@ -24,6 +46,26 @@ var BUILTIN_MODULES = map[string]bool{
 	"http": true,
 	"json": true,
 	"time": true,
+}
+
+// DetermineModuleType categorizes an import path
+func DetermineModuleType(importPath string, projectName string) ModuleType {
+	importRoot := FirstPart(importPath)
+
+	if IsRemote(importPath) {
+		return REMOTE
+	}
+
+	if IsBuiltinModule(importRoot) {
+		return BUILTIN
+	}
+
+	if importRoot == projectName {
+		return LOCAL
+	}
+
+	// Default to local for unrecognized paths
+	return LOCAL
 }
 
 func IsBuiltinModule(importRoot string) bool {
@@ -94,51 +136,68 @@ func LastPart(path string) string {
 }
 
 func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerContext) (string, error) {
-
-	if IsRemote(importPath) {
-		return resolveRemoteModule(importPath, ctxx)
+	// Validate import path
+	if importPath == "" {
+		return "", fmt.Errorf("import path cannot be empty")
 	}
 
-	//the first part of the import path is the root
-	importRoot := FirstPart(importPath)
-	if importRoot == "" {
-		return "", fmt.Errorf("invalid import path: %s", importPath)
+	// Get project name for local module resolution
+	projectName := ""
+	if ctxx.ProjectConfig != nil {
+		projectName = ctxx.ProjectConfig.Name
 	}
 
-	// Check if it's a built-in module
-	if IsBuiltinModule(importRoot) {
-		// Search for the module in the system modules directory
-		// e.g., "std/io" becomes "modules/std/io.fer"
-		modulePath := filepath.Join(ctxx.ModulesPath, importPath+EXT)
-		colors.AQUA.Printf("Searching for built-in module: %s -> %s\n", importPath, modulePath)
-		if IsValidFile(modulePath) {
-			return modulePath, nil
-		}
-		return "", fmt.Errorf("built-in module not found: %s", importPath)
-	}
+	// Determine module type
+	moduleType := DetermineModuleType(importPath, projectName)
 
-	// Check if the current file is inside a remote module cache
-	// If so, resolve imports relative to that remote module's project
-	if isFileInRemoteCache(currentFileFullPath, ctxx) {
+	// Handle special case: if current file is in remote cache, local imports should be remote
+	if moduleType == LOCAL && isFileInRemoteCache(currentFileFullPath, ctxx) {
 		return resolveModuleInRemoteContext(importPath, currentFileFullPath, ctxx)
 	}
 
-	// Use project name from configuration instead of folder name
-	projectName := ctxx.ProjectConfig.Name
+	// Route to appropriate resolver based on module type
+	switch moduleType {
+	case REMOTE:
+		return resolveRemoteModule(importPath, ctxx)
+	case BUILTIN:
+		return resolveBuiltinModule(importPath, ctxx)
+	case LOCAL:
+		return resolveLocalModule(importPath, projectName, ctxx)
+	default:
+		return "", fmt.Errorf("unknown module type for import: %s", importPath)
+	}
+}
+
+// resolveBuiltinModule resolves built-in system modules
+func resolveBuiltinModule(importPath string, ctxx *ctx.CompilerContext) (string, error) {
+	modulePath := filepath.Join(ctxx.ModulesPath, importPath+EXT)
+	colors.AQUA.Printf("Searching for built-in module: %s -> %s\n", importPath, modulePath)
+
+	if IsValidFile(modulePath) {
+		return modulePath, nil
+	}
+
+	return "", fmt.Errorf("built-in module not found: %s", importPath)
+}
+
+// resolveLocalModule resolves local project modules
+func resolveLocalModule(importPath, projectName string, ctxx *ctx.CompilerContext) (string, error) {
 	if projectName == "" {
 		return "", fmt.Errorf("project name not defined in configuration")
 	}
 
-	if importRoot == projectName {
-		// Remove the project name from the import path and resolve relative to project root
-		// e.g., "myapp/maths/math" becomes "maths/math"
-		relativePath := strings.TrimPrefix(importPath, projectName+"/")
-		resolvedPath := filepath.Join(ctxx.ProjectRoot, relativePath+EXT)
-
-		if IsValidFile(resolvedPath) {
-			return resolvedPath, nil
-		}
+	importRoot := FirstPart(importPath)
+	if importRoot != projectName {
 		return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
+	}
+
+	// Remove the project name from the import path and resolve relative to project root
+	// e.g., "myapp/maths/math" becomes "maths/math"
+	relativePath := strings.TrimPrefix(importPath, projectName+"/")
+	resolvedPath := filepath.Join(ctxx.ProjectRoot, relativePath+EXT)
+
+	if IsValidFile(resolvedPath) {
+		return resolvedPath, nil
 	}
 
 	return "", fmt.Errorf("module `%s` does not exist in this project", importPath)

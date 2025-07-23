@@ -4,14 +4,7 @@ import (
 	"os"
 )
 
-func parseArgs() (string, bool, bool, string, string, bool, string) {
-	var debug bool
-	var outputPath string
-	var filename string
-	var initProject bool
-	var initPath string
-	var getCommand bool
-	var getModule string
+func parseArgs() (filename string, debug bool, initProject bool, initPath string, outputPath string, getCommand bool, getModule string) {
 
 	args := os.Args[1:]
 
