@@ -47,7 +47,6 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 		resultType = checkFunctionCallType(r, e, cm)
 	case *ast.CastExpr:
 		resultType = checkCastExprType(r, e, cm)
-
 	default:
 		// Unknown expression type
 		resultType = nil
@@ -153,6 +152,10 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *ctx.Mod
 
 // isCastValid determines if a cast from sourceType to targetType is valid
 func isCastValid(sourceType, targetType stype.Type) bool {
+
+	sourceType = ctx.UnwrapType(sourceType) // Unwrap any type aliases
+	targetType = ctx.UnwrapType(targetType) // Unwrap any type aliases
+
 	// Allow casting between same types (no-op cast)
 	if sourceType.String() == targetType.String() {
 		return true
