@@ -1,7 +1,7 @@
 //import "github.com/itsfuad/ferret-mod/data/bigint";
 
-import "app/cmd/expr";
-import "app/cmd/arrays";
+import "myapp/cmd/expr";
+import "myapp/cmd/arrays";
 
 // fn doSomething() {
 //     // This function does something
