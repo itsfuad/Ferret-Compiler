@@ -123,6 +123,7 @@ func deriveSemanticArrayType(array *ast.ArrayType, module *ctx.Module) (stype.Ty
 
 // IsStringType checks if a type is string
 func IsStringType(t stype.Type) bool {
+	t = ctx.UnwrapType(t) // Unwrap any type aliases
 	if prim, ok := t.(*stype.PrimitiveType); ok {
 		return prim.Name == atype.STRING
 	}
@@ -131,6 +132,7 @@ func IsStringType(t stype.Type) bool {
 
 // IsBoolType checks if a type is boolean
 func IsBoolType(t stype.Type) bool {
+	t = ctx.UnwrapType(t) // Unwrap any type aliases
 	if prim, ok := t.(*stype.PrimitiveType); ok {
 		return prim.Name == atype.BOOL
 	}
@@ -139,6 +141,7 @@ func IsBoolType(t stype.Type) bool {
 
 // IsNumericType checks if a type is numeric
 func IsNumericType(t stype.Type) bool {
+	t = ctx.UnwrapType(t) // Unwrap any type aliases
 	if prim, ok := t.(*stype.PrimitiveType); ok {
 		return atype.IsNumericTypeName(prim.Name)
 	}
@@ -147,6 +150,7 @@ func IsNumericType(t stype.Type) bool {
 
 // IsIntegerType checks if a type is an integer type
 func IsIntegerType(t stype.Type) bool {
+	t = ctx.UnwrapType(t) // Unwrap any type aliases
 	if prim, ok := t.(*stype.PrimitiveType); ok {
 		return atype.IsIntegerTypeName(prim.Name)
 	}
