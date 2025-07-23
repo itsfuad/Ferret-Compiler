@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
-	//"strings"
-
 	"compiler/colors"
 	"compiler/internal/ctx"
 	"compiler/internal/modules"
@@ -147,13 +145,74 @@ func handleGetCommand(module string) {
 	}
 }
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module]")
+func handleRemoveCommand(module string) {
+	if module == "" {
+		colors.RED.Println("No module specified. Usage: ferret remove [module]")
 		os.Exit(1)
 	}
 
-	filename, debug, initProject, initPath, outputPath, getCommand, getModule := parseArgs()
+	// Get current working directory as project root
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		colors.RED.Println("Failed to get current working directory:", err)
+		os.Exit(1)
+	}
+
+	// Check if fer.ret exists
+	ferRetPath := filepath.Join(projectRoot, "fer.ret")
+	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
+		colors.YELLOW.Println("No fer.ret file found in current directory.")
+		return
+	}
+
+	// Parse dependencies from fer.ret to check if module exists
+	dependencies, err := modules.ParseFerRetDependencies(projectRoot)
+	if err != nil {
+		colors.RED.Printf("Failed to parse fer.ret dependencies: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Check if the module is in dependencies
+	if _, exists := dependencies[module]; !exists {
+		colors.YELLOW.Printf("Module '%s' is not in fer.ret dependencies. Nothing to remove.\n", module)
+		return
+	}
+
+	// Remove from fer.ret file
+	err = modules.RemoveDependencyFromFerRet(ferRetPath, module)
+	if err != nil {
+		colors.RED.Printf("Failed to remove module from fer.ret: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Remove from cache if it exists
+	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
+	if err := modules.RemoveModuleFromCache(cachePath, module); err != nil {
+		colors.YELLOW.Printf("Warning: Failed to remove module from cache: %s\n", err)
+	}
+
+	// Update lockfile
+	lockfilePath := filepath.Join(projectRoot, "ferret.lock")
+	if err := modules.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
+		colors.YELLOW.Printf("Warning: Failed to remove module from lockfile: %s\n", err)
+	}
+
+	colors.GREEN.Printf("Successfully removed module: %s\n", module)
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module]")
+		os.Exit(1)
+	}
+
+	filename, debug, initProject, initPath, outputPath, getCommand, getModule, removeCommand, removeModule := parseArgs()
+
+	// Handle remove command
+	if removeCommand {
+		handleRemoveCommand(removeModule)
+		return
+	}
 
 	// Handle get command
 	if getCommand {
@@ -184,7 +243,7 @@ func main() {
 
 	// Check for filename argument
 	if filename == "" {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module]")
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module] | ferret remove [module]")
 		os.Exit(1)
 	}
 
