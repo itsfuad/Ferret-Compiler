@@ -12,6 +12,22 @@ import (
 const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
 
+// Built-in modules that are part of the standard library
+var BUILTIN_MODULES = map[string]bool{
+	"std":  true,
+	"math": true,
+	"io":   true,
+	"os":   true,
+	"net":  true,
+	"http": true,
+	"json": true,
+	"time": true,
+}
+
+func IsBuiltinModule(importRoot string) bool {
+	return BUILTIN_MODULES[importRoot]
+}
+
 func IsRemote(importPath string) bool {
 	return strings.HasPrefix(importPath, REMOTE_HOST)
 }
@@ -87,18 +103,29 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 		return "", fmt.Errorf("invalid import path: %s", importPath)
 	}
 
-	projectRoot := LastPart(ctxx.ProjectRoot)
-	if projectRoot == "" {
-		return "", fmt.Errorf("invalid project root: %s", ctxx.ProjectRoot)
+	// Check if it's a built-in module
+	if IsBuiltinModule(importRoot) {
+		// TODO: Implement built-in module resolution
+		return "", fmt.Errorf("built-in module '%s' is not implemented yet", importRoot)
 	}
 
-	if importRoot == projectRoot {
-		resolvedPath := filepath.Join(strings.TrimSuffix(ctxx.ProjectRoot, projectRoot), importPath+EXT)
+	// Use project name from configuration instead of folder name
+	projectName := ctxx.ProjectConfig.Name
+	if projectName == "" {
+		return "", fmt.Errorf("project name not defined in configuration")
+	}
+
+	if importRoot == projectName {
+		// Remove the project name from the import path and resolve relative to project root
+		// e.g., "myapp/maths/math" becomes "maths/math"
+		relativePath := strings.TrimPrefix(importPath, projectName+"/")
+		resolvedPath := filepath.Join(ctxx.ProjectRoot, relativePath+EXT)
+
 		if IsValidFile(resolvedPath) {
 			return resolvedPath, nil
 		}
-		return "", fmt.Errorf("module not found: %s", importPath)
+		return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
 	}
 
-	return "", fmt.Errorf("external imports are not supported yet: %s", importPath)
+	return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
 }
