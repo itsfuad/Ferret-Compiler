@@ -31,6 +31,116 @@ type GitHubRelease struct {
 	PublishedAt string `json:"published_at"`
 }
 
+// RemoveDependencyFromFerRet removes a dependency from the fer.ret file
+func RemoveDependencyFromFerRet(ferRetPath, module string) error {
+	content, err := os.ReadFile(ferRetPath)
+	if err != nil {
+		return fmt.Errorf("failed to read fer.ret: %w", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	inDependenciesSection := false
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		// Check if we're entering the dependencies section
+		if trimmedLine == "[dependencies]" {
+			inDependenciesSection = true
+			newLines = append(newLines, line)
+			continue
+		}
+
+		// Check if we're leaving the dependencies section (new section starts)
+		if inDependenciesSection && strings.HasPrefix(trimmedLine, "[") && trimmedLine != "[dependencies]" {
+			inDependenciesSection = false
+		}
+
+		// If we're in dependencies section and this line contains our module, skip it
+		if inDependenciesSection && strings.Contains(trimmedLine, module) && strings.Contains(trimmedLine, "=") {
+			continue // Skip this line
+		}
+
+		newLines = append(newLines, line)
+	}
+
+	// Write the updated content back
+	newContent := strings.Join(newLines, "\n")
+	err = os.WriteFile(ferRetPath, []byte(newContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write fer.ret: %w", err)
+	}
+
+	return nil
+}
+
+// RemoveModuleFromCache removes a module from the cache directory
+func RemoveModuleFromCache(cachePath, module string) error {
+	var removed bool
+
+	err := filepath.WalkDir(cachePath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		shouldRemove, err := ShouldRemoveModuleDir(cachePath, module, path, d)
+		if err != nil {
+			return err
+		}
+
+		if shouldRemove {
+			relPath, _ := filepath.Rel(cachePath, path)
+			relPath = filepath.ToSlash(relPath)
+			colors.YELLOW.Printf("Removing cached module: %s\n", relPath)
+
+			err := os.RemoveAll(path)
+			if err != nil {
+				return fmt.Errorf("failed to remove %s: %w", relPath, err)
+			}
+			removed = true
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if !removed {
+		colors.YELLOW.Printf("Module '%s' not found in cache.\n", module)
+	}
+
+	return nil
+}
+
+// ShouldRemoveModuleDir checks if a directory should be removed for the given module
+func ShouldRemoveModuleDir(cachePath, module, path string, d os.DirEntry) (bool, error) {
+	if !d.IsDir() {
+		return false, nil
+	}
+
+	// Check if this is a versioned module directory that matches our module
+	if !strings.Contains(d.Name(), "@") {
+		return false, nil
+	}
+
+	relPath, err := filepath.Rel(cachePath, path)
+	if err != nil {
+		return false, err
+	}
+
+	relPath = filepath.ToSlash(relPath)
+	atIndex := strings.LastIndex(relPath, "@")
+	if atIndex == -1 {
+		return false, nil
+	}
+
+	repoPath := relPath[:atIndex]
+	return repoPath == module, nil
+}
+
 // DownloadRemoteModule downloads a remote module from GitHub releases
 func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersion string) error {
 	version, err := resolveVersionToUse(context, repoPath, requestedVersion)

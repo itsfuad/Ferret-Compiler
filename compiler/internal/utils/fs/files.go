@@ -285,6 +285,11 @@ func resolveVersionForCache(repoPath, version string, ctxx *ctx.CompilerContext)
 
 // isFileInRemoteCache checks if the given file path is inside a remote module cache
 func isFileInRemoteCache(filePath string, ctxx *ctx.CompilerContext) bool {
+	// If file path is empty, it's not in remote cache
+	if filePath == "" {
+		return false
+	}
+
 	// Normalize paths for comparison
 	absFilePath, err := filepath.Abs(filePath)
 	if err != nil {

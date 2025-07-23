@@ -4,42 +4,82 @@ import (
 	"os"
 )
 
-func parseArgs() (filename string, debug bool, initProject bool, initPath string, outputPath string, getCommand bool, getModule string) {
+// Args holds the parsed command line arguments
+type Args struct {
+	filename      string
+	debug         bool
+	initProject   bool
+	initPath      string
+	outputPath    string
+	getCommand    bool
+	getModule     string
+	removeCommand bool
+	removeModule  string
+}
 
+// parseCommand processes command-specific arguments
+func parseCommand(args []string, i int, result *Args) int {
+	if i+1 >= len(args) || args[i+1][:1] == "-" {
+		return i
+	}
+
+	switch args[i] {
+	case "init":
+		result.initProject = true
+		result.initPath = args[i+1]
+		return i + 1
+	case "get":
+		result.getCommand = true
+		result.getModule = args[i+1]
+		return i + 1
+	case "remove":
+		result.removeCommand = true
+		result.removeModule = args[i+1]
+		return i + 1
+	}
+	return i
+}
+
+// parseFlag processes flag arguments
+func parseFlag(args []string, i int, result *Args) int {
+	switch args[i] {
+	case "-debug":
+		result.debug = true
+	case "-o", "-output":
+		if i+1 < len(args) {
+			result.outputPath = args[i+1]
+			return i + 1
+		}
+	}
+	return i
+}
+
+func parseArgs() (filename string, debug bool, initProject bool, initPath string, outputPath string, getCommand bool, getModule string, removeCommand bool, removeModule string) {
 	args := os.Args[1:]
+	result := &Args{}
 
-	// Parse arguments manually to handle mixed flag and positional argument order
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+
 		switch arg {
-		case "-debug":
-			debug = true
-		case "-o", "-output":
-			if i+1 < len(args) {
-				outputPath = args[i+1]
-				i++ // Skip the next argument since we consumed it
-			}
 		case "init":
-			initProject = true
-			// Check if next argument is a path
-			if i+1 < len(args) && args[i+1][:1] != "-" {
-				initPath = args[i+1]
-				i++
-			}
+			result.initProject = true
+			i = parseCommand(args, i, result)
 		case "get":
-			getCommand = true
-			// Check if next argument is a module path
-			if i+1 < len(args) && args[i+1][:1] != "-" {
-				getModule = args[i+1]
-				i++
-			}
+			result.getCommand = true
+			i = parseCommand(args, i, result)
+		case "remove":
+			result.removeCommand = true
+			i = parseCommand(args, i, result)
+		case "-debug", "-o", "-output":
+			i = parseFlag(args, i, result)
 		default:
 			// If it's not a flag and we haven't set filename yet, this is the filename
-			if !initProject && !getCommand && filename == "" && arg[:1] != "-" {
-				filename = arg
+			if !result.initProject && !result.getCommand && !result.removeCommand && result.filename == "" && arg[:1] != "-" {
+				result.filename = arg
 			}
 		}
 	}
 
-	return filename, debug, initProject, initPath, outputPath, getCommand, getModule
+	return result.filename, result.debug, result.initProject, result.initPath, result.outputPath, result.getCommand, result.getModule, result.removeCommand, result.removeModule
 }
