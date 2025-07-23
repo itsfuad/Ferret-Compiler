@@ -23,8 +23,8 @@ func IsAssignableFrom(target, source stype.Type) bool {
 	}
 
 	// Handle user types (aliases) - limited resolution without symbol table access
-	resolvedTarget := stype.UnwrapType(target)
-	resolvedSource := stype.UnwrapType(source)
+	resolvedTarget := semantic.UnwrapType(target)
+	resolvedSource := semantic.UnwrapType(source)
 
 	colors.MAGENTA.Printf("Checking assignability: %v → %v\n", resolvedSource, resolvedTarget)
 
@@ -174,6 +174,9 @@ func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Mo
 	if leftType == nil || rightType == nil {
 		return nil
 	}
+
+	leftType = semantic.UnwrapType(leftType)   // Unwrap any type aliases
+	rightType = semantic.UnwrapType(rightType) // Unwrap any type aliases
 
 	resultType := getBinaryOperationResultType(e.Operator.Value, leftType, rightType)
 	if resultType == nil {

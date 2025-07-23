@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"compiler/colors"
+	"compiler/internal/config"
 	"compiler/internal/ctx"
 )
 
@@ -116,6 +117,12 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 		return "", fmt.Errorf("built-in module not found: %s", importPath)
 	}
 
+	// Check if the current file is inside a remote module cache
+	// If so, resolve imports relative to that remote module's project
+	if isFileInRemoteCache(currentFileFullPath, ctxx) {
+		return resolveModuleInRemoteContext(importPath, currentFileFullPath, ctxx)
+	}
+
 	// Use project name from configuration instead of folder name
 	projectName := ctxx.ProjectConfig.Name
 	if projectName == "" {
@@ -215,4 +222,131 @@ func resolveVersionForCache(repoPath, version string, ctxx *ctx.CompilerContext)
 	}
 
 	return "", fmt.Errorf("no cached version found for %s", repoPath)
+}
+
+// isFileInRemoteCache checks if the given file path is inside a remote module cache
+func isFileInRemoteCache(filePath string, ctxx *ctx.CompilerContext) bool {
+	// Normalize paths for comparison
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return false
+	}
+
+	absCachePath, err := filepath.Abs(ctxx.RemoteCachePath)
+	if err != nil {
+		return false
+	}
+
+	// Check if the file is inside the remote cache directory
+	return strings.HasPrefix(absFilePath, absCachePath)
+}
+
+// resolveModuleInRemoteContext resolves a module import within a remote module's context
+func resolveModuleInRemoteContext(importPath, currentFileFullPath string, ctxx *ctx.CompilerContext) (string, error) {
+	// Find the directory containing the fer.ret file for the current file's module
+	remoteModuleConfigDir, err := findRemoteModuleConfigDir(currentFileFullPath, ctxx)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse the remote module's configuration (LoadProjectConfig expects directory path)
+	remoteConfig, err := config.LoadProjectConfig(remoteModuleConfigDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to load remote module config: %w", err)
+	}
+
+	// Get the first part of the import path (the project name)
+	importRoot := FirstPart(importPath)
+
+	// Check if this import matches the remote module's project name
+	if importRoot == remoteConfig.Name {
+		// Remove the project name from the import path and resolve relative to remote module config dir
+		relativePath := strings.TrimPrefix(importPath, remoteConfig.Name+"/")
+		resolvedPath := filepath.Join(remoteModuleConfigDir, relativePath+EXT)
+
+		if IsValidFile(resolvedPath) {
+			return resolvedPath, nil
+		}
+		return "", fmt.Errorf("module `%s` does not exist in remote module", importPath)
+	}
+
+	return "", fmt.Errorf("module `%s` does not exist in remote module", importPath)
+}
+
+// findRemoteModuleConfigDir finds the directory containing the fer.ret for the module containing the given file
+func findRemoteModuleConfigDir(filePath string, ctxx *ctx.CompilerContext) (string, error) {
+	// Start from the directory containing the file and walk up looking for fer.ret
+	currentDir := filepath.Dir(filePath)
+
+	// Get the cache path to ensure we don't walk outside the cache
+	absCachePath, err := filepath.Abs(ctxx.RemoteCachePath)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		// Check if fer.ret exists in current directory
+		configPath := filepath.Join(currentDir, "fer.ret")
+		if IsValidFile(configPath) {
+			return currentDir, nil
+		}
+
+		// Move up one level
+		parentDir := filepath.Dir(currentDir)
+
+		// Stop if we've reached the cache root or can't go up further
+		if parentDir == currentDir || !strings.HasPrefix(currentDir, absCachePath) {
+			break
+		}
+
+		currentDir = parentDir
+	}
+
+	return "", fmt.Errorf("no fer.ret found in remote module hierarchy for: %s", filePath)
+}
+
+// findRemoteModuleRoot finds the root directory of the remote module containing the given file
+func findRemoteModuleRoot(filePath string, ctxx *ctx.CompilerContext) (string, error) {
+	// Normalize the file path
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	absCachePath, err := filepath.Abs(ctxx.RemoteCachePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Remove the cache path prefix to get the relative path within cache
+	relPath, err := filepath.Rel(absCachePath, absFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	// The structure is: github.com/user/repo@version/...
+	// We need to find the repo@version directory
+	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid remote module path structure")
+	}
+
+	// Find the part that contains @ (the repo@version part)
+	var repoVersionIndex int = -1
+	for i, part := range parts {
+		if strings.Contains(part, "@") {
+			repoVersionIndex = i
+			break
+		}
+	}
+
+	if repoVersionIndex == -1 {
+		return "", fmt.Errorf("could not find versioned module directory")
+	}
+
+	// Reconstruct the path up to the repo@version directory
+	moduleRootParts := parts[:repoVersionIndex+1]
+	moduleRoot := filepath.Join(absCachePath, filepath.Join(moduleRootParts...))
+
+	return moduleRoot, nil
 }

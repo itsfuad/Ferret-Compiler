@@ -78,6 +78,11 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 		return c.getBuiltinModuleImportPath(fullPath)
 	}
 
+	// Check if this is a remote module file
+	if c.isRemoteModuleFile(fullPath) {
+		return c.getRemoteModuleImportPath(fullPath)
+	}
+
 	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
 		return ""
@@ -135,6 +140,79 @@ func (c *CompilerContext) getBuiltinModuleImportPath(fullPath string) string {
 	importPath := strings.TrimSuffix(relPath, filepath.Ext(relPath))
 
 	return importPath
+}
+
+// IsRemoteModuleFile checks if the given file path is within the remote modules cache
+func (c *CompilerContext) IsRemoteModuleFile(fullPath string) bool {
+	return c.isRemoteModuleFile(fullPath)
+}
+
+// isRemoteModuleFile checks if the given file path is within the remote modules cache
+func (c *CompilerContext) isRemoteModuleFile(fullPath string) bool {
+	if c.RemoteCachePath == "" {
+		return false
+	}
+	absRemotePath, err := filepath.Abs(c.RemoteCachePath)
+	if err != nil {
+		return false
+	}
+	absFullPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(absFullPath, absRemotePath)
+}
+
+// GetRemoteModuleImportPath converts a remote module file path back to its import path
+func (c *CompilerContext) GetRemoteModuleImportPath(fullPath string) string {
+	return c.getRemoteModuleImportPath(fullPath)
+}
+
+// getRemoteModuleImportPath converts a remote module file path back to its import path
+func (c *CompilerContext) getRemoteModuleImportPath(fullPath string) string {
+	// Convert: D:\...\cache\github.com\user\repo@v1\sub\path\file.fer
+	// To: github.com/user/repo/sub/path/file
+
+	absRemotePath, err := filepath.Abs(c.RemoteCachePath)
+	if err != nil {
+		return ""
+	}
+	absFullPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return ""
+	}
+
+	// Get relative path within cache
+	relPath, err := filepath.Rel(absRemotePath, absFullPath)
+	if err != nil {
+		return ""
+	}
+
+	// Normalize to forward slashes
+	relPath = filepath.ToSlash(relPath)
+
+	// Remove file extension
+	relPath = strings.TrimSuffix(relPath, filepath.Ext(relPath))
+
+	// Parse the path structure: github.com/user/repo@version/sub/path
+	parts := strings.Split(relPath, "/")
+	if len(parts) < 3 {
+		return ""
+	}
+
+	// Find the repo@version part and remove the @version
+	var result []string
+	for _, part := range parts {
+		if strings.Contains(part, "@") {
+			// Remove version from repo name
+			repoName := strings.Split(part, "@")[0]
+			result = append(result, repoName)
+		} else {
+			result = append(result, part)
+		}
+	}
+
+	return strings.Join(result, "/")
 }
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
