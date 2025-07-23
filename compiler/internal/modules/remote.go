@@ -231,7 +231,6 @@ func downloadToTempFile(downloadURL string) (string, error) {
 
 // updateProjectFiles updates lockfile and fer.ret after successful download
 func updateProjectFiles(context *ctx.CompilerContext, repoPath, requestedVersion, actualVersion string) error {
-	// Update lockfile
 	downloadURL, _, _ := getGitHubDownloadURL(repoPath, actualVersion)
 	err := UpdateLockEntry(context.ProjectRoot, repoPath, actualVersion, downloadURL)
 	if err != nil {
