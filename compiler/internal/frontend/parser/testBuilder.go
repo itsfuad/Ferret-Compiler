@@ -35,8 +35,6 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 		ProjectRoot: tempDir,
 	}
 
-	cachePath := filepath.Join(tempDir, projectConfig.Cache.Path)
-
 	// Get entry point relative to temp dir
 	entryPoint, err := filepath.Rel(tempDir, entryPointPath)
 	if err != nil {
@@ -50,7 +48,6 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 		Builtins:      ctx.AddPreludeSymbols(ctx.NewSymbolTable(nil)),
 		Modules:       make(map[string]*ctx.Module),
 		Reports:       report.Reports{},
-		CachePath:     filepath.ToSlash(cachePath),
 		ProjectConfig: projectConfig,
 		ProjectRoot:   tempDir,
 	}

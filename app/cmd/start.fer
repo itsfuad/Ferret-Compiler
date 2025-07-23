@@ -1,4 +1,4 @@
-//import "github.com/itsfuad/ferret-mod/data/bigint";
+import "github.com/itsfuad/ferret-mod/data/bigint";
 
 import "std/io";
 import "math/constants";

@@ -54,7 +54,7 @@ compiler/
 ├── cmd/                  # CLI entry point and main compilation driver
 ├── colors/              # Terminal output formatting utilities
 ├── internal/            # Internal compiler packages (not public API)
-│   ├── config/         # Project configuration (.ferret.json handling)
+│   ├── config/         # Project configuration handling
 │   ├── ctx/            # Compiler context and state management
 │   ├── frontend/       # Frontend compilation pipeline
 │   ├── semantic/       # Semantic analysis pipeline
@@ -93,7 +93,7 @@ compiler/
 - **Memory Efficiency**: Efficient AST and symbol table representations
 
 ### Module System Design
-- `.ferret.json`: Project root indicator and configuration
+- `fer.ret`: Project root indicator and configuration
 - Remote dependencies: GitHub repos stored in config
 - Local imports: Relative path-based, no config needed
 - Cache management: `.ferret/modules` directory
@@ -184,6 +184,20 @@ func TestParserFeature(t *testing.T) {
 - Consider impact on compilation performance
 - Maintain backward compatibility in AST structures
 - Document any new compiler phases or major changes
+
+### Code Testing while developing
+- To compile or build the compiler, use:
+```bash
+./build.sh        # Unix
+.\build.bat       # Windows
+```
+From `scripts/` directory. (Mandatory)
+
+Then go to the `app/` directory and run:
+```bash
+ferret filename.fer --debug
+```
+Make sure you add the `bin` directory to your `PATH` environment variable to run the `ferret` command from anywhere.
 
 ### Available Scripts
 ```bash
