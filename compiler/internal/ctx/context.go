@@ -56,7 +56,6 @@ type CompilerContext struct {
 	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
 	Modules    map[string]*Module // key: import path
 	Reports    report.Reports
-	CachePath  string
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
 	ProjectRoot   string
@@ -506,11 +505,6 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	}
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
-	// Use cache path from project config
-	cachePath := filepath.Join(root, projectConfig.Cache.Path)
-	cachePath = filepath.ToSlash(cachePath)
-	os.MkdirAll(cachePath, 0755)
-
 	// Determine modules path relative to compiler binary
 	modulesPath := getModulesPath()
 
@@ -524,7 +518,6 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 		Builtins:      AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
 		Modules:       make(map[string]*Module),
 		Reports:       report.Reports{},
-		CachePath:     cachePath,
 		ProjectConfig: projectConfig,
 		ProjectRoot:   root,
 		ModulesPath:   modulesPath,
@@ -540,9 +533,4 @@ func (c *CompilerContext) Destroy() {
 	c.Modules = nil
 	c.Reports = nil
 	c.DepGraph = nil
-
-	// Optionally, clear the cache directory
-	if c.CachePath != "" {
-		os.RemoveAll(c.CachePath)
-	}
 }

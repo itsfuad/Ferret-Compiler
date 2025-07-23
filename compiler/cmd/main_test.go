@@ -200,7 +200,7 @@ func TestInitFunctionality(t *testing.T) {
 	}
 
 	// Verify the config file path would be correct
-	expectedConfigPath := filepath.Join(tempDir, ".ferret.json")
+	expectedConfigPath := filepath.Join(tempDir, "fer.ret")
 	if _, err := os.Stat(filepath.FromSlash(expectedConfigPath)); err == nil {
 		t.Error("Config file should not exist yet (we only parsed args)")
 	}
