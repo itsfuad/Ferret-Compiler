@@ -6,11 +6,9 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
-	//"strings"
-
 	"compiler/colors"
 	"compiler/internal/ctx"
-	"compiler/internal/modules"
+	"compiler/internal/registry"
 
 	//"compiler/internal/backend"
 	"compiler/internal/config"
@@ -110,7 +108,7 @@ func handleGetCommand(module string) {
 	// Get current working directory to find project root
 	cwd, err := os.Getwd()
 	if err != nil {
-		colors.RED.Println("Failed to get current working directory:", err)
+		colors.RED.Println(err)
 		os.Exit(1)
 	}
 
@@ -123,7 +121,7 @@ func handleGetCommand(module string) {
 	if module == "" {
 		// Install all dependencies from fer.ret
 		colors.BLUE.Println("Installing all dependencies from fer.ret...")
-		err := modules.InstallDependencies(context)
+		err := registry.InstallDependencies(context)
 		if err != nil {
 			colors.RED.Printf("Failed to install dependencies: %s\n", err)
 			os.Exit(1)
@@ -139,7 +137,7 @@ func handleGetCommand(module string) {
 		repoPath, version, _ := context.ParseRemoteImport(module)
 		colors.BLUE.Printf("Installing module: %s@%s\n", repoPath, version)
 
-		err := modules.DownloadRemoteModule(context, repoPath, version)
+		err := registry.DownloadRemoteModule(context, repoPath, version)
 		if err != nil {
 			colors.RED.Printf("Failed to download module: %s\n", err)
 			os.Exit(1)
@@ -147,27 +145,88 @@ func handleGetCommand(module string) {
 	}
 }
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module]")
+func handleRemoveCommand(module string) {
+	if module == "" {
+		colors.RED.Println("No module specified. Usage: ferret remove [module]")
 		os.Exit(1)
 	}
 
-	filename, debug, initProject, initPath, outputPath, getCommand, getModule := parseArgs()
+	// Get current working directory as project root
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+
+	// Check if fer.ret exists
+	ferRetPath := filepath.Join(projectRoot, "fer.ret")
+	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
+		colors.YELLOW.Println("No fer.ret file found in current directory.")
+		return
+	}
+
+	// Parse dependencies from fer.ret to check if module exists
+	dependencies, err := registry.ParseFerRetDependencies(projectRoot)
+	if err != nil {
+		colors.RED.Printf("Failed to parse fer.ret dependencies: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Check if the module is in dependencies
+	if _, exists := dependencies[module]; !exists {
+		colors.YELLOW.Printf("Module '%s' is not in fer.ret dependencies. Nothing to remove.\n", module)
+		return
+	}
+
+	// Remove from fer.ret file
+	err = registry.RemoveDependencyFromFerRet(ferRetPath, module)
+	if err != nil {
+		colors.RED.Printf("Failed to remove module from fer.ret: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Remove from cache if it exists
+	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
+	if err := registry.RemoveModuleFromCache(cachePath, module); err != nil {
+		colors.YELLOW.Printf("Warning: Failed to remove module from cache: %s\n", err)
+	}
+
+	// Update lockfile
+	lockfilePath := filepath.Join(projectRoot, "ferret.lock")
+	if err := registry.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
+		colors.YELLOW.Printf("Warning: Failed to remove module from lockfile: %s\n", err)
+	}
+
+	colors.GREEN.Printf("Successfully removed module: %s\n", module)
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module]")
+		os.Exit(1)
+	}
+
+	args := parseArgs()
+
+	// Handle remove command
+	if args.removeCommand {
+		handleRemoveCommand(args.removeModule)
+		return
+	}
 
 	// Handle get command
-	if getCommand {
-		handleGetCommand(getModule)
+	if args.getCommand {
+		handleGetCommand(args.getModule)
 		return
 	}
 
 	// Handle init command
-	if initProject {
-		projectRoot := initPath
+	if args.initProject {
+		projectRoot := args.initPath
 		if projectRoot == "" {
 			cwd, err := os.Getwd()
 			if err != nil {
-				colors.RED.Println("Failed to get current working directory:", err)
+				colors.RED.Println(err)
 				os.Exit(1)
 			}
 			projectRoot = cwd
@@ -183,16 +242,16 @@ func main() {
 	}
 
 	// Check for filename argument
-	if filename == "" {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module]")
+	if args.filename == "" {
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module] | ferret remove [module]")
 		os.Exit(1)
 	}
 
-	if debug {
+	if args.debug {
 		colors.BLUE.Println("Debug mode enabled")
 	}
 
-	context := Compile(filename, debug, outputPath)
+	context := Compile(args.filename, args.debug, args.outputPath)
 
 	// Only destroy and print modules if context is not nil
 	if context != nil {
