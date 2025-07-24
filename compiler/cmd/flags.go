@@ -81,5 +81,5 @@ func parseArgs() *Args {
 		}
 	}
 
-		return result
+	return result
 }

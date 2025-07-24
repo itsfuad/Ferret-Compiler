@@ -8,7 +8,7 @@ import (
 
 	"compiler/colors"
 	"compiler/internal/ctx"
-	"compiler/internal/modules"
+	"compiler/internal/registry"
 
 	//"compiler/internal/backend"
 	"compiler/internal/config"
@@ -121,7 +121,7 @@ func handleGetCommand(module string) {
 	if module == "" {
 		// Install all dependencies from fer.ret
 		colors.BLUE.Println("Installing all dependencies from fer.ret...")
-		err := modules.InstallDependencies(context)
+		err := registry.InstallDependencies(context)
 		if err != nil {
 			colors.RED.Printf("Failed to install dependencies: %s\n", err)
 			os.Exit(1)
@@ -137,7 +137,7 @@ func handleGetCommand(module string) {
 		repoPath, version, _ := context.ParseRemoteImport(module)
 		colors.BLUE.Printf("Installing module: %s@%s\n", repoPath, version)
 
-		err := modules.DownloadRemoteModule(context, repoPath, version)
+		err := registry.DownloadRemoteModule(context, repoPath, version)
 		if err != nil {
 			colors.RED.Printf("Failed to download module: %s\n", err)
 			os.Exit(1)
@@ -166,7 +166,7 @@ func handleRemoveCommand(module string) {
 	}
 
 	// Parse dependencies from fer.ret to check if module exists
-	dependencies, err := modules.ParseFerRetDependencies(projectRoot)
+	dependencies, err := registry.ParseFerRetDependencies(projectRoot)
 	if err != nil {
 		colors.RED.Printf("Failed to parse fer.ret dependencies: %s\n", err)
 		os.Exit(1)
@@ -179,7 +179,7 @@ func handleRemoveCommand(module string) {
 	}
 
 	// Remove from fer.ret file
-	err = modules.RemoveDependencyFromFerRet(ferRetPath, module)
+	err = registry.RemoveDependencyFromFerRet(ferRetPath, module)
 	if err != nil {
 		colors.RED.Printf("Failed to remove module from fer.ret: %s\n", err)
 		os.Exit(1)
@@ -187,13 +187,13 @@ func handleRemoveCommand(module string) {
 
 	// Remove from cache if it exists
 	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
-	if err := modules.RemoveModuleFromCache(cachePath, module); err != nil {
+	if err := registry.RemoveModuleFromCache(cachePath, module); err != nil {
 		colors.YELLOW.Printf("Warning: Failed to remove module from cache: %s\n", err)
 	}
 
 	// Update lockfile
 	lockfilePath := filepath.Join(projectRoot, "ferret.lock")
-	if err := modules.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
+	if err := registry.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
 		colors.YELLOW.Printf("Warning: Failed to remove module from lockfile: %s\n", err)
 	}
 
