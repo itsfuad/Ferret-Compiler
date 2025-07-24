@@ -1,4 +1,4 @@
-package modules
+package registry
 
 import (
 	"crypto/sha256"
@@ -145,4 +145,50 @@ func GetLockedVersion(projectRoot, repoPath string) (string, error) {
 	}
 
 	return "", nil
+}
+
+// RemoveModuleFromLockfile removes a module from the lockfile
+func RemoveModuleFromLockfile(lockfilePath, module string) error {
+	if _, err := os.Stat(lockfilePath); os.IsNotExist(err) {
+		return nil // Lockfile doesn't exist, nothing to do
+	}
+
+	content, err := os.ReadFile(lockfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read lockfile: %w", err)
+	}
+
+	// Parse the JSON lockfile
+	var lockfile map[string]interface{}
+	err = json.Unmarshal(content, &lockfile)
+	if err != nil {
+		return fmt.Errorf("failed to parse lockfile JSON: %w", err)
+	}
+
+	// Get the packages section
+	packages, ok := lockfile["packages"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid lockfile format: missing packages section")
+	}
+
+	// Remove the module from packages
+	if _, exists := packages[module]; exists {
+		delete(packages, module)
+		colors.YELLOW.Printf("Removed '%s' from lockfile\n", module)
+	} else {
+		colors.YELLOW.Printf("Module '%s' not found in lockfile\n", module)
+	}
+
+	// Write the updated lockfile back
+	updatedContent, err := json.MarshalIndent(lockfile, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal lockfile JSON: %w", err)
+	}
+
+	err = os.WriteFile(lockfilePath, updatedContent, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write lockfile: %w", err)
+	}
+
+	return nil
 }
