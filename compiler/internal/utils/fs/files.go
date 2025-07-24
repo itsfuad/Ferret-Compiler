@@ -14,63 +14,26 @@ import (
 const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
 
-// ModuleType represents the category of a module
-type ModuleType int
-
-const (
-	LOCAL ModuleType = iota
-	BUILTIN
-	REMOTE
-)
-
-func (mt ModuleType) String() string {
-	switch mt {
-	case LOCAL:
-		return "LOCAL"
-	case BUILTIN:
-		return "BUILTIN"
-	case REMOTE:
-		return "REMOTE"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-// Built-in modules that are part of the standard library
-var BUILTIN_MODULES = map[string]bool{
-	"std":  true,
-	"math": true,
-	"io":   true,
-	"os":   true,
-	"net":  true,
-	"http": true,
-	"json": true,
-	"time": true,
-}
-
 // DetermineModuleType categorizes an import path
-func DetermineModuleType(importPath string, projectName string) ModuleType {
+func DetermineModuleType(importPath string, projectName string) ctx.ModuleType {
 	importRoot := FirstPart(importPath)
 
 	if IsRemote(importPath) {
-		return REMOTE
+		return ctx.REMOTE
 	}
 
 	if IsBuiltinModule(importRoot) {
-		return BUILTIN
+		return ctx.BUILTIN
 	}
 
 	if importRoot == projectName {
-		return LOCAL
+		return ctx.LOCAL
 	}
 
 	// Default to local for unrecognized paths
-	return LOCAL
+	return ctx.LOCAL
 }
 
-func IsBuiltinModule(importRoot string) bool {
-	return BUILTIN_MODULES[importRoot]
-}
 
 func IsRemote(importPath string) bool {
 	return strings.HasPrefix(importPath, REMOTE_HOST)
@@ -151,17 +114,17 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 	moduleType := DetermineModuleType(importPath, projectName)
 
 	// Handle special case: if current file is in remote cache, local imports should be remote
-	if moduleType == LOCAL && isFileInRemoteCache(currentFileFullPath, ctxx) {
+	if moduleType == ctx.LOCAL && isFileInRemoteCache(currentFileFullPath, ctxx) {
 		return resolveModuleInRemoteContext(importPath, currentFileFullPath, ctxx)
 	}
 
 	// Route to appropriate resolver based on module type
 	switch moduleType {
-	case REMOTE:
+	case ctx.REMOTE:
 		return resolveRemoteModule(importPath, ctxx)
-	case BUILTIN:
+	case ctx.BUILTIN:
 		return resolveBuiltinModule(importPath, ctxx)
-	case LOCAL:
+	case ctx.LOCAL:
 		return resolveLocalModule(importPath, projectName, ctxx)
 	default:
 		return "", fmt.Errorf("unknown module type for import: %s", importPath)
