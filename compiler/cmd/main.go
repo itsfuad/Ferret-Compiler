@@ -206,23 +206,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	filename, debug, initProject, initPath, outputPath, getCommand, getModule, removeCommand, removeModule := parseArgs()
+	args := parseArgs()
 
 	// Handle remove command
-	if removeCommand {
-		handleRemoveCommand(removeModule)
+	if args.removeCommand {
+		handleRemoveCommand(args.removeModule)
 		return
 	}
 
 	// Handle get command
-	if getCommand {
-		handleGetCommand(getModule)
+	if args.getCommand {
+		handleGetCommand(args.getModule)
 		return
 	}
 
 	// Handle init command
-	if initProject {
-		projectRoot := initPath
+	if args.initProject {
+		projectRoot := args.initPath
 		if projectRoot == "" {
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -242,16 +242,16 @@ func main() {
 	}
 
 	// Check for filename argument
-	if filename == "" {
+	if args.filename == "" {
 		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module] | ferret remove [module]")
 		os.Exit(1)
 	}
 
-	if debug {
+	if args.debug {
 		colors.BLUE.Println("Debug mode enabled")
 	}
 
-	context := Compile(filename, debug, outputPath)
+	context := Compile(args.filename, args.debug, args.outputPath)
 
 	// Only destroy and print modules if context is not nil
 	if context != nil {

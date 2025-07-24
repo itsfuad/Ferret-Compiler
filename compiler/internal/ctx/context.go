@@ -10,51 +10,16 @@ import (
 	"compiler/colors"
 	"compiler/internal/config"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 )
 
 var contextCreated = false
 
-// ModulePhase represents the current processing phase of a module
-type ModulePhase int
-
-const (
-	PhaseNotStarted  ModulePhase = iota
-	PhaseParsed                  // Module has been parsed into AST
-	PhaseCollected               // Symbols have been collected
-	PhaseResolved                // Symbols have been resolved
-	PhaseTypeChecked             // Type checking completed
-)
-
-func (p ModulePhase) String() string {
-	switch p {
-	case PhaseNotStarted:
-		return "Not Started"
-	case PhaseParsed:
-		return "Parsed"
-	case PhaseCollected:
-		return "Collected"
-	case PhaseResolved:
-		return "Resolved"
-	case PhaseTypeChecked:
-		return "Type Checked"
-	default:
-		return "Unknown"
-	}
-}
-
-type Module struct {
-	AST         *ast.Program
-	SymbolTable *SymbolTable
-	Phase       ModulePhase // Current processing phase
-	IsBuiltin   bool        // Whether this is a builtin module
-	Type        string      // Module type: "LOCAL", "BUILTIN", or "REMOTE"
-}
-
 type CompilerContext struct {
 	EntryPoint string             // Entry point file
 	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules    map[string]*Module // key: import path
+	Modules    map[string]*modules.Module // key: import path
 	Reports    report.Reports
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
@@ -277,7 +242,7 @@ func (c *CompilerContext) IsRemoteModuleCached(repoPath, version string) bool {
 	return err == nil
 }
 
-func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
+func (c *CompilerContext) GetModule(importPath string) (*modules.Module, error) {
 	if c.Modules == nil {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
@@ -310,28 +275,28 @@ func (c *CompilerContext) PrintModules() {
 		colors.YELLOW.Println("No modules in cache (context is nil)")
 		return
 	}
-	modules := c.ModuleNames()
-	if len(modules) == 0 {
+	modulesStr := c.ModuleNames()
+	if len(modulesStr) == 0 {
 		colors.YELLOW.Println("No modules in cache")
 		return
 	}
 
 	//sort
-	sort.Strings(modules)
+	sort.Strings(modulesStr)
 
 	colors.BLUE.Println("Modules in cache:")
-	for _, name := range modules {
+	for _, name := range modulesStr {
 		module, exists := c.Modules[name]
 		if exists {
 			colors.PURPLE.Printf("- %s ", name)
 
 			// Color-code by module type
 			switch module.Type {
-			case "BUILTIN":
+			case modules.LOCAL:
 				colors.LIGHT_BLUE.Printf("(%s)", module.Type)
-			case "REMOTE":
+			case modules.REMOTE:
 				colors.GREEN.Printf("(%s)", module.Type)
-			case "LOCAL":
+			case modules.BUILTIN:
 				colors.YELLOW.Printf("(%s)", module.Type)
 			default:
 				colors.WHITE.Printf("(%s)", module.Type)
@@ -369,23 +334,23 @@ func (c *CompilerContext) IsModuleParsed(importPath string) bool {
 		return false
 	}
 	module, exists := c.Modules[importPath]
-	return exists && module.Phase >= PhaseParsed
+	return exists && module.Phase >= modules.PhaseParsed
 }
 
 // GetModulePhase returns the current processing phase of a module
-func (c *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+func (c *CompilerContext) GetModulePhase(importPath string) modules.ModulePhase {
 	if c.Modules == nil {
-		return PhaseNotStarted
+		return modules.PhaseNotStarted
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return PhaseNotStarted
+		return modules.PhaseNotStarted
 	}
 	return module.Phase
 }
 
 // SetModulePhase updates the processing phase of a module
-func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+func (c *CompilerContext) SetModulePhase(importPath string, phase modules.ModulePhase) {
 	if c.Modules == nil {
 		return
 	}
@@ -397,7 +362,7 @@ func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
 }
 
 // CanProcessPhase checks if a module is ready for a specific phase
-func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase modules.ModulePhase) bool {
 	currentPhase := c.GetModulePhase(importPath)
 	// Can only process the next phase in sequence
 	return currentPhase == requiredPhase-1
@@ -405,7 +370,7 @@ func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase Modul
 
 func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBuiltin bool) {
 	if c.Modules == nil {
-		c.Modules = make(map[string]*Module)
+		c.Modules = make(map[string]*modules.Module)
 	}
 	if _, exists := c.Modules[importPath]; exists {
 		return
@@ -415,19 +380,19 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 	}
 
 	// Determine module type
-	var moduleType string
+	var moduleType modules.ModuleType
 	if isBuiltin {
-		moduleType = "BUILTIN"
+		moduleType = modules.BUILTIN
 	} else if strings.HasPrefix(importPath, "github.com/") {
-		moduleType = "REMOTE"
+		moduleType = modules.REMOTE
 	} else {
-		moduleType = "LOCAL"
+		moduleType = modules.LOCAL
 	}
 
-	c.Modules[importPath] = &Module{
+	c.Modules[importPath] = &modules.Module{
 		AST:         module,
 		SymbolTable: NewSymbolTable(c.Builtins),
-		Phase:       PhaseParsed, // Module is parsed when added
+		Phase:       modules.PhaseParsed, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
 		Type:        moduleType,
 	}
@@ -613,7 +578,7 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 	return &CompilerContext{
 		EntryPoint:      entryPoint,
 		Builtins:        AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:         make(map[string]*Module),
+		Modules:         make(map[string]*modules.Module),
 		Reports:         report.Reports{},
 		ProjectConfig:   projectConfig,
 		ProjectRoot:     root,
