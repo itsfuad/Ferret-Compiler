@@ -54,7 +54,7 @@ func parseFlag(args []string, i int, result *Args) int {
 	return i
 }
 
-func parseArgs() (filename string, debug bool, initProject bool, initPath string, outputPath string, getCommand bool, getModule string, removeCommand bool, removeModule string) {
+func parseArgs() *Args {
 	args := os.Args[1:]
 	result := &Args{}
 
@@ -81,5 +81,5 @@ func parseArgs() (filename string, debug bool, initProject bool, initPath string
 		}
 	}
 
-	return result.filename, result.debug, result.initProject, result.initPath, result.outputPath, result.getCommand, result.getModule, result.removeCommand, result.removeModule
+		return result
 }
