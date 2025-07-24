@@ -14,6 +14,22 @@ import (
 const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
 
+// Built-in modules that are part of the standard library
+var BUILTIN_MODULES = map[string]bool{
+	"std":  true,
+	"math": true,
+	"io":   true,
+	"os":   true,
+	"net":  true,
+	"http": true,
+	"json": true,
+	"time": true,
+}
+
+func IsBuiltinModule(importRoot string) bool {
+	return BUILTIN_MODULES[importRoot]
+}
+
 // DetermineModuleType categorizes an import path
 func DetermineModuleType(importPath string, projectName string) ctx.ModuleType {
 	importRoot := FirstPart(importPath)
@@ -33,7 +49,6 @@ func DetermineModuleType(importPath string, projectName string) ctx.ModuleType {
 	// Default to local for unrecognized paths
 	return ctx.LOCAL
 }
-
 
 func IsRemote(importPath string) bool {
 	return strings.HasPrefix(importPath, REMOTE_HOST)
