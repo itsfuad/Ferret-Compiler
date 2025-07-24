@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"compiler/cmd/flags"
 	"compiler/colors"
 	"compiler/internal/ctx"
 	"compiler/internal/registry"
@@ -206,23 +207,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	args := parseArgs()
+	args := flags.ParseArgs()
 
 	// Handle remove command
-	if args.removeCommand {
-		handleRemoveCommand(args.removeModule)
+	if args.RemoveCommand {
+		handleRemoveCommand(args.RemoveModule)
 		return
 	}
 
 	// Handle get command
-	if args.getCommand {
-		handleGetCommand(args.getModule)
+	if args.GetCommand {
+		handleGetCommand(args.GetModule)
 		return
 	}
 
 	// Handle init command
-	if args.initProject {
-		projectRoot := args.initPath
+	if args.InitProject {
+		projectRoot := args.InitPath
 		if projectRoot == "" {
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -242,16 +243,16 @@ func main() {
 	}
 
 	// Check for filename argument
-	if args.filename == "" {
+	if args.Filename == "" {
 		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module] | ferret remove [module]")
 		os.Exit(1)
 	}
 
-	if args.debug {
+	if args.Debug {
 		colors.BLUE.Println("Debug mode enabled")
 	}
 
-	context := Compile(args.filename, args.debug, args.outputPath)
+	context := Compile(args.Filename, args.Debug, args.OutputPath)
 
 	// Only destroy and print modules if context is not nil
 	if context != nil {

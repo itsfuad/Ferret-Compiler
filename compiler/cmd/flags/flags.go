@@ -1,4 +1,4 @@
-package main
+package flags
 
 import (
 	"os"
@@ -6,15 +6,15 @@ import (
 
 // Args holds the parsed command line arguments
 type Args struct {
-	filename      string
-	debug         bool
-	initProject   bool
-	initPath      string
-	outputPath    string
-	getCommand    bool
-	getModule     string
-	removeCommand bool
-	removeModule  string
+	Filename      string
+	Debug         bool
+	InitProject   bool
+	InitPath      string
+	OutputPath    string
+	GetCommand    bool
+	GetModule     string
+	RemoveCommand bool
+	RemoveModule  string
 }
 
 // parseCommand processes command-specific arguments
@@ -25,16 +25,16 @@ func parseCommand(args []string, i int, result *Args) int {
 
 	switch args[i] {
 	case "init":
-		result.initProject = true
-		result.initPath = args[i+1]
+		result.InitProject = true
+		result.InitPath = args[i+1]
 		return i + 1
 	case "get":
-		result.getCommand = true
-		result.getModule = args[i+1]
+		result.GetCommand = true
+		result.GetModule = args[i+1]
 		return i + 1
 	case "remove":
-		result.removeCommand = true
-		result.removeModule = args[i+1]
+		result.RemoveCommand = true
+		result.RemoveModule = args[i+1]
 		return i + 1
 	}
 	return i
@@ -44,17 +44,17 @@ func parseCommand(args []string, i int, result *Args) int {
 func parseFlag(args []string, i int, result *Args) int {
 	switch args[i] {
 	case "-debug":
-		result.debug = true
+		result.Debug = true
 	case "-o", "-output":
 		if i+1 < len(args) {
-			result.outputPath = args[i+1]
+			result.OutputPath = args[i+1]
 			return i + 1
 		}
 	}
 	return i
 }
 
-func parseArgs() *Args {
+func ParseArgs() *Args {
 	args := os.Args[1:]
 	result := &Args{}
 
@@ -63,20 +63,20 @@ func parseArgs() *Args {
 
 		switch arg {
 		case "init":
-			result.initProject = true
+			result.InitProject = true
 			i = parseCommand(args, i, result)
 		case "get":
-			result.getCommand = true
+			result.GetCommand = true
 			i = parseCommand(args, i, result)
 		case "remove":
-			result.removeCommand = true
+			result.RemoveCommand = true
 			i = parseCommand(args, i, result)
 		case "-debug", "-o", "-output":
 			i = parseFlag(args, i, result)
 		default:
 			// If it's not a flag and we haven't set filename yet, this is the filename
-			if !result.initProject && !result.getCommand && !result.removeCommand && result.filename == "" && arg[:1] != "-" {
-				result.filename = arg
+			if !result.InitProject && !result.GetCommand && !result.RemoveCommand && result.Filename == "" && len(arg) > 0 && arg[:1] != "-" {
+				result.Filename = arg
 			}
 		}
 	}
