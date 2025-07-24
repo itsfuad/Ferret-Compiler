@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compiler/cmd/flags"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,22 +104,22 @@ func runParseArgsTest(t *testing.T, tt parseArgsTestCase) {
 	// Set up test args (prepend program name as os.Args[0])
 	os.Args = append([]string{"ferret"}, tt.args...)
 
-	args := parseArgs()
+	args := flags.ParseArgs()
 
-	if args.filename != tt.wantFilename {
-		t.Errorf("parseArgs() filename = %v, want %v", args.filename, tt.wantFilename)
+	if args.Filename != tt.wantFilename {
+		t.Errorf("parseArgs() filename = %v, want %v", args.Filename, tt.wantFilename)
 	}
-	if args.debug != tt.wantDebug {
-		t.Errorf("parseArgs() debug = %v, want %v", args.debug, tt.wantDebug)
+	if args.Debug != tt.wantDebug {
+		t.Errorf("parseArgs() debug = %v, want %v", args.Debug, tt.wantDebug)
 	}
-	if args.initProject != tt.wantInit {
-		t.Errorf("parseArgs() initProject = %v, want %v", args.initProject, tt.wantInit)
+	if args.InitProject != tt.wantInit {
+		t.Errorf("parseArgs() initProject = %v, want %v", args.InitProject, tt.wantInit)
 	}
-	if args.initPath != tt.wantInitPath {
-		t.Errorf("parseArgs() initPath = %v, want %v", args.initPath, tt.wantInitPath)
+	if args.InitPath != tt.wantInitPath {
+		t.Errorf("parseArgs() initPath = %v, want %v", args.InitPath, tt.wantInitPath)
 	}
-	if args.outputPath != tt.wantOutput {
-		t.Errorf("parseArgs() outputPath = %v, want %v", args.outputPath, tt.wantOutput)
+	if args.OutputPath != tt.wantOutput {
+		t.Errorf("parseArgs() outputPath = %v, want %v", args.OutputPath, tt.wantOutput)
 	}
 }
 
@@ -181,22 +182,22 @@ func TestInitFunctionality(t *testing.T) {
 	// Test init in temporary directory
 	os.Args = []string{"ferret", "init", tempDir}
 
-	args := parseArgs()
+	args := flags.ParseArgs()
 
-	if !args.initProject {
+	if !args.InitProject {
 		t.Fatal("Expected initProject to be true")
 	}
-	if args.initPath != tempDir {
-		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.initPath)
+	if args.InitPath != tempDir {
+		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.InitPath)
 	}
-	if args.filename != "" {
-		t.Errorf("Expected filename to be empty, got %s", args.filename)
+	if args.Filename != "" {
+		t.Errorf("Expected filename to be empty, got %s", args.Filename)
 	}
-	if args.debug {
+	if args.Debug {
 		t.Error("Expected debug to be false")
 	}
-	if args.outputPath != "" {
-		t.Errorf("Expected outputPath to be empty, got %s", args.outputPath)
+	if args.OutputPath != "" {
+		t.Errorf("Expected outputPath to be empty, got %s", args.OutputPath)
 	}
 
 	// Verify the config file path would be correct
