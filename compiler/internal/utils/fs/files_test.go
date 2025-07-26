@@ -18,6 +18,9 @@ const (
 	BUILTIN_MODULES_EXT = ".fer"
 	MATH_MODULE         = "math/geometry"
 	IO_MODULE           = "std/io"
+
+	TEST_REPO        = "github.com/user/repo"
+	NON_GH_TEST_REPO = "example.com/test/repo"
 )
 
 func TestIsBuiltinModule(t *testing.T) {
@@ -306,28 +309,28 @@ func TestResolveVersionConstraint(t *testing.T) {
 	}{
 		{
 			name:              "exact version constraint (non-GitHub)",
-			repoPath:          "example.com/test/repo", // Non-GitHub to avoid validation
-			versionConstraint: "v1.2.3",
-			expectedVersion:   "v1.2.3",
+			repoPath:          NON_GH_TEST_REPO, // Non-GitHub to avoid validation
+			versionConstraint: "v3.2.3",
+			expectedVersion:   "v3.2.3",
 			expectError:       false,
 			isGitHub:          false,
 		},
 		{
 			name:              "caret constraint with lockfile match",
-			repoPath:          "example.com/test/repo",
+			repoPath:          NON_GH_TEST_REPO,
 			versionConstraint: "^v1.0.0",
 			lockFilePackages: map[string]registry.LockEntry{
-				"example.com/test/repo@v1.2.0": {
-					Version: "v1.2.0",
+				"example.com/test/repo@v1.2.1": {
+					Version: "v1.2.1",
 				},
 			},
-			expectedVersion: "v1.2.0",
+			expectedVersion: "v1.2.1",
 			expectError:     false,
 			isGitHub:        false,
 		},
 		{
 			name:              "constraint without lockfile match (non-GitHub)",
-			repoPath:          "example.com/test/repo",
+			repoPath:          NON_GH_TEST_REPO,
 			versionConstraint: "^v2.0.0",
 			lockFilePackages:  map[string]registry.LockEntry{}, // Empty lockfile
 			expectedVersion:   "",                              // Will fail to find version
@@ -336,7 +339,7 @@ func TestResolveVersionConstraint(t *testing.T) {
 		},
 		{
 			name:              "tilde constraint without match",
-			repoPath:          "example.com/test/repo",
+			repoPath:          NON_GH_TEST_REPO,
 			versionConstraint: "~v2.1.0",
 			expectedVersion:   "",
 			expectError:       true,
@@ -346,42 +349,54 @@ func TestResolveVersionConstraint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory for cache
-			tempDir, err := os.MkdirTemp("", "ferret-test-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(tempDir)
-
-			// Create mock context
-			context := &ctx.CompilerContext{
-				RemoteCachePath: tempDir,
-			}
-
-			// Create mock lock file
-			lockFile := &registry.LockFile{
-				Packages: tt.lockFilePackages,
-			}
-			if lockFile.Packages == nil {
-				lockFile.Packages = make(map[string]registry.LockEntry)
-			}
-
-			// Test resolveVersionConstraint
-			result, err := resolveVersionConstraint(tt.repoPath, tt.versionConstraint, lockFile, context)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Expected no error, got: %v", err)
-				}
-				if result != tt.expectedVersion {
-					t.Errorf("Expected version %s, got %s", tt.expectedVersion, result)
-				}
-			}
+			testResolveVersionConstraintCase(t, tt)
 		})
+	}
+}
+
+func testResolveVersionConstraintCase(t *testing.T, tt struct {
+	name              string
+	repoPath          string
+	versionConstraint string
+	lockFilePackages  map[string]registry.LockEntry
+	expectedVersion   string
+	expectError       bool
+	isGitHub          bool
+}) {
+	// Create temporary directory for cache
+	tempDir, err := os.MkdirTemp("", "ferret-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create mock context
+	context := &ctx.CompilerContext{
+		RemoteCachePath: tempDir,
+	}
+
+	// Create mock lock file
+	lockFile := &registry.LockFile{
+		Packages: tt.lockFilePackages,
+	}
+	if lockFile.Packages == nil {
+		lockFile.Packages = make(map[string]registry.LockEntry)
+	}
+
+	// Test resolveVersionConstraint
+	result, err := resolveVersionConstraint(tt.repoPath, tt.versionConstraint, lockFile, context)
+
+	if tt.expectError {
+		if err == nil {
+			t.Errorf("Expected error but got none")
+		}
+	} else {
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if result != tt.expectedVersion {
+			t.Errorf("Expected version %s, got %s", tt.expectedVersion, result)
+		}
 	}
 }
 
@@ -459,13 +474,13 @@ func TestRemoteImportValidation(t *testing.T) {
 	}{
 		{
 			name:          "remote import allowed",
-			importPath:    "github.com/user/repo",
+			importPath:    TEST_REPO,
 			remoteEnabled: true,
 			expectError:   false,
 		},
 		{
 			name:          "remote import disabled",
-			importPath:    "github.com/user/repo",
+			importPath:    TEST_REPO,
 			remoteEnabled: false,
 			expectError:   true,
 			errorContains: "remote module imports are disabled",
@@ -480,57 +495,67 @@ func TestRemoteImportValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary test project
-			tempDir, err := os.MkdirTemp("", "ferret-test-")
-			if err != nil {
-				t.Fatalf("Failed to create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tempDir)
-
-			// Create fer.ret content
-			var ferretContent strings.Builder
-			ferretContent.WriteString("[default]\n")
-			ferretContent.WriteString("name = \"myapp\"\n")
-			ferretContent.WriteString("version = \"1.0.0\"\n")
-			ferretContent.WriteString("\n")
-			ferretContent.WriteString("[remote]\n")
-			ferretContent.WriteString(fmt.Sprintf("enabled = %t\n", tt.remoteEnabled))
-			ferretContent.WriteString("share = false\n")
-			ferretContent.WriteString("\n")
-			ferretContent.WriteString("[dependencies]\n")
-
-			ferRetPath := filepath.Join(tempDir, "fer.ret")
-			err = os.WriteFile(ferRetPath, []byte(ferretContent.String()), 0644)
-			if err != nil {
-				t.Fatalf("Failed to write fer.ret: %v", err)
-			}
-
-			// Create context
-			ctxx := createTestContext(tempDir)
-
-			// Test the validation
-			moduleType := DetermineModuleType(tt.importPath, "myapp")
-
-			if moduleType == ctx.REMOTE {
-				_, err = resolveRemoteModuleNew(tt.importPath, ctxx)
-			} else {
-				// For local modules, we just validate they don't error inappropriately
-				err = nil
-			}
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errorContains) {
-					t.Errorf("Expected error containing '%s', got: %v", tt.errorContains, err)
-				}
-			} else {
-				if err != nil && !strings.Contains(err.Error(), "not installed") {
-					// We expect "not installed" errors since we're not actually installing modules
-					t.Errorf("Expected no error, got: %v", err)
-				}
-			}
+			testRemoteImportValidationCase(t, tt)
 		})
+	}
+}
+
+func testRemoteImportValidationCase(t *testing.T, tt struct {
+	name          string
+	importPath    string
+	remoteEnabled bool
+	expectError   bool
+	errorContains string
+}) {
+	// Create temporary test project
+	tempDir, err := os.MkdirTemp("", "ferret-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create fer.ret content
+	var ferretContent strings.Builder
+	ferretContent.WriteString("[default]\n")
+	ferretContent.WriteString("name = \"myapp\"\n")
+	ferretContent.WriteString("version = \"1.0.0\"\n")
+	ferretContent.WriteString("\n")
+	ferretContent.WriteString("[remote]\n")
+	ferretContent.WriteString(fmt.Sprintf("enabled = %t\n", tt.remoteEnabled))
+	ferretContent.WriteString("share = false\n")
+	ferretContent.WriteString("\n")
+	ferretContent.WriteString("[dependencies]\n")
+
+	ferRetPath := filepath.Join(tempDir, "fer.ret")
+	err = os.WriteFile(ferRetPath, []byte(ferretContent.String()), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write fer.ret: %v", err)
+	}
+
+	// Create context
+	ctxx := createTestContext(tempDir)
+
+	// Test the validation
+	moduleType := DetermineModuleType(tt.importPath, "myapp")
+
+	if moduleType == ctx.REMOTE {
+		_, err = resolveRemoteModule(tt.importPath, ctxx)
+	} else {
+		// For local modules, we just validate they don't error inappropriately
+		err = nil
+	}
+
+	if tt.expectError {
+		if err == nil {
+			t.Errorf("Expected error but got none")
+		} else if !strings.Contains(err.Error(), tt.errorContains) {
+			t.Errorf("Expected error containing '%s', got: %v", tt.errorContains, err)
+		}
+	} else {
+		if err != nil && !strings.Contains(err.Error(), "not installed") {
+			// We expect "not installed" errors since we're not actually installing modules
+			t.Errorf("Expected no error, got: %v", err)
+		}
 	}
 }
 
@@ -543,14 +568,14 @@ func TestVersionConstraintValidation(t *testing.T) {
 	}{
 		{
 			name:       "exact version match",
-			version:    "v1.0.0",
-			constraint: "v1.0.0",
+			version:    "v4.0.0",
+			constraint: "v4.0.0",
 			satisfies:  true,
 		},
 		{
 			name:       "exact version mismatch",
-			version:    "v1.0.0",
-			constraint: "v2.0.0",
+			version:    "v3.0.0",
+			constraint: "v6.0.0",
 			satisfies:  false,
 		},
 		{
@@ -561,8 +586,8 @@ func TestVersionConstraintValidation(t *testing.T) {
 		},
 		{
 			name:       "caret constraint not satisfied",
-			version:    "v2.0.0",
-			constraint: "^v1",
+			version:    "v20.0.0",
+			constraint: "^v10",
 			satisfies:  false,
 		},
 		{
@@ -573,7 +598,7 @@ func TestVersionConstraintValidation(t *testing.T) {
 		},
 		{
 			name:       "tilde constraint not satisfied",
-			version:    "v1.3.0",
+			version:    "v1.3.4",
 			constraint: "~v1.2",
 			satisfies:  false,
 		},
@@ -606,81 +631,87 @@ func TestFindCurrentCachedVersion(t *testing.T) {
 	}{
 		{
 			name:            "single cached version",
-			repoPath:        "github.com/user/repo",
-			cachedVersions:  []string{"v1.0.0"},
-			expectedVersion: "v1.0.0",
+			repoPath:        TEST_REPO,
+			cachedVersions:  []string{"v3.1.0"},
+			expectedVersion: "v3.1.0",
 		},
 		{
 			name:            "multiple cached versions - returns any found",
-			repoPath:        "github.com/user/repo",
-			cachedVersions:  []string{"v1.0.0", "v2.0.0"},
+			repoPath:        TEST_REPO,
+			cachedVersions:  []string{"v1.2.0", "v1.3.0"},
 			expectedVersion: "", // We'll check that some version is returned
 		},
 		{
 			name:            "no cached versions",
-			repoPath:        "github.com/user/repo",
+			repoPath:        TEST_REPO,
 			cachedVersions:  []string{},
 			expectedVersion: "",
 		},
 		{
 			name:            "different repo - no match",
 			repoPath:        "github.com/user/other", // Search for this repo
-			cachedVersions:  []string{"v1.0.0"},      // But create cache for a different repo
+			cachedVersions:  []string{"v8.0.0"},      // But create cache for a different repo
 			expectedVersion: "",
-			cacheForRepo:    "github.com/user/repo", // Create cache for this repo instead
+			cacheForRepo:    TEST_REPO, // Create cache for this repo instead
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary cache directory
-			tempDir, err := os.MkdirTemp("", "ferret-cache-test-")
-			if err != nil {
-				t.Fatalf("Failed to create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tempDir)
-
-			// Create mock cached versions
-			for _, version := range tt.cachedVersions {
-				// Use cacheForRepo if specified, otherwise use repoPath
-				repoToCache := tt.repoPath
-				if tt.cacheForRepo != "" {
-					repoToCache = tt.cacheForRepo
-				}
-
-				flatName := repoToCache + "@" + version
-				// Use the same method as other successful tests
-				cachePath := filepath.Join(tempDir, flatName)
-				err := os.MkdirAll(cachePath, 0755)
-				if err != nil {
-					t.Fatalf("Failed to create cache dir: %v", err)
-				}
-				// Verify the directory was created
-				if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-					t.Fatalf("Cache directory was not created: %v", cachePath)
-				}
-			}
-
-			// Create test context
-			ctxx := createTestContext("")
-			ctxx.RemoteCachePath = tempDir
-
-			// Test finding cached version
-			result := findCurrentCachedVersion(tt.repoPath, ctxx)
-
-			if tt.name == "multiple cached versions - returns any found" {
-				// For multiple versions, just check that we got one of the expected versions
-				if result != "v1.0.0" && result != "v2.0.0" {
-					t.Errorf("findCurrentCachedVersion(%q) = %q, want either v1.0.0 or v2.0.0",
-						tt.repoPath, result)
-				}
-			} else {
-				if result != tt.expectedVersion {
-					t.Errorf("findCurrentCachedVersion(%q) = %q, want %q",
-						tt.repoPath, result, tt.expectedVersion)
-				}
-			}
+			runFindCurrentCachedVersionTest(t, tt)
 		})
+	}
+}
+
+func runFindCurrentCachedVersionTest(t *testing.T, tt struct {
+	name            string
+	repoPath        string
+	cachedVersions  []string
+	expectedVersion string
+	cacheForRepo    string
+}) {
+	// Create temporary cache directory
+	tempDir, err := os.MkdirTemp("", "ferret-cache-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create mock cached versions
+	for _, version := range tt.cachedVersions {
+		repoToCache := tt.repoPath
+		if tt.cacheForRepo != "" {
+			repoToCache = tt.cacheForRepo
+		}
+
+		flatName := repoToCache + "@" + version
+		cachePath := filepath.Join(tempDir, flatName)
+		err := os.MkdirAll(cachePath, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create cache dir: %v", err)
+		}
+		if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+			t.Fatalf("Cache directory was not created: %v", cachePath)
+		}
+	}
+
+	// Create test context
+	ctxx := createTestContext("")
+	ctxx.RemoteCachePath = tempDir
+
+	// Test finding cached version
+	result := findCurrentCachedVersion(tt.repoPath, ctxx)
+
+	if tt.name == "multiple cached versions - returns any found" {
+		if result != "v1.2.0" && result != "v1.3.0" {
+			t.Errorf("findCurrentCachedVersion(%q) = %q, want either v1.2.0 or v1.3.0",
+				tt.repoPath, result)
+		}
+	} else {
+		if result != tt.expectedVersion {
+			t.Errorf("findCurrentCachedVersion(%q) = %q, want %q",
+				tt.repoPath, result, tt.expectedVersion)
+		}
 	}
 }
 
@@ -695,21 +726,21 @@ func TestVersionChangeDetection(t *testing.T) {
 	}{
 		{
 			name:           "version satisfies constraint - no change",
-			repoPath:       "github.com/user/repo",
+			repoPath:       TEST_REPO,
 			currentVersion: "v1.0.0",
 			newConstraint:  "^v1",
 			shouldChange:   false,
 		},
 		{
 			name:           "version doesn't satisfy constraint - should change",
-			repoPath:       "github.com/user/repo",
+			repoPath:       TEST_REPO,
 			currentVersion: "v0.9.0",
 			newConstraint:  "^v1",
 			shouldChange:   true,
 		},
 		{
 			name:           "exact version change",
-			repoPath:       "github.com/user/repo",
+			repoPath:       TEST_REPO,
 			currentVersion: "v1.0.0",
 			newConstraint:  "v2.0.0",
 			shouldChange:   true,

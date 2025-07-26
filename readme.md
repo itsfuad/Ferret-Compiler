@@ -21,6 +21,11 @@ Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming l
    go build -o ferret cmd/main.go
    ```
 
+## Language Support Extension
+Download the Ferret Language Support Extension for your IDE for Syntax Highlighting Errors.
+
+Visit [Ferret Language Support](https://github.com/itsfuad/Ferret-Language-Support) for installation instructions.
+
 ### Usage
 
 #### Initialize a new Ferret project
