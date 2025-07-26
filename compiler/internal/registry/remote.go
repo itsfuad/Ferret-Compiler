@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"compiler/colors"
+	"compiler/internal/config"
 	"compiler/internal/ctx"
 )
 
@@ -155,12 +156,129 @@ func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersi
 		return nil
 	}
 
+	// Check if the target module allows sharing (remote.share = true)
+	// Note: This is a basic implementation. In a full implementation, we'd check the target repo's fer.ret
+	colors.CYAN.Printf("Checking if %s allows remote imports...\n", repoPath)
+
 	actualVersion, err := downloadAndExtractModuleFlat(context, repoPath, version)
 	if err != nil {
 		return err
 	}
 
+	// After download, check if the module's fer.ret allows sharing
+	err = validateRemoteSharing(context, repoPath, actualVersion)
+	if err != nil {
+		// If sharing is not allowed, remove the downloaded module
+		flatModuleName := repoPath + "@" + actualVersion
+		cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
+		os.RemoveAll(cachePath)
+		return err
+	}
+
 	return updateProjectFilesFlat(context, repoPath, requestedVersion, actualVersion)
+}
+
+// validateRemoteSharing checks if a remote module allows sharing by reading its fer.ret
+func validateRemoteSharing(context *ctx.CompilerContext, repoPath, version string) error {
+	err := ValidateModuleSharing(context, repoPath, version)
+	if err != nil {
+		return err
+	}
+
+	colors.GREEN.Printf("✓ sharing enabled for %s\n", repoPath)
+
+	if err := installModuleDependencies(context, repoPath, version); err != nil {
+		colors.YELLOW.Printf("⚠ failed to install dependencies for %s: %v\n", repoPath, err)
+	}
+
+	return nil
+}
+
+// ValidateModuleSharing is the core validation function that checks if a module allows sharing
+// This function is shared between download-time and import-time validation
+func ValidateModuleSharing(context *ctx.CompilerContext, repoPath, version string) error {
+	flatModuleName := repoPath + "@" + version
+	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
+	ferRetPath := filepath.Join(cachePath, "fer.ret")
+
+	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
+		return fmt.Errorf("invalid module '%s': missing required 'fer.ret' file", repoPath)
+	}
+
+	remoteConfig, err := config.LoadProjectConfig(cachePath)
+	if err != nil {
+		return fmt.Errorf("error reading fer.ret from module '%s': %v", repoPath, err)
+	}
+
+	if !remoteConfig.Remote.Share {
+		return fmt.Errorf("module '%s' does not allow remote sharing (share = false)", repoPath)
+	}
+
+	return nil
+}
+
+// installModuleDependencies reads a remote module's fer.ret and installs its dependencies
+func installModuleDependencies(context *ctx.CompilerContext, repoPath, version string) error {
+	flatModuleName := repoPath + "@" + version
+	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
+
+	// Read dependencies from the remote module's fer.ret
+	dependencies, err := ParseFerRetDependencies(cachePath)
+	if err != nil {
+		return fmt.Errorf("failed to read dependencies from %s: %w", repoPath, err)
+	}
+
+	if len(dependencies) == 0 {
+		colors.CYAN.Printf("Module %s has no dependencies\n", repoPath)
+		return nil
+	}
+
+	colors.CYAN.Printf("Installing %d dependencies for module %s...\n", len(dependencies), repoPath)
+
+	// Install each dependency recursively
+	for depRepoPath, depVersion := range dependencies {
+		colors.BLUE.Printf("Installing dependency: %s@%s\n", depRepoPath, depVersion)
+
+		// Check if already cached to avoid reinstalling
+		depFlatName := depRepoPath + "@" + depVersion
+		if context.IsRemoteModuleCachedFlat(depFlatName) {
+			colors.GREEN.Printf("Dependency %s already cached\n", depFlatName)
+			continue
+		}
+
+		// Recursively download the dependency
+		err := DownloadRemoteModule(context, depRepoPath, depVersion)
+		if err != nil {
+			return fmt.Errorf("failed to install dependency %s@%s: %w", depRepoPath, depVersion, err)
+		}
+	}
+
+	colors.GREEN.Printf("Successfully installed all dependencies for %s\n", repoPath)
+	return nil
+}
+
+// DownloadRemoteModuleWithoutFerRetUpdate downloads a module without updating fer.ret
+// This is used for auto-installation when the module is already declared in fer.ret
+func DownloadRemoteModuleWithoutFerRetUpdate(context *ctx.CompilerContext, repoPath, requestedVersion string) error {
+	version, err := resolveVersionToUse(context, repoPath, requestedVersion)
+	if err != nil {
+		return err
+	}
+
+	// Use flat structure for checking if module is cached
+	flatModuleName := repoPath + "@" + version
+	if context.IsRemoteModuleCachedFlat(flatModuleName) {
+		colors.GREEN.Printf("Module %s already cached\n", flatModuleName)
+		return nil
+	}
+
+	actualVersion, err := downloadAndExtractModuleFlat(context, repoPath, version)
+	if err != nil {
+		return err
+	}
+
+	// Only update lockfile, don't update fer.ret since it's already declared
+	return updateLockFileOnly(context, repoPath, actualVersion)
 }
 
 // resolveVersionToUse determines which version to use based on locked version and requested version
@@ -258,10 +376,28 @@ func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, requestedVer
 	return nil
 }
 
+// updateLockFileOnly updates only the lockfile entry for a module, without modifying fer.ret
+func updateLockFileOnly(context *ctx.CompilerContext, repoPath, actualVersion string) error {
+	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, actualVersion)
+	if err != nil {
+		return fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, actualVersion, err)
+	}
+
+	// Update lockfile with flat structure
+	err = UpdateLockEntry(context.ProjectRoot, repoPath, actualVersion, downloadURL)
+	if err != nil {
+		colors.YELLOW.Printf("Warning: Failed to update lock file: %v\n", err)
+	}
+
+	colors.GREEN.Printf("Successfully cached %s@%s (no fer.ret update)\n", repoPath, actualVersion)
+	return nil
+}
+
 // shouldUpdateFerRet determines if fer.ret should be updated based on the request
 func shouldUpdateFerRet(projectRoot, repoPath, requestedVersion string) bool {
-	lockedVersion, _ := GetLockedVersion(projectRoot, repoPath)
-	return requestedVersion != "latest" || lockedVersion == ""
+	// Always update fer.ret when explicitly installing via ferret get
+	// This makes ferret get behave like go get - it adds the dependency to fer.ret
+	return true
 }
 
 // updateFerRetWithNewDependency adds the dependency to fer.ret with appropriate version constraint
