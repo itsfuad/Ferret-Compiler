@@ -85,15 +85,17 @@ func UpdateLockEntry(projectRoot, repoPath, version, downloadURL string) error {
 		return err
 	}
 
-	// Calculate checksum of the downloaded archive
-	cachePath := filepath.Join(projectRoot, ".ferret", "modules", repoPath+"@"+version)
+	// Calculate checksum of the downloaded archive using flat structure
+	flatModuleName := repoPath + "@" + version
+	cachePath := filepath.Join(projectRoot, ".ferret", "modules", flatModuleName)
 	checksum, err := calculateDirectoryChecksum(cachePath)
 	if err != nil {
 		colors.YELLOW.Printf("Warning: Failed to calculate checksum for %s: %v\n", repoPath, err)
 		checksum = "unknown"
 	}
 
-	lockFile.Packages[repoPath] = LockEntry{
+	// Store using flat structure - key is flatModuleName instead of just repoPath
+	lockFile.Packages[flatModuleName] = LockEntry{
 		Version:     version,
 		ResolvedURL: downloadURL,
 		Checksum:    checksum,
@@ -145,6 +147,30 @@ func GetLockedVersion(projectRoot, repoPath string) (string, error) {
 	}
 
 	return "", nil
+}
+
+// GetLockedEntryFlat returns the lock entry for a flat module name
+func GetLockedEntryFlat(projectRoot, flatModuleName string) (*LockEntry, error) {
+	lockFile, err := LoadLockFile(projectRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	if entry, exists := lockFile.Packages[flatModuleName]; exists {
+		return &entry, nil
+	}
+
+	return nil, fmt.Errorf("module %s not found in lock file", flatModuleName)
+}
+
+// ListAllDependencies returns all dependencies in flat structure
+func ListAllDependencies(projectRoot string) (map[string]LockEntry, error) {
+	lockFile, err := LoadLockFile(projectRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	return lockFile.Packages, nil
 }
 
 // RemoveModuleFromLockfile removes a module from the lockfile

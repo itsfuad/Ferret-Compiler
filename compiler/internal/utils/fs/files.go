@@ -9,6 +9,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/config"
 	"compiler/internal/ctx"
+	"compiler/internal/registry"
 )
 
 const EXT = ".fer"
@@ -136,7 +137,7 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 	// Route to appropriate resolver based on module type
 	switch moduleType {
 	case ctx.REMOTE:
-		return resolveRemoteModule(importPath, ctxx)
+		return resolveRemoteModuleNew(importPath, ctxx)
 	case ctx.BUILTIN:
 		return resolveBuiltinModule(importPath, ctxx)
 	case ctx.LOCAL:
@@ -181,34 +182,87 @@ func resolveLocalModule(importPath, projectName string, ctxx *ctx.CompilerContex
 	return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
 }
 
-// resolveRemoteModule resolves a remote module import by checking local cache
-func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, error) {
-	repoPath, version, subPath := ctxx.ParseRemoteImport(importPath)
+// resolveRemoteModuleNew implements the new import system workflow:
+// 1. Check fer.ret for dependency declaration
+// 2. Check ferret.lock for version/dependency info
+// 3. Check cache and auto-install if needed
+func resolveRemoteModuleNew(importPath string, ctxx *ctx.CompilerContext) (string, error) {
+	repoPath, requestedVersion, subPath := ctxx.ParseRemoteImport(importPath)
 
 	if repoPath == "" {
 		return "", fmt.Errorf("invalid remote import path: %s", importPath)
 	}
 
-	// Resolve the version to the actual cached version
-	actualVersion, err := resolveVersionForCache(repoPath, version, ctxx)
+	// Step 1: Check fer.ret for dependency declaration
+	dependencies, err := registry.ParseFerRetDependencies(ctxx.ProjectRoot)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read fer.ret: %w", err)
 	}
 
-	// Check if module is cached locally with the resolved version
-	if !ctxx.IsRemoteModuleCached(repoPath, actualVersion) {
-		return "", fmt.Errorf("remote module not found in cache: %s@%s\nRun: ferret get %s", repoPath, version, repoPath)
+	declaredVersion, isDeclared := dependencies[repoPath]
+	if !isDeclared {
+		return "", fmt.Errorf("module '%s' is not declared in fer.ret\n\nPlease add it to the [dependencies] section:\n\n[dependencies]\n%s = \"v1.0.0\"\n\nThen run: ferret get %s", repoPath, repoPath, repoPath)
 	}
 
-	// Construct path to the cached module file
-	cachePath := ctxx.GetRemoteModuleCachePath(repoPath, actualVersion)
+	// Use declared version if no specific version was requested
+	targetVersion := declaredVersion
+	if requestedVersion != "" && requestedVersion != "latest" {
+		// Validate that requested version matches declared version
+		if requestedVersion != declaredVersion {
+			colors.YELLOW.Printf("Warning: Requested version %s differs from declared version %s for %s, using declared version\n",
+				requestedVersion, declaredVersion, repoPath)
+		}
+	}
+
+	// Step 2: Check ferret.lock for dependency info
+	lockFile, err := registry.LoadLockFile(ctxx.ProjectRoot)
+	if err != nil {
+		return "", fmt.Errorf("failed to read ferret.lock: %w", err)
+	}
+
+	// Step 3: Resolve version using flat dependency structure
+	flatModuleName := repoPath + "@" + targetVersion
+
+	// Check if this specific version is in cache
+	if !ctxx.IsRemoteModuleCachedFlat(flatModuleName) {
+		// Auto-install from fer.ret and lock file data
+		colors.CYAN.Printf("Installing module %s@%s...\n", repoPath, targetVersion)
+		err := autoInstallModule(repoPath, targetVersion, lockFile, ctxx)
+		if err != nil {
+			return "", fmt.Errorf("failed to auto-install module %s@%s: %w", repoPath, targetVersion, err)
+		}
+	}
+
+	// Construct path to the cached module file using flat structure
+	return resolveCachedModulePathFlat(flatModuleName, subPath, ctxx)
+}
+
+// autoInstallModule automatically installs a module based on fer.ret and lock file data
+func autoInstallModule(repoPath, version string, lockFile *registry.LockFile, ctxx *ctx.CompilerContext) error {
+	// This will trigger the download/installation process
+	// We'll implement this to call the existing remote installation logic
+	colors.GREEN.Printf("Auto-installing %s@%s from declared dependencies...\n", repoPath, version)
+
+	// Call the existing download function with the flat structure support
+	err := registry.DownloadRemoteModule(ctxx, repoPath, version)
+	if err != nil {
+		return fmt.Errorf("failed to download module %s@%s: %w", repoPath, version, err)
+	}
+
+	colors.GREEN.Printf("Successfully auto-installed %s@%s\n", repoPath, version)
+	return nil
+}
+
+// resolveCachedModulePathFlat resolves module path using flat cache structure
+func resolveCachedModulePathFlat(flatModuleName, subPath string, ctxx *ctx.CompilerContext) (string, error) {
+	// Construct path using flat structure: .ferret/modules/github.com/user/repo@version/
+	cachePath := filepath.Join(ctxx.RemoteCachePath, flatModuleName)
+
 	var modulePath string
-
 	if subPath != "" {
 		modulePath = filepath.Join(cachePath, subPath+EXT)
 	} else {
-		// If no subpath, look for main module file (could be index.fer, main.fer, etc.)
-		// Try common entry point names
+		// Look for common entry point names
 		possibleFiles := []string{"index.fer", "main.fer", "mod.fer"}
 		for _, fileName := range possibleFiles {
 			candidatePath := filepath.Join(cachePath, fileName)
@@ -219,7 +273,7 @@ func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, 
 		}
 
 		if modulePath == "" {
-			return "", fmt.Errorf("no entry point found in cached module: %s@%s", repoPath, actualVersion)
+			return "", fmt.Errorf("no entry point found in cached module: %s", flatModuleName)
 		}
 	}
 
