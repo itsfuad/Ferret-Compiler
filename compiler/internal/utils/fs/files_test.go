@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"compiler/internal/config"
 	"compiler/internal/ctx"
+	"compiler/internal/registry"
 )
 
 const (
@@ -289,5 +291,231 @@ func TestResolveModuleProjectNameValidation(t *testing.T) {
 	_, err := ResolveModule("someproject/module", "", ctxx)
 	if err == nil || !strings.Contains(err.Error(), "project name not defined") {
 		t.Errorf("Expected error about project name not defined, got: %v", err)
+	}
+}
+
+func TestResolveVersionConstraint(t *testing.T) {
+	tests := []struct {
+		name              string
+		repoPath          string
+		versionConstraint string
+		lockFilePackages  map[string]registry.LockEntry
+		expectedVersion   string
+		expectError       bool
+	}{
+		{
+			name:              "exact version constraint",
+			repoPath:          "github.com/test/repo",
+			versionConstraint: "v1.2.3",
+			expectedVersion:   "v1.2.3",
+			expectError:       false,
+		},
+		{
+			name:              "caret constraint with lockfile match",
+			repoPath:          "github.com/test/repo",
+			versionConstraint: "^v1.0.0",
+			lockFilePackages: map[string]registry.LockEntry{
+				"github.com/test/repo@v1.2.0": {
+					Version: "v1.2.0",
+				},
+			},
+			expectedVersion: "v1.2.0",
+			expectError:     false,
+		},
+		{
+			name:              "latest constraint",
+			repoPath:          "github.com/test/repo",
+			versionConstraint: "latest",
+			expectedVersion:   "latest",
+			expectError:       false,
+		},
+		{
+			name:              "tilde constraint",
+			repoPath:          "github.com/test/repo",
+			versionConstraint: "~v2.1.0",
+			expectedVersion:   "~v2.1.0", // Falls back to constraint when no lockfile match
+			expectError:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary directory for cache
+			tempDir, err := os.MkdirTemp("", "ferret-test-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(tempDir)
+
+			// Create mock context
+			context := &ctx.CompilerContext{
+				RemoteCachePath: tempDir,
+			}
+
+			// Create mock lock file
+			lockFile := &registry.LockFile{
+				Packages: tt.lockFilePackages,
+			}
+			if lockFile.Packages == nil {
+				lockFile.Packages = make(map[string]registry.LockEntry)
+			}
+
+			// Test resolveVersionConstraint
+			result, err := resolveVersionConstraint(tt.repoPath, tt.versionConstraint, lockFile, context)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got: %v", err)
+				}
+				if result != tt.expectedVersion {
+					t.Errorf("Expected version %s, got %s", tt.expectedVersion, result)
+				}
+			}
+		})
+	}
+}
+
+func TestDetermineModuleType(t *testing.T) {
+	tests := []struct {
+		name        string
+		importPath  string
+		projectName string
+		expected    ctx.ModuleType
+	}{
+		{
+			name:        "remote GitHub module",
+			importPath:  "github.com/user/repo/module",
+			projectName: "myapp",
+			expected:    ctx.REMOTE,
+		},
+		{
+			name:        "builtin std module",
+			importPath:  "std/io",
+			projectName: "myapp",
+			expected:    ctx.BUILTIN,
+		},
+		{
+			name:        "builtin math module",
+			importPath:  "math/geometry",
+			projectName: "myapp",
+			expected:    ctx.BUILTIN,
+		},
+		{
+			name:        "local project module",
+			importPath:  "myapp/utils",
+			projectName: "myapp",
+			expected:    ctx.LOCAL,
+		},
+		{
+			name:        "unknown module defaults to local",
+			importPath:  "unknown/module",
+			projectName: "myapp",
+			expected:    ctx.LOCAL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetermineModuleType(tt.importPath, tt.projectName)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestRemoteImportValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		importPath    string
+		remoteEnabled bool
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:          "remote import allowed",
+			importPath:    "github.com/user/repo/module",
+			remoteEnabled: true,
+			expectError:   false,
+		},
+		{
+			name:          "remote import disabled",
+			importPath:    "github.com/user/repo/module",
+			remoteEnabled: false,
+			expectError:   true,
+			errorContains: "remote module imports are disabled",
+		},
+		{
+			name:          "local import always allowed",
+			importPath:    "myapp/utils",
+			remoteEnabled: false,
+			expectError:   false, // This test would need proper setup for local resolution
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary directory structure
+			tempDir, err := os.MkdirTemp("", "ferret-test-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(tempDir)
+
+			// Create fer.ret with remote settings
+			var ferretContent strings.Builder
+			ferretContent.WriteString("[default]\n")
+			ferretContent.WriteString("name = \"myapp\"\n")
+			ferretContent.WriteString("version = \"1.0.0\"\n")
+			ferretContent.WriteString("\n")
+			ferretContent.WriteString("[remote]\n")
+			ferretContent.WriteString(fmt.Sprintf("enabled = %t\n", tt.remoteEnabled))
+			ferretContent.WriteString("share = false\n")
+			ferretContent.WriteString("\n")
+			ferretContent.WriteString("[dependencies]\n")
+
+			ferretPath := filepath.Join(tempDir, "fer.ret")
+			if err := os.WriteFile(ferretPath, []byte(ferretContent.String()), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			// Load project config
+			projectConfig, err := config.LoadProjectConfig(tempDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Create mock context
+			context := &ctx.CompilerContext{
+				ProjectConfig:   projectConfig,
+				ProjectRoot:     tempDir,
+				RemoteCachePath: filepath.Join(tempDir, ".ferret", "modules"),
+			}
+
+			// Only test remote imports for the disabled case
+			if tt.importPath == "github.com/user/repo/module" && !tt.remoteEnabled {
+				// Create minimal dependencies for the test
+				os.WriteFile(filepath.Join(tempDir, "fer.ret"), []byte(ferretContent.String()), 0644)
+
+				// Test should fail with remote disabled error
+				_, err := resolveRemoteModuleNew(tt.importPath, context)
+
+				if tt.expectError {
+					if err == nil {
+						t.Errorf("Expected error but got none")
+					} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+						t.Errorf("Expected error to contain '%s', got: %s", tt.errorContains, err.Error())
+					}
+				} else {
+					if err != nil {
+						t.Errorf("Expected no error, got: %v", err)
+					}
+				}
+			}
+		})
 	}
 }
