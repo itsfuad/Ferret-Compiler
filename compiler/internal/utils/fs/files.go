@@ -193,6 +193,11 @@ func resolveRemoteModuleNew(importPath string, ctxx *ctx.CompilerContext) (strin
 		return "", fmt.Errorf("invalid remote import path: %s", importPath)
 	}
 
+	// Step 0: Check if remote imports are enabled in project configuration
+	if ctxx.ProjectConfig != nil && !ctxx.ProjectConfig.Remote.Enabled {
+		return "", fmt.Errorf("remote module imports are disabled in this project\n\nTo enable remote imports, set 'enabled = true' in the [remote] section of fer.ret:\n\n[remote]\nenabled = true\nshare = false")
+	}
+
 	// Step 1: Check fer.ret for dependency declaration
 	dependencies, err := registry.ParseFerRetDependencies(ctxx.ProjectRoot)
 	if err != nil {
@@ -201,7 +206,7 @@ func resolveRemoteModuleNew(importPath string, ctxx *ctx.CompilerContext) (strin
 
 	declaredVersion, isDeclared := dependencies[repoPath]
 	if !isDeclared {
-		return "", fmt.Errorf("module '%s' is not declared in fer.ret\n\nPlease add it to the [dependencies] section:\n\n[dependencies]\n%s = \"v1.0.0\"\n\nThen run: ferret get %s", repoPath, repoPath, repoPath)
+		return "", fmt.Errorf("module '%s' is not installed.\n To install this module, run:\n  ferret get %s", repoPath, repoPath)
 	}
 
 	// Use declared version if no specific version was requested
@@ -220,17 +225,41 @@ func resolveRemoteModuleNew(importPath string, ctxx *ctx.CompilerContext) (strin
 		return "", fmt.Errorf("failed to read ferret.lock: %w", err)
 	}
 
-	// Step 3: Resolve version using flat dependency structure
-	flatModuleName := repoPath + "@" + targetVersion
+	// Step 3: Resolve version constraint to actual version
+	// We need to resolve constraints like "^v0" to actual versions like "v0"
+	actualVersion, err := resolveVersionConstraint(repoPath, targetVersion, lockFile, ctxx)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve version for %s@%s: %w", repoPath, targetVersion, err)
+	}
+
+	// Use the actual resolved version for cache operations
+	flatModuleName := repoPath + "@" + actualVersion
 
 	// Check if this specific version is in cache
 	if !ctxx.IsRemoteModuleCachedFlat(flatModuleName) {
-		// Auto-install from fer.ret and lock file data
-		colors.CYAN.Printf("Installing module %s@%s...\n", repoPath, targetVersion)
-		err := autoInstallModule(repoPath, targetVersion, lockFile, ctxx)
-		if err != nil {
-			return "", fmt.Errorf("failed to auto-install module %s@%s: %w", repoPath, targetVersion, err)
+		// Check if we have lock file entry for this module (meaning it was previously installed)
+		lockEntry, err := registry.GetLockedEntryFlat(ctxx.ProjectRoot, flatModuleName)
+		if err == nil && lockEntry != nil {
+			// Module was previously installed but cache is missing - auto-download
+			colors.CYAN.Printf("Module %s was previously installed but cache is missing. Re-downloading...\n", flatModuleName)
+			err := autoInstallModule(repoPath, actualVersion, lockFile, ctxx)
+			if err != nil {
+				return "", fmt.Errorf("failed to re-download module %s: %w", flatModuleName, err)
+			}
+		} else {
+			// Module is declared but never installed - auto-install
+			colors.CYAN.Printf("Installing declared module %s...\n", flatModuleName)
+			err := autoInstallModule(repoPath, actualVersion, lockFile, ctxx)
+			if err != nil {
+				return "", fmt.Errorf("failed to auto-install module %s: %w", flatModuleName, err)
+			}
 		}
+	}
+
+	// Always check if the cached module still allows sharing (even if cached)
+	err = registry.ValidateModuleSharing(ctxx, repoPath, actualVersion)
+	if err != nil {
+		return "", fmt.Errorf("cached module validation failed: %w", err)
 	}
 
 	// Construct path to the cached module file using flat structure
@@ -243,8 +272,8 @@ func autoInstallModule(repoPath, version string, lockFile *registry.LockFile, ct
 	// We'll implement this to call the existing remote installation logic
 	colors.GREEN.Printf("Auto-installing %s@%s from declared dependencies...\n", repoPath, version)
 
-	// Call the existing download function with the flat structure support
-	err := registry.DownloadRemoteModule(ctxx, repoPath, version)
+	// Call the download function but don't update fer.ret since it's already declared
+	err := registry.DownloadRemoteModuleWithoutFerRetUpdate(ctxx, repoPath, version)
 	if err != nil {
 		return fmt.Errorf("failed to download module %s@%s: %w", repoPath, version, err)
 	}
@@ -282,37 +311,6 @@ func resolveCachedModulePathFlat(flatModuleName, subPath string, ctxx *ctx.Compi
 	}
 
 	return modulePath, nil
-}
-
-// resolveVersionForCache resolves version like "latest" to actual cached version
-func resolveVersionForCache(repoPath, version string, ctxx *ctx.CompilerContext) (string, error) {
-	if version != "latest" {
-		return version, nil
-	}
-
-	// For "latest", we need to find what version was actually cached
-	// The cache structure is: .ferret/modules/github.com/user/repo@version
-	// So we need to look in the directory containing all versions of this repo
-	baseRepoPath := filepath.Join(ctxx.RemoteCachePath, repoPath)
-	parentDir := filepath.Dir(baseRepoPath)
-	repoName := filepath.Base(repoPath) // e.g., "ferret-mod"
-
-	entries, err := os.ReadDir(parentDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to read cache directory: %w", err)
-	}
-
-	// Find directories that start with repoName@
-	prefix := repoName + "@"
-	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) {
-			// Extract version from directory name
-			actualVersion := strings.TrimPrefix(entry.Name(), prefix)
-			return actualVersion, nil
-		}
-	}
-
-	return "", fmt.Errorf("no cached version found for %s", repoPath)
 }
 
 // isFileInRemoteCache checks if the given file path is inside a remote module cache
@@ -401,48 +399,39 @@ func findRemoteModuleConfigDir(filePath string, ctxx *ctx.CompilerContext) (stri
 	return "", fmt.Errorf("no fer.ret found in remote module hierarchy for: %s", filePath)
 }
 
-// findRemoteModuleRoot finds the root directory of the remote module containing the given file
-func findRemoteModuleRoot(filePath string, ctxx *ctx.CompilerContext) (string, error) {
-	// Normalize the file path
-	absFilePath, err := filepath.Abs(filePath)
-	if err != nil {
-		return "", err
+// resolveVersionConstraint resolves a version constraint to an actual version
+// by checking the lockfile and cache for the best matching version
+func resolveVersionConstraint(repoPath, versionConstraint string, lockFile *registry.LockFile, ctxx *ctx.CompilerContext) (string, error) {
+	// If the constraint is already a specific version (not a constraint), return it
+	if !strings.HasPrefix(versionConstraint, "^") && !strings.HasPrefix(versionConstraint, "~") && versionConstraint != "latest" {
+		return versionConstraint, nil
 	}
 
-	absCachePath, err := filepath.Abs(ctxx.RemoteCachePath)
-	if err != nil {
-		return "", err
-	}
-
-	// Remove the cache path prefix to get the relative path within cache
-	relPath, err := filepath.Rel(absCachePath, absFilePath)
-	if err != nil {
-		return "", err
-	}
-
-	// The structure is: github.com/user/repo@version/...
-	// We need to find the repo@version directory
-	parts := strings.Split(filepath.ToSlash(relPath), "/")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid remote module path structure")
-	}
-
-	// Find the part that contains @ (the repo@version part)
-	var repoVersionIndex int = -1
-	for i, part := range parts {
-		if strings.Contains(part, "@") {
-			repoVersionIndex = i
-			break
+	// First, try to find in lockfile what actual version was resolved for this constraint
+	for flatName := range lockFile.Packages {
+		// Check if this lockfile entry matches our repo
+		if strings.HasPrefix(flatName, repoPath+"@") {
+			actualVersion := strings.TrimPrefix(flatName, repoPath+"@")
+			// For now, return the first matching version from lockfile
+			// In a more sophisticated implementation, we'd do proper semver resolution
+			return actualVersion, nil
 		}
 	}
 
-	if repoVersionIndex == -1 {
-		return "", fmt.Errorf("could not find versioned module directory")
+	// If not in lockfile, resolve constraint by looking at available cache
+	// For constraints like "^v0", we'll try to resolve to "v0"
+	if strings.HasPrefix(versionConstraint, "^") {
+		baseVersion := strings.TrimPrefix(versionConstraint, "^")
+		if ctxx.IsRemoteModuleCachedFlat(repoPath + "@" + baseVersion) {
+			return baseVersion, nil
+		}
 	}
 
-	// Reconstruct the path up to the repo@version directory
-	moduleRootParts := parts[:repoVersionIndex+1]
-	moduleRoot := filepath.Join(absCachePath, filepath.Join(moduleRootParts...))
+	// If "latest", we need to download to resolve it
+	if versionConstraint == "latest" {
+		return "latest", nil
+	}
 
-	return moduleRoot, nil
+	// For now, return the constraint as-is and let the download logic handle it
+	return versionConstraint, nil
 }

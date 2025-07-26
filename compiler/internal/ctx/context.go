@@ -287,18 +287,6 @@ func (c *CompilerContext) ParseRemoteImport(importPath string) (string, string, 
 	return repoPath, version, subPath
 }
 
-// GetRemoteModuleCachePath returns the cache path for a remote module
-func (c *CompilerContext) GetRemoteModuleCachePath(repoPath, version string) string {
-	return filepath.Join(c.RemoteCachePath, repoPath+"@"+version)
-}
-
-// IsRemoteModuleCached checks if a remote module is already cached locally
-func (c *CompilerContext) IsRemoteModuleCached(repoPath, version string) bool {
-	cachePath := c.GetRemoteModuleCachePath(repoPath, version)
-	_, err := os.Stat(cachePath)
-	return err == nil
-}
-
 // IsRemoteModuleCachedFlat checks if a remote module is cached using flat structure
 // flatModuleName format: "github.com/user/repo@version"
 func (c *CompilerContext) IsRemoteModuleCachedFlat(flatModuleName string) bool {
