@@ -199,13 +199,21 @@ func validateRemoteSharing(context *ctx.CompilerContext, repoPath, version strin
 func ValidateModuleSharing(context *ctx.CompilerContext, repoPath, version string) error {
 	flatModuleName := repoPath + "@" + version
 	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
+
+	// First, try to find fer.ret at the repo root (standard case)
 	ferRetPath := filepath.Join(cachePath, "fer.ret")
 
+	// If no fer.ret at root, this might be a multi-project repo
+	// We need to find any fer.ret file in the repo to validate sharing
 	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
-		return fmt.Errorf("invalid module '%s': missing required 'fer.ret' file", repoPath)
+		foundFerRet, err := findAnyFerRetInRepo(cachePath)
+		if err != nil {
+			return fmt.Errorf("invalid module '%s': no fer.ret file found in repository", repoPath)
+		}
+		ferRetPath = foundFerRet
 	}
 
-	remoteConfig, err := config.LoadProjectConfig(cachePath)
+	remoteConfig, err := config.LoadProjectConfig(filepath.Dir(ferRetPath))
 	if err != nil {
 		return fmt.Errorf("error reading fer.ret from module '%s': %v", repoPath, err)
 	}
@@ -217,13 +225,57 @@ func ValidateModuleSharing(context *ctx.CompilerContext, repoPath, version strin
 	return nil
 }
 
+// findAnyFerRetInRepo searches for any fer.ret file in the repository
+// This supports multi-project repositories where fer.ret might be in subdirectories
+func findAnyFerRetInRepo(repoPath string) (string, error) {
+	var foundFerRet string
+
+	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.Name() == "fer.ret" {
+			foundFerRet = path
+			return filepath.SkipDir // Stop after finding the first one
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if foundFerRet == "" {
+		return "", fmt.Errorf("no fer.ret file found in repository")
+	}
+
+	return foundFerRet, nil
+}
+
 // installModuleDependencies reads a remote module's fer.ret and installs its dependencies
 func installModuleDependencies(context *ctx.CompilerContext, repoPath, version string) error {
 	flatModuleName := repoPath + "@" + version
 	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
 
+	// Find the fer.ret file (might be in subdirectory for multi-project repos)
+	ferRetPath := filepath.Join(cachePath, "fer.ret")
+	var configDir string
+
+	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
+		// Look for fer.ret in subdirectories
+		foundFerRet, err := findAnyFerRetInRepo(cachePath)
+		if err != nil {
+			return fmt.Errorf("no fer.ret found in %s for dependency resolution", repoPath)
+		}
+		configDir = filepath.Dir(foundFerRet)
+	} else {
+		configDir = cachePath
+	}
+
 	// Read dependencies from the remote module's fer.ret
-	dependencies, err := ParseFerRetDependencies(cachePath)
+	dependencies, err := ParseFerRetDependencies(configDir)
 	if err != nil {
 		return fmt.Errorf("failed to read dependencies from %s: %w", repoPath, err)
 	}
