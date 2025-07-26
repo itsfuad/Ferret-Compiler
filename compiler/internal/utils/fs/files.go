@@ -279,7 +279,7 @@ func resolveVersionConstraint(repoPath, constraint string, lockFile *registry.Lo
 	if constraint == "latest" {
 		return resolveLatestVersion(repoPath)
 	}
-	return findBestVersionForConstraint(repoPath, constraint, ctxx)
+	return findBestVersionForConstraint(repoPath, constraint)
 }
 
 func isExactVersion(v string) bool {
@@ -301,7 +301,7 @@ func resolveFromCache(repoPath, constraint, cached string, ctxx *ctx.CompilerCon
 		return cached, nil
 	}
 	colors.YELLOW.Printf("Current cached version %s does not satisfy new constraint %s for %s\n", cached, constraint, repoPath)
-	newVersion, err := findBestVersionForConstraint(repoPath, constraint, ctxx)
+	newVersion, err := findBestVersionForConstraint(repoPath, constraint)
 	if err != nil {
 		return "", fmt.Errorf("failed to find version satisfying constraint %s for %s: %w", constraint, repoPath, err)
 	}
@@ -524,7 +524,7 @@ func findRemoteModuleConfigDir(filePath string, ctxx *ctx.CompilerContext) (stri
 }
 
 // findBestVersionForConstraint finds the best version that satisfies a constraint
-func findBestVersionForConstraint(repoPath, constraint string, ctxx *ctx.CompilerContext) (string, error) {
+func findBestVersionForConstraint(repoPath, constraint string) (string, error) {
 	if !strings.HasPrefix(repoPath, REMOTE_HOST) {
 		return "", fmt.Errorf("version constraint resolution only supported for GitHub repositories")
 	}

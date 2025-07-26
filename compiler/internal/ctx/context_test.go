@@ -8,6 +8,11 @@ import (
 	"compiler/internal/frontend/ast"
 )
 
+const (
+	VALID_REPO               = "github.com/user/repo@v1.0.0"
+	VALID_REPO_NON_VERSIONED = "github.com/user/repo"
+)
+
 func TestModuleFunctions(t *testing.T) {
 	// Reset the contextCreated flag for testing
 	contextCreated = false
@@ -209,7 +214,7 @@ func TestIsRemoteModuleCachedFlat(t *testing.T) {
 	}{
 		{
 			name:           "existing flat module",
-			flatModuleName: "github.com/user/repo@v1.0.0",
+			flatModuleName: VALID_REPO,
 			createModule:   true,
 			expected:       true,
 		},
@@ -267,7 +272,7 @@ func TestGetRemoteModuleCachePathFlat(t *testing.T) {
 	}{
 		{
 			name:           "standard flat module path",
-			flatModuleName: "github.com/user/repo@v1.0.0",
+			flatModuleName: VALID_REPO,
 			basePath:       "/cache/modules",
 			expected:       "/cache/modules/github.com/user/repo@v1.0.0",
 		},
@@ -312,29 +317,29 @@ func TestParseRemoteImport(t *testing.T) {
 	}{
 		{
 			name:         "basic GitHub import",
-			importPath:   "github.com/user/repo",
-			expectedRepo: "github.com/user/repo",
+			importPath:   VALID_REPO_NON_VERSIONED,
+			expectedRepo: VALID_REPO_NON_VERSIONED,
 			expectedVer:  "latest",
 			expectedSub:  "",
 		},
 		{
 			name:         "GitHub import with version",
 			importPath:   "github.com/user/repo@v1.2.3",
-			expectedRepo: "github.com/user/repo",
+			expectedRepo: VALID_REPO_NON_VERSIONED,
 			expectedVer:  "v1.2.3",
 			expectedSub:  "",
 		},
 		{
 			name:         "GitHub import with subpath",
 			importPath:   "github.com/user/repo/utils/math",
-			expectedRepo: "github.com/user/repo",
+			expectedRepo: VALID_REPO_NON_VERSIONED,
 			expectedVer:  "latest",
 			expectedSub:  "utils/math",
 		},
 		{
 			name:         "GitHub import with version and subpath",
 			importPath:   "github.com/user/repo@v2.0.0/data/types",
-			expectedRepo: "github.com/user/repo",
+			expectedRepo: VALID_REPO_NON_VERSIONED,
 			expectedVer:  "v2.0.0",
 			expectedSub:  "data/types",
 		},
@@ -380,7 +385,7 @@ func TestFlatVsOldCacheStructure(t *testing.T) {
 
 	// Test flat structure paths
 	flatModules := []string{
-		"github.com/user/repo@v1.0.0",
+		VALID_REPO,
 		"github.com/user/repo@v2.0.0",
 		"github.com/other/lib@v1.5.0",
 	}
@@ -399,7 +404,7 @@ func TestFlatVsOldCacheStructure(t *testing.T) {
 	}
 
 	// Verify different versions of same repo can coexist
-	repo1v1 := "github.com/user/repo@v1.0.0"
+	repo1v1 := VALID_REPO
 	repo1v2 := "github.com/user/repo@v2.0.0"
 
 	if !context.IsRemoteModuleCachedFlat(repo1v1) {
