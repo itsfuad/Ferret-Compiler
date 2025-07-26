@@ -20,6 +20,12 @@ const (
 	GitHubTagArchiveURL = "https://github.com/%s/%s/archive/refs/tags/%s.zip"
 )
 
+const (
+	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
+	GitHubReleasesURL         = "https://api.github.com/repos/%s/%s/releases"
+	FerretConfigFile          = "fer.ret"
+)
+
 // GitHubRelease represents a GitHub release from the API
 type GitHubRelease struct {
 	TagName     string `json:"tag_name"`
@@ -201,7 +207,7 @@ func ValidateModuleSharing(context *ctx.CompilerContext, repoPath, version strin
 	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
 
 	// First, try to find fer.ret at the repo root (standard case)
-	ferRetPath := filepath.Join(cachePath, "fer.ret")
+	ferRetPath := filepath.Join(cachePath, FerretConfigFile)
 
 	// If no fer.ret at root, this might be a multi-project repo
 	// We need to find any fer.ret file in the repo to validate sharing
@@ -235,7 +241,7 @@ func findAnyFerRetInRepo(repoPath string) (string, error) {
 			return err
 		}
 
-		if info.Name() == "fer.ret" {
+		if info.Name() == FerretConfigFile {
 			foundFerRet = path
 			return filepath.SkipDir // Stop after finding the first one
 		}
@@ -260,7 +266,7 @@ func installModuleDependencies(context *ctx.CompilerContext, repoPath, version s
 	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
 
 	// Find the fer.ret file (might be in subdirectory for multi-project repos)
-	ferRetPath := filepath.Join(cachePath, "fer.ret")
+	ferRetPath := filepath.Join(cachePath, FerretConfigFile)
 	var configDir string
 
 	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
@@ -354,7 +360,7 @@ func downloadAndExtractModuleFlat(context *ctx.CompilerContext, repoPath, versio
 
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, version)
 	if err != nil {
-		return "", fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, version, err)
+		return "", fmt.Errorf(ErrFailedToGetDownloadURL, repoPath, version, err)
 	}
 
 	colors.CYAN.Printf("Downloading from: %s\n", downloadURL)
@@ -407,7 +413,7 @@ func downloadToTempFile(downloadURL string) (string, error) {
 func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, requestedVersion, actualVersion string) error {
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, actualVersion)
 	if err != nil {
-		return fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, actualVersion, err)
+		return fmt.Errorf(ErrFailedToGetDownloadURL, repoPath, actualVersion, err)
 	}
 
 	// Update lockfile with flat structure
@@ -432,7 +438,7 @@ func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, requestedVer
 func updateLockFileOnly(context *ctx.CompilerContext, repoPath, actualVersion string) error {
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, actualVersion)
 	if err != nil {
-		return fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, actualVersion, err)
+		return fmt.Errorf(ErrFailedToGetDownloadURL, repoPath, actualVersion, err)
 	}
 
 	// Update lockfile with flat structure
@@ -492,7 +498,7 @@ func getGitHubDownloadURL(repoPath, version string) (string, string, error) {
 
 // getLatestGitHubRelease fetches the latest release from GitHub API
 func GetLatestGitHubRelease(owner, repo string) (string, string, error) {
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
+	apiURL := fmt.Sprintf(GitHubReleasesURL, owner, repo)
 
 	colors.CYAN.Printf("Fetching releases from: %s\n", apiURL)
 
@@ -546,7 +552,7 @@ func GetLatestGitHubRelease(owner, repo string) (string, string, error) {
 // validateGitHubVersion checks if a specific version/tag exists on GitHub
 func ValidateGitHubVersion(owner, repo, version string) error {
 	// First try to get all releases
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
+	apiURL := fmt.Sprintf(GitHubReleasesURL, owner, repo)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
@@ -601,54 +607,51 @@ func ValidateGitHubVersion(owner, repo, version string) error {
 	return fmt.Errorf("version '%s' not found in GitHub repository %s/%s", version, owner, repo)
 }
 
-// getAllAvailableVersions gets all available versions for a GitHub repository
+func fetchJSON(url string, target interface{}) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+	return json.NewDecoder(resp.Body).Decode(target)
+}
+
 func GetAllAvailableVersions(owner, repo string) ([]string, error) {
 	var versions []string
+	releasesURL := fmt.Sprintf(GitHubReleasesURL, owner, repo)
 
-	// Get releases first
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
-	resp, err := http.Get(apiURL)
-	if err != nil {
+	// Fetch releases
+	var releases []GitHubRelease
+	if err := fetchJSON(releasesURL, &releases); err != nil {
 		return nil, fmt.Errorf("failed to fetch releases: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		var releases []GitHubRelease
-		if err := json.NewDecoder(resp.Body).Decode(&releases); err == nil {
-			for _, release := range releases {
-				versions = append(versions, release.TagName)
-			}
-		}
+	for _, release := range releases {
+		versions = append(versions, release.TagName)
 	}
 
-	// Also get tags (in case some versions are tags but not releases)
+	// Fetch tags
 	tagsURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tags", owner, repo)
-	resp, err = http.Get(tagsURL)
-	if err != nil {
+	var tags []struct {
+		Name string `json:"name"`
+	}
+	if err := fetchJSON(tagsURL, &tags); err != nil {
 		return versions, nil // Return releases even if tags fail
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		var tags []struct {
-			Name string `json:"name"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&tags); err == nil {
-			// Add tags that aren't already in releases
-			tagSet := make(map[string]bool)
-			for _, version := range versions {
-				tagSet[version] = true
-			}
-
-			for _, tag := range tags {
-				if !tagSet[tag.Name] {
-					versions = append(versions, tag.Name)
-				}
-			}
+	// Merge tags without duplicates
+	existing := make(map[string]struct{}, len(versions))
+	for _, v := range versions {
+		existing[v] = struct{}{}
+	}
+	for _, tag := range tags {
+		if _, found := existing[tag.Name]; !found {
+			versions = append(versions, tag.Name)
 		}
 	}
-
 	return versions, nil
 }
 
