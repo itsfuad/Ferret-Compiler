@@ -14,6 +14,7 @@ import (
 
 const EXT = ".fer"
 const REMOTE_HOST = "github.com/"
+const INVALID_GITHUB_PATH_MSG = "invalid GitHub repository path: %s"
 
 // Built-in modules that are part of the standard library
 var BUILTIN_MODULES = map[string]bool{
@@ -137,7 +138,7 @@ func ResolveModule(importPath, currentFileFullPath string, ctxx *ctx.CompilerCon
 	// Route to appropriate resolver based on module type
 	switch moduleType {
 	case ctx.REMOTE:
-		return resolveRemoteModuleNew(importPath, ctxx)
+		return resolveRemoteModule(importPath, ctxx)
 	case ctx.BUILTIN:
 		return resolveBuiltinModule(importPath, ctxx)
 	case ctx.LOCAL:
@@ -182,24 +183,57 @@ func resolveLocalModule(importPath, projectName string, ctxx *ctx.CompilerContex
 	return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
 }
 
-// resolveRemoteModuleNew implements the new import system workflow:
-// 1. Check fer.ret for dependency declaration
-// 2. Check ferret.lock for version/dependency info
-// 3. Check cache and auto-install if needed
-func resolveRemoteModuleNew(importPath string, ctxx *ctx.CompilerContext) (string, error) {
+// resolveRemoteModule implements the new import system workflow
+func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, error) {
 	repoPath, requestedVersion, subPath := ctxx.ParseRemoteImport(importPath)
-
 	if repoPath == "" {
 		return "", fmt.Errorf("invalid remote import path: %s", importPath)
 	}
-
-	// Step 0: Check if remote imports are enabled in project configuration
-	if ctxx.ProjectConfig != nil && !ctxx.ProjectConfig.Remote.Enabled {
-		return "", fmt.Errorf("remote module imports are disabled in this project\n\nTo enable remote imports, set 'enabled = true' in the [remote] section of fer.ret:\n\n[remote]\nenabled = true\nshare = false")
+	if err := checkRemoteImportsEnabled(ctxx); err != nil {
+		return "", err
 	}
 
-	// Step 1: Check fer.ret for dependency declaration
-	dependencies, err := registry.ParseFerRetDependencies(ctxx.ProjectRoot)
+	targetVersion, err := getTargetVersion(repoPath, requestedVersion, ctxx.ProjectRoot)
+	if err != nil {
+		return "", err
+	}
+
+	lockFile, err := registry.LoadLockFile(ctxx.ProjectRoot)
+	if err != nil {
+		return "", fmt.Errorf("failed to read ferret.lock: %w", err)
+	}
+
+	actualVersion, err := resolveVersionConstraint(repoPath, targetVersion, lockFile, ctxx)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve version for %s@%s: %w", repoPath, targetVersion, err)
+	}
+
+	if err := ensureModuleCached(repoPath, actualVersion, ctxx); err != nil {
+		return "", err
+	}
+
+	if err := registry.ValidateModuleSharing(ctxx, repoPath, actualVersion); err != nil {
+		return "", fmt.Errorf("cached module validation failed: %w", err)
+	}
+
+	return resolveCachedModulePathFlat(repoPath+"@"+actualVersion, subPath, ctxx)
+}
+
+func checkRemoteImportsEnabled(ctxx *ctx.CompilerContext) error {
+	if ctxx.ProjectConfig != nil && !ctxx.ProjectConfig.Remote.Enabled {
+		return fmt.Errorf(`remote module imports are disabled in this project
+
+To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret:
+
+[remote]
+enabled = true
+share = false`)
+	}
+	return nil
+}
+
+func getTargetVersion(repoPath, requestedVersion, projectRoot string) (string, error) {
+	dependencies, err := registry.ParseFerRetDependencies(projectRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to read fer.ret: %w", err)
 	}
@@ -209,65 +243,155 @@ func resolveRemoteModuleNew(importPath string, ctxx *ctx.CompilerContext) (strin
 		return "", fmt.Errorf("module '%s' is not installed.\n To install this module, run:\n  ferret get %s", repoPath, repoPath)
 	}
 
-	// Use declared version if no specific version was requested
-	targetVersion := declaredVersion
-	if requestedVersion != "" && requestedVersion != "latest" {
-		// Validate that requested version matches declared version
-		if requestedVersion != declaredVersion {
-			colors.YELLOW.Printf("Warning: Requested version %s differs from declared version %s for %s, using declared version\n",
-				requestedVersion, declaredVersion, repoPath)
-		}
+	if requestedVersion != "" && requestedVersion != "latest" && requestedVersion != declaredVersion {
+		colors.YELLOW.Printf("Warning: Requested version %s differs from declared version %s for %s, using declared version\n",
+			requestedVersion, declaredVersion, repoPath)
 	}
 
-	// Step 2: Check ferret.lock for dependency info
-	lockFile, err := registry.LoadLockFile(ctxx.ProjectRoot)
-	if err != nil {
-		return "", fmt.Errorf("failed to read ferret.lock: %w", err)
-	}
+	return declaredVersion, nil
+}
 
-	// Step 3: Resolve version constraint to actual version
-	// We need to resolve constraints like "^v0" to actual versions like "v0"
-	actualVersion, err := resolveVersionConstraint(repoPath, targetVersion, lockFile, ctxx)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve version for %s@%s: %w", repoPath, targetVersion, err)
-	}
-
-	// Use the actual resolved version for cache operations
+func ensureModuleCached(repoPath, actualVersion string, ctxx *ctx.CompilerContext) error {
 	flatModuleName := repoPath + "@" + actualVersion
+	if ctxx.IsRemoteModuleCachedFlat(flatModuleName) {
+		return nil
+	}
 
-	// Check if this specific version is in cache
-	if !ctxx.IsRemoteModuleCachedFlat(flatModuleName) {
-		// Check if we have lock file entry for this module (meaning it was previously installed)
-		lockEntry, err := registry.GetLockedEntryFlat(ctxx.ProjectRoot, flatModuleName)
-		if err == nil && lockEntry != nil {
-			// Module was previously installed but cache is missing - auto-download
-			colors.CYAN.Printf("Module %s was previously installed but cache is missing. Re-downloading...\n", flatModuleName)
-			err := autoInstallModule(repoPath, actualVersion, lockFile, ctxx)
-			if err != nil {
-				return "", fmt.Errorf("failed to re-download module %s: %w", flatModuleName, err)
-			}
-		} else {
-			// Module is declared but never installed - auto-install
-			colors.CYAN.Printf("Installing declared module %s...\n", flatModuleName)
-			err := autoInstallModule(repoPath, actualVersion, lockFile, ctxx)
-			if err != nil {
-				return "", fmt.Errorf("failed to auto-install module %s: %w", flatModuleName, err)
+	lockEntry, err := registry.GetLockedEntryFlat(ctxx.ProjectRoot, flatModuleName)
+	action := "Installing declared module"
+	if err == nil && lockEntry != nil {
+		action = "Module was previously installed but cache is missing. Re-downloading"
+	}
+	colors.CYAN.Printf("%s %s...\n", action, flatModuleName)
+	return autoInstallModule(repoPath, actualVersion, ctxx)
+}
+
+func resolveVersionConstraint(repoPath, constraint string, lockFile *registry.LockFile, ctxx *ctx.CompilerContext) (string, error) {
+	if isExactVersion(constraint) {
+		return validateExactVersion(repoPath, constraint)
+	}
+	if cached := findCurrentCachedVersion(repoPath, ctxx); cached != "" {
+		return resolveFromCache(repoPath, constraint, cached, ctxx)
+	}
+	if v := findInLockFile(repoPath, constraint, lockFile); v != "" {
+		return v, nil
+	}
+	if constraint == "latest" {
+		return resolveLatestVersion(repoPath)
+	}
+	return findBestVersionForConstraint(repoPath, constraint, ctxx)
+}
+
+func isExactVersion(v string) bool {
+	return !strings.HasPrefix(v, "^") && !strings.HasPrefix(v, "~") && v != "latest"
+}
+
+func validateExactVersion(repoPath, version string) (string, error) {
+	if strings.HasPrefix(repoPath, REMOTE_HOST) {
+		if err := validateGitHubVersionExists(repoPath, version); err != nil {
+			return "", fmt.Errorf("version validation failed for %s@%s: %w", repoPath, version, err)
+		}
+	}
+	return version, nil
+}
+
+func resolveFromCache(repoPath, constraint, cached string, ctxx *ctx.CompilerContext) (string, error) {
+	if versionSatisfiesConstraint(cached, constraint) {
+		colors.GREEN.Printf("Current cached version %s satisfies constraint %s for %s\n", cached, constraint, repoPath)
+		return cached, nil
+	}
+	colors.YELLOW.Printf("Current cached version %s does not satisfy new constraint %s for %s\n", cached, constraint, repoPath)
+	newVersion, err := findBestVersionForConstraint(repoPath, constraint, ctxx)
+	if err != nil {
+		return "", fmt.Errorf("failed to find version satisfying constraint %s for %s: %w", constraint, repoPath, err)
+	}
+	if newVersion != cached {
+		colors.CYAN.Printf("Version change detected: %s -> %s for %s\n", cached, newVersion, repoPath)
+		if err := handleVersionChange(repoPath, cached, newVersion, ctxx); err != nil {
+			return "", fmt.Errorf("failed to handle version change for %s: %w", repoPath, err)
+		}
+	}
+	return newVersion, nil
+}
+
+func findInLockFile(repoPath, constraint string, lockFile *registry.LockFile) string {
+	for flatName := range lockFile.Packages {
+		if strings.HasPrefix(flatName, repoPath+"@") {
+			actualVersion := strings.TrimPrefix(flatName, repoPath+"@")
+			if versionSatisfiesConstraint(actualVersion, constraint) {
+				return actualVersion
 			}
 		}
 	}
+	return ""
+}
 
-	// Always check if the cached module still allows sharing (even if cached)
-	err = registry.ValidateModuleSharing(ctxx, repoPath, actualVersion)
-	if err != nil {
-		return "", fmt.Errorf("cached module validation failed: %w", err)
+func findCurrentCachedVersion(repoPath string, ctxx *ctx.CompilerContext) string {
+	cacheDir := ctxx.RemoteCachePath
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return ""
 	}
 
-	// Construct path to the cached module file using flat structure
-	return resolveCachedModulePathFlat(flatModuleName, subPath, ctxx)
+	prefix := repoPath + "@"
+	var foundVersion string
+
+	filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !info.IsDir() {
+			return nil
+		}
+		relPath, err := filepath.Rel(cacheDir, path)
+		if err != nil {
+			return nil
+		}
+		if strings.HasPrefix(filepath.ToSlash(relPath), prefix) {
+			version := strings.TrimPrefix(filepath.ToSlash(relPath), prefix)
+			if version != "" && !strings.Contains(version, "/") {
+				foundVersion = version
+				return filepath.SkipDir
+			}
+		}
+		return nil
+	})
+	return foundVersion
+}
+
+func versionSatisfiesConstraint(version, constraint string) bool {
+	switch {
+	case constraint == "latest":
+		return true
+	case constraint == version:
+		return true
+	case strings.HasPrefix(constraint, "^"):
+		return satisfiesCaret(version, strings.TrimPrefix(constraint, "^"))
+	case strings.HasPrefix(constraint, "~"):
+		return satisfiesTilde(version, strings.TrimPrefix(constraint, "~"))
+	default:
+		return false
+	}
+}
+
+func satisfiesCaret(version, base string) bool {
+	if strings.HasPrefix(base, "v") && strings.Contains(base, ".") {
+		major := strings.SplitN(base, ".", 2)[0]
+		return strings.HasPrefix(version, major+".")
+	}
+	return strings.HasPrefix(version, base)
+}
+
+func satisfiesTilde(version, base string) bool {
+	if !strings.HasPrefix(base, "v") {
+		return strings.HasPrefix(version, base)
+	}
+	parts := strings.Split(base, ".")
+	if len(parts) < 2 {
+		return strings.HasPrefix(version, base)
+	}
+	majorMinor := parts[0] + "." + parts[1]
+	return strings.HasPrefix(version, majorMinor+".")
 }
 
 // autoInstallModule automatically installs a module based on fer.ret and lock file data
-func autoInstallModule(repoPath, version string, lockFile *registry.LockFile, ctxx *ctx.CompilerContext) error {
+func autoInstallModule(repoPath, version string, ctxx *ctx.CompilerContext) error {
 	// This will trigger the download/installation process
 	// We'll implement this to call the existing remote installation logic
 	colors.GREEN.Printf("Auto-installing %s@%s from declared dependencies...\n", repoPath, version)
@@ -399,184 +523,16 @@ func findRemoteModuleConfigDir(filePath string, ctxx *ctx.CompilerContext) (stri
 	return "", fmt.Errorf("no fer.ret found in remote module hierarchy for: %s", filePath)
 }
 
-// resolveVersionConstraint resolves a version constraint to an actual version
-// by checking the lockfile and cache for the best matching version
-func resolveVersionConstraint(repoPath, versionConstraint string, lockFile *registry.LockFile, ctxx *ctx.CompilerContext) (string, error) {
-	// If the constraint is already a specific version (not a constraint), validate it exists on GitHub
-	if !strings.HasPrefix(versionConstraint, "^") && !strings.HasPrefix(versionConstraint, "~") && versionConstraint != "latest" {
-		// For GitHub repositories, validate the version exists
-		if strings.HasPrefix(repoPath, "github.com/") {
-			err := validateGitHubVersionExists(repoPath, versionConstraint)
-			if err != nil {
-				return "", fmt.Errorf("version validation failed for %s@%s: %w", repoPath, versionConstraint, err)
-			}
-		}
-		return versionConstraint, nil
-	}
-
-	// First, check if we have a cached version and if it matches the constraint
-	currentCachedVersion := findCurrentCachedVersion(repoPath, ctxx)
-	if currentCachedVersion != "" {
-		// Check if the current cached version satisfies the new constraint
-		if versionSatisfiesConstraint(currentCachedVersion, versionConstraint) {
-			colors.GREEN.Printf("Current cached version %s satisfies constraint %s for %s\n",
-				currentCachedVersion, versionConstraint, repoPath)
-			return currentCachedVersion, nil
-		} else {
-			colors.YELLOW.Printf("Current cached version %s does not satisfy new constraint %s for %s\n",
-				currentCachedVersion, versionConstraint, repoPath)
-
-			// Need to find a version that satisfies the constraint
-			newVersion, err := findBestVersionForConstraint(repoPath, versionConstraint, ctxx)
-			if err != nil {
-				return "", fmt.Errorf("failed to find version satisfying constraint %s for %s: %w", versionConstraint, repoPath, err)
-			}
-
-			// If we found a different version, we'll need to upgrade/downgrade
-			if newVersion != currentCachedVersion {
-				colors.CYAN.Printf("Version change detected: %s -> %s for %s\n", currentCachedVersion, newVersion, repoPath)
-				err := handleVersionChange(repoPath, currentCachedVersion, newVersion, ctxx)
-				if err != nil {
-					return "", fmt.Errorf("failed to handle version change for %s: %w", repoPath, err)
-				}
-			}
-
-			return newVersion, nil
-		}
-	}
-
-	// No cached version, try to find in lockfile what actual version was resolved for this constraint
-	for flatName := range lockFile.Packages {
-		// Check if this lockfile entry matches our repo
-		if strings.HasPrefix(flatName, repoPath+"@") {
-			actualVersion := strings.TrimPrefix(flatName, repoPath+"@")
-			// Validate that this locked version still satisfies the constraint
-			if versionSatisfiesConstraint(actualVersion, versionConstraint) {
-				return actualVersion, nil
-			}
-		}
-	}
-
-	// If "latest", we need to resolve it by checking GitHub
-	if versionConstraint == "latest" {
-		return resolveLatestVersion(repoPath)
-	}
-
-	// For constraints like "^v0", resolve to the best available version
-	if strings.HasPrefix(versionConstraint, "^") || strings.HasPrefix(versionConstraint, "~") {
-		return findBestVersionForConstraint(repoPath, versionConstraint, ctxx)
-	}
-
-	// Fallback: return the constraint as-is and let the download logic handle it
-	return versionConstraint, nil
-}
-
-// findCurrentCachedVersion finds the currently cached version for a repository
-func findCurrentCachedVersion(repoPath string, ctxx *ctx.CompilerContext) string {
-	cacheDir := ctxx.RemoteCachePath
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		return ""
-	}
-
-	prefix := repoPath + "@"
-	var foundVersion string
-
-	// Walk through the cache directory to find any directory that matches repoPath@version
-	err := filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			// Get relative path from cache directory
-			relPath, err := filepath.Rel(cacheDir, path)
-			if err != nil {
-				return err
-			}
-
-			// Normalize path separators for consistent comparison
-			normalizedRelPath := filepath.ToSlash(relPath)
-
-			// Check if this directory matches our repo pattern
-			if strings.HasPrefix(normalizedRelPath, prefix) {
-				version := strings.TrimPrefix(normalizedRelPath, prefix)
-				// Make sure we found a version (not just a partial match)
-				if version != "" && !strings.Contains(version, "/") {
-					foundVersion = version
-					return filepath.SkipDir // Stop after finding the first match
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return ""
-	}
-
-	return foundVersion
-}
-
-// versionSatisfiesConstraint checks if a version satisfies a constraint
-func versionSatisfiesConstraint(version, constraint string) bool {
-	// Simple constraint checking - can be enhanced with proper semver library later
-	if constraint == "latest" {
-		return true // Any version satisfies latest
-	}
-
-	if constraint == version {
-		return true // Exact match
-	}
-
-	if strings.HasPrefix(constraint, "^") {
-		baseVersion := strings.TrimPrefix(constraint, "^")
-		// For caret constraints like ^v1.0.0, any v1.x.x satisfies it (same major version)
-		// Extract major version from base version
-		if strings.HasPrefix(baseVersion, "v") && strings.Contains(baseVersion, ".") {
-			dotIndex := strings.Index(baseVersion, ".")
-			majorVersion := baseVersion[:dotIndex]
-			return strings.HasPrefix(version, majorVersion+".")
-		}
-		// Fallback to simple prefix check for non-standard versions
-		return strings.HasPrefix(version, baseVersion)
-	}
-
-	if strings.HasPrefix(constraint, "~") {
-		baseVersion := strings.TrimPrefix(constraint, "~")
-		// For tilde constraints:
-		// ~v1.2.0 allows v1.2.x (same major.minor version)
-		// ~v1.2 allows v1.2.x (same major.minor version)
-		if strings.HasPrefix(baseVersion, "v") {
-			// Count dots to determine if we have major.minor or major.minor.patch
-			dotCount := strings.Count(baseVersion, ".")
-
-			if dotCount >= 1 {
-				// For ~v1.2 or ~v1.2.0, extract major.minor (v1.2)
-				parts := strings.Split(baseVersion, ".")
-				if len(parts) >= 2 {
-					majorMinor := parts[0] + "." + parts[1]
-					return strings.HasPrefix(version, majorMinor+".")
-				}
-			}
-		}
-		// Fallback to simple prefix check for non-standard versions
-		return strings.HasPrefix(version, baseVersion)
-	}
-
-	return false
-}
-
 // findBestVersionForConstraint finds the best version that satisfies a constraint
 func findBestVersionForConstraint(repoPath, constraint string, ctxx *ctx.CompilerContext) (string, error) {
-	if !strings.HasPrefix(repoPath, "github.com/") {
+	if !strings.HasPrefix(repoPath, REMOTE_HOST) {
 		return "", fmt.Errorf("version constraint resolution only supported for GitHub repositories")
 	}
 
 	// Get all available versions from GitHub
-	parts := strings.Split(strings.TrimPrefix(repoPath, "github.com/"), "/")
+	parts := strings.Split(strings.TrimPrefix(repoPath, REMOTE_HOST), "/")
 	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid GitHub repository path: %s", repoPath)
+		return "", fmt.Errorf(INVALID_GITHUB_PATH_MSG, repoPath)
 	}
 
 	owner, repo := parts[0], parts[1]
@@ -618,9 +574,9 @@ func handleVersionChange(repoPath, oldVersion, newVersion string, ctxx *ctx.Comp
 
 // validateGitHubVersionExists validates that a version exists on GitHub
 func validateGitHubVersionExists(repoPath, version string) error {
-	parts := strings.Split(strings.TrimPrefix(repoPath, "github.com/"), "/")
+	parts := strings.Split(strings.TrimPrefix(repoPath, REMOTE_HOST), "/")
 	if len(parts) < 2 {
-		return fmt.Errorf("invalid GitHub repository path: %s", repoPath)
+		return fmt.Errorf(INVALID_GITHUB_PATH_MSG, repoPath)
 	}
 
 	owner, repo := parts[0], parts[1]
@@ -631,13 +587,13 @@ func validateGitHubVersionExists(repoPath, version string) error {
 
 // resolveLatestVersion resolves "latest" to the actual latest version
 func resolveLatestVersion(repoPath string) (string, error) {
-	if !strings.HasPrefix(repoPath, "github.com/") {
+	if !strings.HasPrefix(repoPath, REMOTE_HOST) {
 		return "", fmt.Errorf("latest version resolution only supported for GitHub repositories")
 	}
 
-	parts := strings.Split(strings.TrimPrefix(repoPath, "github.com/"), "/")
+	parts := strings.Split(strings.TrimPrefix(repoPath, REMOTE_HOST), "/")
 	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid GitHub repository path: %s", repoPath)
+		return "", fmt.Errorf(INVALID_GITHUB_PATH_MSG, repoPath)
 	}
 
 	owner, repo := parts[0], parts[1]
