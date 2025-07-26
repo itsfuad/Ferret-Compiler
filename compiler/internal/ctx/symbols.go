@@ -1,6 +1,7 @@
 package ctx
 
 import (
+	"compiler/internal/semantic/stype"
 	"compiler/internal/source"
 )
 
@@ -20,12 +21,12 @@ const (
 type Symbol struct {
 	Name     string
 	Kind     SymbolKind
-	Type     Type             // Now uses semantic.Type instead of ast.DataType
-	Location *source.Location // Optional, only when needed for error reporting
+	Type     stype.Type
+	Location *source.Location
 }
 
 // NewSymbol creates a new symbol with the given properties
-func NewSymbol(name string, kind SymbolKind, semanticType Type) *Symbol {
+func NewSymbol(name string, kind SymbolKind, semanticType stype.Type) *Symbol {
 	return &Symbol{
 		Name: name,
 		Kind: kind,
@@ -34,7 +35,7 @@ func NewSymbol(name string, kind SymbolKind, semanticType Type) *Symbol {
 }
 
 // NewSymbolWithLocation creates a new symbol with location information
-func NewSymbolWithLocation(name string, kind SymbolKind, semanticType Type, loc *source.Location) *Symbol {
+func NewSymbolWithLocation(name string, kind SymbolKind, semanticType stype.Type, loc *source.Location) *Symbol {
 	return &Symbol{
 		Name:     name,
 		Kind:     kind,

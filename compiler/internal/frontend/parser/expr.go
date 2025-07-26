@@ -7,6 +7,113 @@ import (
 	"compiler/internal/source"
 )
 
+// parseExpressionList parses a comma-separated list of expressions
+func parseExpressionList(p *Parser, first ast.Expression) ast.ExpressionList {
+	exprs := ast.ExpressionList{first}
+	for p.match(lexer.COMMA_TOKEN) {
+		p.advance() // consume comma
+		next := parseExpression(p)
+		if next == nil {
+			token := p.peek()
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE)
+			break
+		}
+		exprs = append(exprs, next)
+	}
+	return exprs
+}
+
+// parseExpressionStatement parses an expression statement
+func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
+	exprs := parseExpressionList(p, first)
+
+	// Check for assignment
+	if p.match(lexer.EQUALS_TOKEN) {
+		return parseAssignment(p, exprs...)
+	}
+
+	return &ast.ExpressionStmt{
+		Expressions: &exprs,
+		Location:    *source.NewLocation(first.Loc().Start, exprs[len(exprs)-1].Loc().End),
+	}
+}
+
+// parseBlock parses a block of statements
+func parseBlock(p *Parser) *ast.Block {
+	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
+
+	nodes := make([]ast.Node, 0)
+
+	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
+		node := parseNode(p)
+		if node != nil {
+			nodes = append(nodes, node)
+		}
+	}
+
+	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
+
+	return &ast.Block{
+		Nodes:    nodes,
+		Location: *source.NewLocation(&start, &end),
+	}
+}
+
+func parseReturnStmt(p *Parser) ast.Statement {
+	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
+	end := start
+
+	// Return immediately if there's a semicolon (no return value)
+	if p.match(lexer.SEMICOLON_TOKEN) {
+		return &ast.ReturnStmt{
+			Value:    nil,
+			Location: *source.NewLocation(&start, &end),
+		}
+	}
+
+	// Parse the return expression
+	value := parseExpression(p)
+	if value == nil {
+		token := p.peek()
+		p.ctx.Reports.AddSyntaxError(
+			p.fullPath,
+			source.NewLocation(&token.Start, &token.End),
+			report.INVALID_EXPRESSION,
+			report.PARSING_PHASE,
+		).AddHint("Add an expression after the return keyword")
+
+		return &ast.ReturnStmt{
+			Value:    nil,
+			Location: *source.NewLocation(&start, &end),
+		}
+	}
+
+	end = *value.Loc().End
+
+	// Check for unsupported multiple return values
+	if p.match(lexer.COMMA_TOKEN) {
+		comma := p.peek()
+		p.ctx.Reports.AddSyntaxError(
+			p.fullPath,
+			source.NewLocation(&comma.Start, &comma.End),
+			"Multiple return values are not supported",
+			report.PARSING_PHASE,
+		).AddHint("Functions can only return a single value")
+
+		for p.match(lexer.COMMA_TOKEN) {
+			p.advance() // consume comma
+			if expr := parseExpression(p); expr != nil {
+				end = *expr.Loc().End
+			}
+		}
+	}
+
+	return &ast.ReturnStmt{
+		Value:    &value,
+		Location: *source.NewLocation(&start, &end),
+	}
+}
+
 // parseExpression is the entry point for expression parsing
 func parseExpression(p *Parser) ast.Expression {
 	return parseLogicalOr(p)
@@ -173,7 +280,29 @@ func parseUnary(p *Parser) ast.Expression {
 		}
 	}
 
-	return parsePostfix(p)
+	return parseCast(p)
+}
+
+// parseCast handles type cast expressions (value as Type)
+func parseCast(p *Parser) ast.Expression {
+	expr := parsePostfix(p)
+
+	if p.match(lexer.AS_TOKEN) {
+		asToken := p.advance()
+		targetType, ok := parseType(p)
+		if !ok || targetType == nil {
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&asToken.Start, &asToken.End), "Expected type after 'as' keyword", report.PARSING_PHASE)
+			return expr
+		}
+
+		return &ast.CastExpr{
+			Value:      &expr,
+			TargetType: targetType,
+			Location:   *source.NewLocation(expr.Loc().Start, targetType.Loc().End),
+		}
+	}
+
+	return expr
 }
 
 // parseIndexing handles array/map indexing operations
@@ -324,7 +453,7 @@ func parsePrimary(p *Parser) ast.Expression {
 		return parseByteLiteral(p)
 	case lexer.FUNCTION_TOKEN:
 		start := p.advance()
-		return parseFunctionLiteral(p, &start.Start, true, true)
+		return parseFunctionLiteral(p, &start.Start, true)
 	case lexer.AT_TOKEN:
 		return parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:

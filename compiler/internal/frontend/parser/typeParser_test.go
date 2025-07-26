@@ -294,11 +294,11 @@ func TestInterfaceTypeDeclaration(t *testing.T) {
 		{`type INode interface {};`, true, "Basic interface type declaration with no methods"},
 		{`type Shape interface { fn show() };`, true, "Interface with method declaration"},
 		{`type INode interface { fn area() -> f64 };`, true, "Interface with method declaration and return type"},
-		{`type INode interface { fn dostuff() -> (i32, str) };`, true, "Interface with method declaration and multiple return types"},
+		{`type INode interface { fn dostuff() -> (i32, str) };`, false, "Interface with method declaration and multiple return types should fail"},
 
 		//params
 		{`type INode interface { fn dostuff(a: i32, b: str) -> i32 };`, true, "Interface with method declaration and parameters"},
-		{`type INode interface { fn dostuff(a: i32, b: str) -> (i32, str) };`, true, "Interface with method declaration and parameters and return types"},
+		{`type INode interface { fn dostuff(a: i32, b: str) -> (i32, str) };`, false, "Interface with method declaration and parameters and return types should fail"},
 
 		//invalid
 		{`type INode interface { name: str };`, false, "Interface with invalid field"},

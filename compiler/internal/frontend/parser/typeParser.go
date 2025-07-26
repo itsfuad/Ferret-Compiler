@@ -213,14 +213,14 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 
 		name := declareFunction(p)
 
-		params, returnTypes := parseSignature(p, true)
+		params, returnType := parseSignature(p, true)
 
 		end := p.previous().End
 
 		method := ast.InterfaceMethod{
 			Name:       name,
 			Params:     params,
-			ReturnType: returnTypes,
+			ReturnType: returnType,
 			Location:   source.Location{Start: &start, End: &end},
 		}
 
@@ -255,18 +255,18 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 	}, true
 }
 
-func parseFunctionTypeSignature(p *Parser) ([]ast.DataType, []ast.DataType) {
+func parseFunctionTypeSignature(p *Parser) ([]ast.DataType, ast.DataType) {
 	// parse the parameters
 	parameters := parseParameters(p)
 	parameterTypes := make([]ast.DataType, len(parameters))
-	// parse the return types
-	returnTypes := parseReturnTypes(p)
+	// parse the return type
+	returnType := parseReturnType(p)
 
 	for i, parameter := range parameters {
 		parameterTypes[i] = parameter.Type
 	}
 
-	return parameterTypes, returnTypes
+	return parameterTypes, returnType
 }
 
 func parseFunctionType(p *Parser) (ast.DataType, bool) {
@@ -274,13 +274,13 @@ func parseFunctionType(p *Parser) (ast.DataType, bool) {
 	token := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
 
 	// parse the parameters
-	parameters, returnTypes := parseFunctionTypeSignature(p)
+	parameters, returnType := parseFunctionTypeSignature(p)
 
 	return &ast.FunctionType{
-		Parameters:  parameters,
-		ReturnTypes: returnTypes,
-		TypeName:    types.FUNCTION,
-		Location:    *source.NewLocation(&token.Start, &token.End),
+		Parameters: parameters,
+		ReturnType: returnType,
+		TypeName:   types.FUNCTION,
+		Location:   *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 

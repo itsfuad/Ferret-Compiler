@@ -1,0 +1,1 @@
+Dummy remote package for Ferret-Compiler

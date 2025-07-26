@@ -1,0 +1,122 @@
+{
+  "name": "ferret",
+  "displayName": "Ferret",
+  "description": "Ferret Language Support",
+  "version": "0.0.2",
+  "icon": "ferret.png",
+  "publisher": "Ferret",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [],
+  "categories": [
+    "Programming Languages"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itsfuad/ferret"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "ferret-fer",
+        "aliases": [
+          "Ferret (.fer)"
+        ],
+        "extensions": [
+          ".fer",
+          ".ferret"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "dark": "ferret.png",
+          "light": "ferret.png"
+        }
+      },
+      {
+        "id": "ferret-mod",
+        "aliases": [
+          "Ferret Module"
+        ],
+        "extensions": [
+          ".fer.ret"
+        ],
+        "filenames": [
+          "fer.ret"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "dark": "ferret_mod.png",
+          "light": "ferret_mod.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ferret-fer",
+        "scopeName": "source.fer",
+        "path": "./syntaxes/fer.tmLanguage.json"
+      },
+      {
+        "language": "ferret-mod",
+        "scopeName": "source.toml",
+        "path": "./syntaxes/toml.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ferret-fer",
+        "path": "./snippets/ferret.json"
+      },
+      {
+        "language": "ferret-ferret",
+        "path": "./snippets/ferret.json"
+      }
+    ],
+    "configurationDefaults": {
+      "files.associations": {
+        "fer.ret": "ferret-mod"
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "title": "ferret LSP",
+      "properties": {
+        "ferretLanguageServer.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the ferret Language Server."
+        }
+      }
+    }
+  },
+  "main": "./out/lsp.js",
+  "scripts": {
+    "bundle": "esbuild src/lsp.ts --bundle --platform=node --outfile=out/lsp.js --external:vscode",
+    "vscode:prepublish": "npm run compile && npm run bundle",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.7",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^4.9.5"
+  },
+  "keywords": [
+    "Walrus",
+    "Programming",
+    "Language"
+  ],
+  "author": "Fuad Hasan",
+  "license": "ISC",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

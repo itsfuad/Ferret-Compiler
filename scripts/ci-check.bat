@@ -76,7 +76,7 @@ if errorlevel 1 (
 )
 
 REM Verify config file was created
-if not exist "test-project\.ferret.json" (
+if not exist "test-project\fer.ret" (
     echo ❌ Config file was not created
     del temp_output.txt
     rmdir /s /q test-project 2>nul

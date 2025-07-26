@@ -1,0 +1,36 @@
+# Complex configuration file with nested sections and various types
+
+# Global settings
+app_name = "MyApp"
+version = "1.2.3"
+debug = false
+
+[server]
+host = "0.0.0.0"
+port = 8080
+timeout = 30.5
+ssl_enabled = true
+
+[database]
+# Database configuration
+driver = "postgresql"
+host = "db.example.com"
+port = 5432
+name = "myapp_production"
+pool_size = 10
+
+[cache]
+enabled = true
+type = "redis"
+ttl = 3600
+
+[logging]
+level = "info"
+file = "/var/log/myapp.log"
+max_size = 100
+rotate = true
+
+[features]
+feature_a = true
+feature_b = false
+experimental_feature = false

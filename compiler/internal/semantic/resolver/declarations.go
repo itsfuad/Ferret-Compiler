@@ -5,8 +5,10 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
-	"compiler/internal/types"
+	"compiler/internal/semantic/stype"
+	atype "compiler/internal/types"
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
@@ -18,11 +20,10 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	}
 
 	//add the type information to the symbol
-	var paramTypes []ctx.Type
+	var paramTypes []stype.Type
 	if fn.Function.Params != nil {
 		for _, param := range fn.Function.Params {
-			resolveNode(r, param.Type, cm)
-			paramType, err := ctx.DeriveSemanticType(param.Type, cm)
+			paramType, err := semantic.DeriveSemanticType(param.Type, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -31,17 +32,16 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 		}
 	}
 
-	var returnTypes []ctx.Type
+	var returnType stype.Type
 	if fn.Function.ReturnType != nil {
-		for _, ret := range fn.Function.ReturnType {
-			resolveNode(r, ret, cm)
-			retType, err := ctx.DeriveSemanticType(ret, cm)
-			if err != nil {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, ret.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
-				return
-			}
-			returnTypes = append(returnTypes, retType)
+		retType, err := semantic.DeriveSemanticType(fn.Function.ReturnType, cm)
+		if err != nil {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Function.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
+			return
 		}
+		returnType = retType
+	} else {
+		returnType = &stype.PrimitiveType{Name: atype.VOID}
 	}
 
 	// Resolve function body
@@ -50,9 +50,9 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	}
 
 	// Create function type and symbol
-	functionType := ctx.FunctionType{
-		Parameters:  paramTypes,
-		ReturnTypes: returnTypes,
+	functionType := stype.FunctionType{
+		Parameters: paramTypes,
+		ReturnType: returnType,
 	}
 
 	symbol.Type = &functionType
@@ -61,7 +61,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *ctx.Module) {
 	for i, variable := range decl.Variables {
 
-		var expType ctx.Type
+		var expType stype.Type
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
@@ -69,7 +69,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 		}
 
 		if variable.ExplicitType != nil {
-			got, err := ctx.DeriveSemanticType(variable.ExplicitType, cm)
+			got, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
 				return
@@ -96,14 +96,14 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 
-	typeToDeclare, err := ctx.DeriveSemanticType(decl.BaseType, cm)
+	typeToDeclare, err := semantic.DeriveSemanticType(decl.BaseType, cm)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.BaseType.Loc(), "Invalid base type for type declaration: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
-	symbolType := &ctx.UserType{
-		Name:       types.TYPE_NAME(aliasName),
+	symbolType := &stype.UserType{
+		Name:       atype.TYPE_NAME(aliasName),
 		Definition: typeToDeclare,
 	}
 	symbol := ctx.NewSymbolWithLocation(aliasName, ctx.SymbolType, symbolType, decl.Alias.Loc())
@@ -114,23 +114,18 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		return
 	}
 	if r.Debug {
-		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*ctx.UserType).Definition, decl.Alias.Loc().String())
+		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc().String())
 	}
 }
 
 func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
 	// Resolve left-hand side expressions (assignees)
 	if assign.Left != nil {
-		for _, lhs := range *assign.Left {
-			resolveExpr(r, lhs, cm)
-		}
+		resolveExpressionList(r, assign.Left, cm)
 	}
-
 	// Resolve right-hand side expressions (values)
 	if assign.Right != nil {
-		for _, rhs := range *assign.Right {
-			resolveExpr(r, rhs, cm)
-		}
+		resolveExpressionList(r, assign.Right, cm)
 	}
 
 	if r.Debug {

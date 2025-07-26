@@ -1,0 +1,18 @@
+[default]
+name = "math"
+version = "1.0.0"
+description = "Ferret Math Library"
+
+[compiler]
+version = "0.1.0"
+
+[cache]
+path = ".ferret/cache"
+
+[remote]
+enabled = false
+share = false
+
+[dependencies]
+# Math library can depend on other built-in modules if needed
+# std = "1.0.0"

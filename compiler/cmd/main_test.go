@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compiler/cmd/flags"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,22 +104,22 @@ func runParseArgsTest(t *testing.T, tt parseArgsTestCase) {
 	// Set up test args (prepend program name as os.Args[0])
 	os.Args = append([]string{"ferret"}, tt.args...)
 
-	filename, debug, initProject, initPath, outputPath := parseArgs()
+	args := flags.ParseArgs()
 
-	if filename != tt.wantFilename {
-		t.Errorf("parseArgs() filename = %v, want %v", filename, tt.wantFilename)
+	if args.Filename != tt.wantFilename {
+		t.Errorf("parseArgs() filename = %v, want %v", args.Filename, tt.wantFilename)
 	}
-	if debug != tt.wantDebug {
-		t.Errorf("parseArgs() debug = %v, want %v", debug, tt.wantDebug)
+	if args.Debug != tt.wantDebug {
+		t.Errorf("parseArgs() debug = %v, want %v", args.Debug, tt.wantDebug)
 	}
-	if initProject != tt.wantInit {
-		t.Errorf("parseArgs() initProject = %v, want %v", initProject, tt.wantInit)
+	if args.InitProject != tt.wantInit {
+		t.Errorf("parseArgs() initProject = %v, want %v", args.InitProject, tt.wantInit)
 	}
-	if initPath != tt.wantInitPath {
-		t.Errorf("parseArgs() initPath = %v, want %v", initPath, tt.wantInitPath)
+	if args.InitPath != tt.wantInitPath {
+		t.Errorf("parseArgs() initPath = %v, want %v", args.InitPath, tt.wantInitPath)
 	}
-	if outputPath != tt.wantOutput {
-		t.Errorf("parseArgs() outputPath = %v, want %v", outputPath, tt.wantOutput)
+	if args.OutputPath != tt.wantOutput {
+		t.Errorf("parseArgs() outputPath = %v, want %v", args.OutputPath, tt.wantOutput)
 	}
 }
 
@@ -181,26 +182,26 @@ func TestInitFunctionality(t *testing.T) {
 	// Test init in temporary directory
 	os.Args = []string{"ferret", "init", tempDir}
 
-	filename, debug, initProject, initPath, outputPath := parseArgs()
+	args := flags.ParseArgs()
 
-	if !initProject {
+	if !args.InitProject {
 		t.Fatal("Expected initProject to be true")
 	}
-	if initPath != tempDir {
-		t.Errorf("Expected initPath to be %s, got %s", tempDir, initPath)
+	if args.InitPath != tempDir {
+		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.InitPath)
 	}
-	if filename != "" {
-		t.Errorf("Expected filename to be empty, got %s", filename)
+	if args.Filename != "" {
+		t.Errorf("Expected filename to be empty, got %s", args.Filename)
 	}
-	if debug {
+	if args.Debug {
 		t.Error("Expected debug to be false")
 	}
-	if outputPath != "" {
-		t.Errorf("Expected outputPath to be empty, got %s", outputPath)
+	if args.OutputPath != "" {
+		t.Errorf("Expected outputPath to be empty, got %s", args.OutputPath)
 	}
 
 	// Verify the config file path would be correct
-	expectedConfigPath := filepath.Join(tempDir, ".ferret.json")
+	expectedConfigPath := filepath.Join(tempDir, "fer.ret")
 	if _, err := os.Stat(filepath.FromSlash(expectedConfigPath)); err == nil {
 		t.Error("Config file should not exist yet (we only parsed args)")
 	}

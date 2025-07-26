@@ -59,7 +59,7 @@ if ! ./ferret-test init test-project 2>&1 | grep -q "Project configuration initi
 fi
 
 # Verify config file was created
-if [ ! -f "test-project/.ferret.json" ]; then
+if [ ! -f "test-project/fer.ret" ]; then
     echo "❌ Config file was not created"
     exit 1
 fi

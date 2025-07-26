@@ -33,8 +33,8 @@ func TestInitCommand(t *testing.T) {
 		t.Fatalf("Init command failed: %v, output: %s", err, output)
 	}
 
-	// Check that config file was created
-	configPath := filepath.Join(tempDir, ".ferret.json")
+	// Check that config file was created (using correct filename)
+	configPath := filepath.Join(tempDir, "fer.ret")
 	if _, err := os.Stat(filepath.FromSlash(configPath)); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}

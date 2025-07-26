@@ -1,5 +1,5 @@
 
-import "app/cmd/types";
+import "myapp/cmd/types";
 
 type Integer types::Int; // Integer is an alias for Int, which is an alias for i32
 
@@ -27,3 +27,19 @@ y = 20; // y is assigned another integer value
 z = x + y; // z is assigned the sum of x and y
 
 x, y, z = 1, 2, 3; // multiple assignment in a single line
+
+let largeNumber: i64 = 1_000_000_000; // largeNumber is of type i64 with a value of 1 billion
+
+x = largeNumber as i32; // narrowing cast - now allowed
+
+fn add(a: i32, b: i32) -> i32 {
+    return a + b; // returns the sum of a and b
+}
+
+fn multiply(a: i32, b: i32) -> i32 {
+    return a * b; // returns the product of a and b
+}
+
+let result = 0;
+
+sum, result = add(5, 10), multiply(2, 3); // calling functions and assigning results

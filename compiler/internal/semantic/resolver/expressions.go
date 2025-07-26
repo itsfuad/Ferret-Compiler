@@ -51,6 +51,10 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) 
 		resolveExpr(r, *e.Index, cm)
 	case *ast.FunctionLiteral:
 		//add later
+	case *ast.CastExpr:
+		// Resolve the value being cast
+		resolveExpr(r, *e.Value, cm)
+		// Target type doesn't need resolution as it's a type declaration
 	default:
 		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, expr.Loc(), fmt.Sprintf("Expression <%T> is not implemented yet", e), report.RESOLVER_PHASE)
 	}
@@ -59,5 +63,11 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) 
 func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *ctx.Module) {
 	if _, found := cm.SymbolTable.Lookup(id.Name); !found {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE)
+	}
+}
+
+func resolveExpressionList(r *analyzer.AnalyzerNode, exprList *ast.ExpressionList, cm *ctx.Module) {
+	for _, expr := range *exprList {
+		resolveExpr(r, expr, cm)
 	}
 }

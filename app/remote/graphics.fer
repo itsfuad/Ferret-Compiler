@@ -1,3 +1,0 @@
-import "remote/audio";
-
-const graphics = "1080p Graphics";

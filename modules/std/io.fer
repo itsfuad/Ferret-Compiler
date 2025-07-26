@@ -1,0 +1,22 @@
+// Standard library IO module
+import "math/constants";
+
+const doublepi = constants::PI * 2.0;
+
+fn print(message: str) {
+    // Built-in print function implementation
+}
+
+fn println(message: str) {
+    // Built-in println function implementation
+}
+
+fn input() -> str {
+    // Built-in input function implementation
+    return "";
+}
+
+// Example usage of math constants
+fn print_pi() {
+    println("PI value: ");
+}

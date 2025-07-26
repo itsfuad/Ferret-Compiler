@@ -1,0 +1,11 @@
+let x: i32 = 42;
+let y: i64 = x as i64;  // Valid cast: i32 -> i64
+let z: i16 = x as i16;  // Invalid cast: i32 -> i16 (potential data loss)
+
+// Test with literals
+let a: i64 = 100 as i64;
+let b: f32 = 42 as f32;
+
+// Test invalid cast
+let s: str = "hello";
+let invalid: i32 = s as i32;  // Should fail

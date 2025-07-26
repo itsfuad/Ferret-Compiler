@@ -79,3 +79,14 @@ func (f *FieldAccessExpr) INode()                {} // Impliments Node interface
 func (f *FieldAccessExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (f *FieldAccessExpr) LValue()               {} // LValue is a marker interface for all lvalues
 func (f *FieldAccessExpr) Loc() *source.Location { return &f.Location }
+
+// CastExpr represents a type cast expression like value as TargetType
+type CastExpr struct {
+	Value      *Expression // The value being cast
+	TargetType DataType    // The target type to cast to
+	source.Location
+}
+
+func (c *CastExpr) INode()                {} // Impliments Node interface
+func (c *CastExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (c *CastExpr) Loc() *source.Location { return &c.Location }

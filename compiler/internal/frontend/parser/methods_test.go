@@ -32,8 +32,8 @@ func TestMethodParsing(t *testing.T) {
 			input: `fn (r: Receiver) someMethod() -> (i32, i32) {
 				return 1, 2;
 			}`,
-			isValid: true,
-			desc:    "Method with multiple returns",
+			isValid: false,
+			desc:    "Method with multiple returns should fail",
 		},
 
 		// invalid

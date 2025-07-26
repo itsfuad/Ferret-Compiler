@@ -83,7 +83,7 @@ func (s *StructLiteralExpr) Loc() *source.Location { return &s.Location }
 
 type FunctionLiteral struct {
 	Params     []Parameter
-	ReturnType []DataType
+	ReturnType DataType
 	Body       *Block
 	source.Location
 }
