@@ -299,6 +299,19 @@ func (c *CompilerContext) IsRemoteModuleCached(repoPath, version string) bool {
 	return err == nil
 }
 
+// IsRemoteModuleCachedFlat checks if a remote module is cached using flat structure
+// flatModuleName format: "github.com/user/repo@version"
+func (c *CompilerContext) IsRemoteModuleCachedFlat(flatModuleName string) bool {
+	cachePath := filepath.Join(c.RemoteCachePath, flatModuleName)
+	_, err := os.Stat(cachePath)
+	return err == nil
+}
+
+// GetRemoteModuleCachePathFlat returns the cache path for a flat-structured remote module
+func (c *CompilerContext) GetRemoteModuleCachePathFlat(flatModuleName string) string {
+	return filepath.Join(c.RemoteCachePath, flatModuleName)
+}
+
 func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
 	if c.Modules == nil {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)

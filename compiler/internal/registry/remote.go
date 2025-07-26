@@ -148,17 +148,19 @@ func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersi
 		return err
 	}
 
-	if context.IsRemoteModuleCached(repoPath, version) {
-		colors.GREEN.Printf("Module %s@%s already cached\n", repoPath, version)
+	// Use flat structure for checking if module is cached
+	flatModuleName := repoPath + "@" + version
+	if context.IsRemoteModuleCachedFlat(flatModuleName) {
+		colors.GREEN.Printf("Module %s already cached\n", flatModuleName)
 		return nil
 	}
 
-	actualVersion, err := downloadAndExtractModule(context, repoPath, version)
+	actualVersion, err := downloadAndExtractModuleFlat(context, repoPath, version)
 	if err != nil {
 		return err
 	}
 
-	return updateProjectFiles(context, repoPath, requestedVersion, actualVersion)
+	return updateProjectFilesFlat(context, repoPath, requestedVersion, actualVersion)
 }
 
 // resolveVersionToUse determines which version to use based on locked version and requested version
@@ -176,8 +178,8 @@ func resolveVersionToUse(context *ctx.CompilerContext, repoPath, requestedVersio
 	return requestedVersion, nil
 }
 
-// downloadAndExtractModule handles the download and extraction process
-func downloadAndExtractModule(context *ctx.CompilerContext, repoPath, version string) (string, error) {
+// downloadAndExtractModuleFlat handles the download and extraction process using flat structure
+func downloadAndExtractModuleFlat(context *ctx.CompilerContext, repoPath, version string) (string, error) {
 	colors.BLUE.Printf("Downloading %s@%s...\n", repoPath, version)
 
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, version)
@@ -193,7 +195,9 @@ func downloadAndExtractModule(context *ctx.CompilerContext, repoPath, version st
 	}
 	defer os.Remove(tempFile)
 
-	cachePath := context.GetRemoteModuleCachePath(repoPath, actualVersion)
+	// Use flat structure for cache path
+	flatModuleName := repoPath + "@" + actualVersion
+	cachePath := context.GetRemoteModuleCachePathFlat(flatModuleName)
 	err = extractZip(tempFile, cachePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract archive: %w", err)
@@ -229,12 +233,14 @@ func downloadToTempFile(downloadURL string) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-// updateProjectFiles updates lockfile and fer.ret after successful download
-func updateProjectFiles(context *ctx.CompilerContext, repoPath, requestedVersion, actualVersion string) error {
+// updateProjectFilesFlat updates lockfile and fer.ret after successful download using flat structure
+func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, requestedVersion, actualVersion string) error {
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, actualVersion)
 	if err != nil {
 		return fmt.Errorf("failed to get download URL for %s@%s: %w", repoPath, actualVersion, err)
 	}
+
+	// Update lockfile with flat structure
 	err = UpdateLockEntry(context.ProjectRoot, repoPath, actualVersion, downloadURL)
 	if err != nil {
 		colors.YELLOW.Printf("Warning: Failed to update lock file: %v\n", err)
@@ -349,33 +355,28 @@ func getLatestGitHubRelease(owner, repo string) (string, string, error) {
 	return downloadURL, latest.TagName, nil
 }
 
-// InstallDependencies reads fer.ret and installs all remote dependencies
+// InstallDependencies installs all dependencies declared in fer.ret
 func InstallDependencies(context *ctx.CompilerContext) error {
-	colors.BLUE.Println("Installing dependencies from fer.ret...")
-
-	// Parse dependencies from fer.ret
+	// Read dependencies from fer.ret
 	dependencies, err := ParseFerRetDependencies(context.ProjectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to parse fer.ret dependencies: %w", err)
+		return fmt.Errorf("failed to read fer.ret dependencies: %w", err)
 	}
 
 	if len(dependencies) == 0 {
-		colors.YELLOW.Println("No remote dependencies found in fer.ret")
+		colors.YELLOW.Println("No dependencies found in fer.ret")
 		return nil
 	}
 
-	colors.CYAN.Printf("Found %d dependencies to install\n", len(dependencies))
+	colors.BLUE.Printf("Installing %d dependencies from fer.ret...\n", len(dependencies))
 
 	// Install each dependency
 	for repoPath, version := range dependencies {
-		if context.IsRemoteImport(repoPath) {
-			colors.BLUE.Printf("Installing %s@%s\n", repoPath, version)
-			err := DownloadRemoteModule(context, repoPath, version)
-			if err != nil {
-				return fmt.Errorf("failed to install %s@%s: %w", repoPath, version, err)
-			}
-		} else {
-			colors.YELLOW.Printf("Skipping non-remote dependency: %s\n", repoPath)
+		colors.CYAN.Printf("Installing %s@%s...\n", repoPath, version)
+		err := DownloadRemoteModule(context, repoPath, version)
+		if err != nil {
+			colors.RED.Printf("Failed to install %s@%s: %v\n", repoPath, version, err)
+			return fmt.Errorf("dependency installation failed: %w", err)
 		}
 	}
 

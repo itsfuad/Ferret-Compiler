@@ -13,3 +13,4 @@ enabled = true
 share = false
 
 [dependencies]
+github.com/itsfuad/ferret-mod = "^v0"
