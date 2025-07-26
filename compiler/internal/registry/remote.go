@@ -22,9 +22,14 @@ const (
 
 const (
 	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
-	GitHubReleasesURL         = "https://api.github.com/repos/%s/%s/releases"
 	FerretConfigFile          = "fer.ret"
 )
+
+// GitHubReleasesURL is the template for GitHub releases API. Made var for test override.
+var GitHubReleasesURL = "https://api.github.com/repos/%s/%s/releases"
+
+// GetLatestGitHubRelease is a package variable for test override.
+var GetLatestGitHubRelease = getLatestGitHubRelease
 
 // GitHubRelease represents a GitHub release from the API
 type GitHubRelease struct {
@@ -103,7 +108,10 @@ func RemoveModuleFromCache(cachePath, module string) error {
 
 			err := os.RemoveAll(path)
 			if err != nil {
-				return fmt.Errorf("failed to remove %s: %w", relPath, err)
+				// Ignore not found errors (directory already gone)
+				if !os.IsNotExist(err) {
+					return fmt.Errorf("failed to remove %s: %w", relPath, err)
+				}
 			}
 			removed = true
 		}
@@ -181,7 +189,7 @@ func DownloadRemoteModule(context *ctx.CompilerContext, repoPath, requestedVersi
 		return err
 	}
 
-	return updateProjectFilesFlat(context, repoPath, requestedVersion, actualVersion)
+	return updateProjectFilesFlat(context, repoPath, actualVersion)
 }
 
 // validateRemoteSharing checks if a remote module allows sharing by reading its fer.ret
@@ -410,7 +418,7 @@ func downloadToTempFile(downloadURL string) (string, error) {
 }
 
 // updateProjectFilesFlat updates lockfile and fer.ret after successful download using flat structure
-func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, requestedVersion, actualVersion string) error {
+func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, actualVersion string) error {
 	downloadURL, actualVersion, err := getGitHubDownloadURL(repoPath, actualVersion)
 	if err != nil {
 		return fmt.Errorf(ErrFailedToGetDownloadURL, repoPath, actualVersion, err)
@@ -422,12 +430,9 @@ func updateProjectFilesFlat(context *ctx.CompilerContext, repoPath, requestedVer
 		colors.YELLOW.Printf("Warning: Failed to update lock file: %v\n", err)
 	}
 
-	// Update fer.ret dependencies (only if this was a manual install, not from fer.ret)
-	if shouldUpdateFerRet(context.ProjectRoot, repoPath, requestedVersion) {
-		err = updateFerRetWithNewDependency(context.ProjectRoot, repoPath, actualVersion)
-		if err != nil {
-			colors.YELLOW.Printf("Warning: Failed to update fer.ret: %v\n", err)
-		}
+	err = updateFerRetWithNewDependency(context.ProjectRoot, repoPath, actualVersion)
+	if err != nil {
+		colors.YELLOW.Printf("Warning: Failed to update fer.ret: %v\n", err)
 	}
 
 	colors.GREEN.Printf("Successfully cached %s@%s\n", repoPath, actualVersion)
@@ -449,13 +454,6 @@ func updateLockFileOnly(context *ctx.CompilerContext, repoPath, actualVersion st
 
 	colors.GREEN.Printf("Successfully cached %s@%s (no fer.ret update)\n", repoPath, actualVersion)
 	return nil
-}
-
-// shouldUpdateFerRet determines if fer.ret should be updated based on the request
-func shouldUpdateFerRet(projectRoot, repoPath, requestedVersion string) bool {
-	// Always update fer.ret when explicitly installing via ferret get
-	// This makes ferret get behave like go get - it adds the dependency to fer.ret
-	return true
 }
 
 // updateFerRetWithNewDependency adds the dependency to fer.ret with appropriate version constraint
@@ -496,8 +494,8 @@ func getGitHubDownloadURL(repoPath, version string) (string, string, error) {
 	return downloadURL, version, nil
 }
 
-// getLatestGitHubRelease fetches the latest release from GitHub API
-func GetLatestGitHubRelease(owner, repo string) (string, string, error) {
+// getLatestGitHubRelease fetches the latest release from GitHub API (default implementation)
+func getLatestGitHubRelease(owner, repo string) (string, string, error) {
 	apiURL := fmt.Sprintf(GitHubReleasesURL, owner, repo)
 
 	colors.CYAN.Printf("Fetching releases from: %s\n", apiURL)
