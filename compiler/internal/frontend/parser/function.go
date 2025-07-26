@@ -34,7 +34,7 @@ func parseFunctionLike(p *Parser) ast.Node {
 			return parseMethodDeclaration(p, &start.Start, params)
 		}
 		// anonymous function
-		return parseFunctionLiteral(p, &start.Start, true, params...)
+		return parseFunctionLiteral(p, &start.Start, false, params...)
 	} else {
 		// named function
 		return parseFunctionDecl(p)
@@ -185,7 +185,7 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 
 	name := declareFunction(p)
 
-	function := parseFunctionLiteral(p, &start.Start, false)
+	function := parseFunctionLiteral(p, &start.Start, true)
 
 	return &ast.FunctionDecl{
 		Identifier: name,
