@@ -257,15 +257,39 @@ func (c *CompilerContext) IsRemoteImport(importPath string) bool {
 // ParseRemoteImport parses a remote import path and extracts version information
 // Returns: modulePath, version, subpath
 // Example: "github.com/user/repo/folder/mod@v1.0.0" -> "github.com/user/repo", "v1.0.0", "folder/mod"
+// Example: "github.com/user/repo@v1.0.0/data/types" -> "github.com/user/repo", "v1.0.0", "data/types"
 func (c *CompilerContext) ParseRemoteImport(importPath string) (string, string, string) {
-	// Check for version specifier
-	atIndex := strings.LastIndex(importPath, "@")
+	// Check for version specifier using @
+	atIndex := strings.Index(importPath, "@")
 	var version string
 	var pathWithoutVersion string
 
 	if atIndex != -1 {
-		version = importPath[atIndex+1:]
-		pathWithoutVersion = importPath[:atIndex]
+		// Split at @ to get the part before and after
+		beforeAt := importPath[:atIndex]
+		afterAt := importPath[atIndex+1:]
+
+		// Check if this looks like a repo@version pattern
+		parts := strings.Split(beforeAt, "/")
+		if len(parts) >= 3 {
+			// This is likely github.com/user/repo@version
+			pathWithoutVersion = beforeAt
+
+			// Find where version ends (at next / or end of string)
+			slashIndex := strings.Index(afterAt, "/")
+			if slashIndex != -1 {
+				version = afterAt[:slashIndex]
+				// The rest after version is subpath, prepend to pathWithoutVersion
+				subpathAfterVersion := afterAt[slashIndex+1:]
+				pathWithoutVersion = beforeAt + "/" + subpathAfterVersion
+			} else {
+				version = afterAt
+			}
+		} else {
+			// @ is not in the expected repo position, treat as no version
+			version = "latest"
+			pathWithoutVersion = importPath
+		}
 	} else {
 		version = "latest"
 		pathWithoutVersion = importPath
@@ -290,6 +314,11 @@ func (c *CompilerContext) ParseRemoteImport(importPath string) (string, string, 
 // IsRemoteModuleCachedFlat checks if a remote module is cached using flat structure
 // flatModuleName format: "github.com/user/repo@version"
 func (c *CompilerContext) IsRemoteModuleCachedFlat(flatModuleName string) bool {
+	// Return false for empty module names
+	if flatModuleName == "" {
+		return false
+	}
+
 	cachePath := filepath.Join(c.RemoteCachePath, flatModuleName)
 	_, err := os.Stat(cachePath)
 	return err == nil
