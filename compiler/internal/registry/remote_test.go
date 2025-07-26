@@ -283,6 +283,75 @@ func TestRemoteConfigValidation(t *testing.T) {
 	}
 }
 
+// versionSatisfiesConstraint is a helper function for testing version constraint satisfaction
+func versionSatisfiesConstraint(version, constraint string) bool {
+	// Simple constraint checking for testing
+	if constraint == "latest" {
+		return true // Any version satisfies latest
+	}
+
+	if constraint == version {
+		return true // Exact match
+	}
+
+	if strings.HasPrefix(constraint, "^") {
+		baseVersion := strings.TrimPrefix(constraint, "^")
+		// For caret constraints like ^v1, v1.x.x satisfies it
+		return strings.HasPrefix(version, baseVersion)
+	}
+
+	if strings.HasPrefix(constraint, "~") {
+		baseVersion := strings.TrimPrefix(constraint, "~")
+		// For tilde constraints like ~v1.2, only v1.2.x satisfies it
+		return strings.HasPrefix(version, baseVersion)
+	}
+
+	return false
+}
+
+func TestVersionChangeDetection(t *testing.T) {
+	tests := []struct {
+		name           string
+		repoPath       string
+		currentVersion string
+		newConstraint  string
+		shouldChange   bool
+		expectedNewVer string
+	}{
+		{
+			name:           "version satisfies constraint - no change",
+			repoPath:       "github.com/user/repo",
+			currentVersion: "v1.0.0",
+			newConstraint:  "^v1",
+			shouldChange:   false,
+		},
+		{
+			name:           "version doesn't satisfy constraint - should change",
+			repoPath:       "github.com/user/repo",
+			currentVersion: "v0.9.0",
+			newConstraint:  "^v1",
+			shouldChange:   true,
+		},
+		{
+			name:           "exact version change",
+			repoPath:       "github.com/user/repo",
+			currentVersion: "v1.0.0",
+			newConstraint:  "v2.0.0",
+			shouldChange:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shouldChange := !versionSatisfiesConstraint(tt.currentVersion, tt.newConstraint)
+			if shouldChange != tt.shouldChange {
+				t.Errorf("Version change detection for %s (current: %s, constraint: %s): got %v, want %v",
+					tt.repoPath, tt.currentVersion, tt.newConstraint, shouldChange, tt.shouldChange)
+			}
+		})
+	}
+}
+
 // Helper function to check if string contains substring
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&

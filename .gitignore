@@ -32,3 +32,4 @@ app/**/*.json
 
 # others
 *.sarif
+.ferret
