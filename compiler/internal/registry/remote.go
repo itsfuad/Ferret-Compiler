@@ -476,12 +476,12 @@ func getGitHubDownloadURL(repoPath, version string) (string, string, error) {
 	// Handle version constraints by resolving to actual versions
 	if strings.HasPrefix(version, "^") || strings.HasPrefix(version, "~") || version == "latest" {
 		// Get the latest release that satisfies the constraint
-		return getLatestGitHubRelease(owner, repo)
+		return GetLatestGitHubRelease(owner, repo)
 	}
 
 	if version == "latest" {
 		// Get the latest release
-		return getLatestGitHubRelease(owner, repo)
+		return GetLatestGitHubRelease(owner, repo)
 	}
 
 	// For specific versions, we can construct the URL directly
@@ -491,7 +491,7 @@ func getGitHubDownloadURL(repoPath, version string) (string, string, error) {
 }
 
 // getLatestGitHubRelease fetches the latest release from GitHub API
-func getLatestGitHubRelease(owner, repo string) (string, string, error) {
+func GetLatestGitHubRelease(owner, repo string) (string, string, error) {
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
 
 	colors.CYAN.Printf("Fetching releases from: %s\n", apiURL)
@@ -541,6 +541,115 @@ func getLatestGitHubRelease(owner, repo string) (string, string, error) {
 
 	downloadURL := fmt.Sprintf(GitHubTagArchiveURL, owner, repo, latest.TagName)
 	return downloadURL, latest.TagName, nil
+}
+
+// validateGitHubVersion checks if a specific version/tag exists on GitHub
+func ValidateGitHubVersion(owner, repo, version string) error {
+	// First try to get all releases
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch releases from GitHub: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub API returned HTTP %d when checking releases", resp.StatusCode)
+	}
+
+	var releases []GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return fmt.Errorf("failed to parse GitHub releases response: %w", err)
+	}
+
+	// Check if the version exists in releases
+	for _, release := range releases {
+		if release.TagName == version {
+			return nil // Version found
+		}
+	}
+
+	// If not found in releases, try checking tags API (some projects use tags without releases)
+	tagsURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tags", owner, repo)
+
+	resp, err = http.Get(tagsURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch tags from GitHub: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub API returned HTTP %d when checking tags", resp.StatusCode)
+	}
+
+	var tags []struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return fmt.Errorf("failed to parse GitHub tags response: %w", err)
+	}
+
+	// Check if the version exists in tags
+	for _, tag := range tags {
+		if tag.Name == version {
+			return nil // Version found in tags
+		}
+	}
+
+	return fmt.Errorf("version '%s' not found in GitHub repository %s/%s", version, owner, repo)
+}
+
+// getAllAvailableVersions gets all available versions for a GitHub repository
+func GetAllAvailableVersions(owner, repo string) ([]string, error) {
+	var versions []string
+
+	// Get releases first
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch releases: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var releases []GitHubRelease
+		if err := json.NewDecoder(resp.Body).Decode(&releases); err == nil {
+			for _, release := range releases {
+				versions = append(versions, release.TagName)
+			}
+		}
+	}
+
+	// Also get tags (in case some versions are tags but not releases)
+	tagsURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tags", owner, repo)
+	resp, err = http.Get(tagsURL)
+	if err != nil {
+		return versions, nil // Return releases even if tags fail
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var tags []struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&tags); err == nil {
+			// Add tags that aren't already in releases
+			tagSet := make(map[string]bool)
+			for _, version := range versions {
+				tagSet[version] = true
+			}
+
+			for _, tag := range tags {
+				if !tagSet[tag.Name] {
+					versions = append(versions, tag.Name)
+				}
+			}
+		}
+	}
+
+	return versions, nil
 }
 
 // InstallDependencies installs all dependencies declared in fer.ret

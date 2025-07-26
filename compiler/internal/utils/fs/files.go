@@ -402,36 +402,250 @@ func findRemoteModuleConfigDir(filePath string, ctxx *ctx.CompilerContext) (stri
 // resolveVersionConstraint resolves a version constraint to an actual version
 // by checking the lockfile and cache for the best matching version
 func resolveVersionConstraint(repoPath, versionConstraint string, lockFile *registry.LockFile, ctxx *ctx.CompilerContext) (string, error) {
-	// If the constraint is already a specific version (not a constraint), return it
+	// If the constraint is already a specific version (not a constraint), validate it exists on GitHub
 	if !strings.HasPrefix(versionConstraint, "^") && !strings.HasPrefix(versionConstraint, "~") && versionConstraint != "latest" {
+		// For GitHub repositories, validate the version exists
+		if strings.HasPrefix(repoPath, "github.com/") {
+			err := validateGitHubVersionExists(repoPath, versionConstraint)
+			if err != nil {
+				return "", fmt.Errorf("version validation failed for %s@%s: %w", repoPath, versionConstraint, err)
+			}
+		}
 		return versionConstraint, nil
 	}
 
-	// First, try to find in lockfile what actual version was resolved for this constraint
+	// First, check if we have a cached version and if it matches the constraint
+	currentCachedVersion := findCurrentCachedVersion(repoPath, ctxx)
+	if currentCachedVersion != "" {
+		// Check if the current cached version satisfies the new constraint
+		if versionSatisfiesConstraint(currentCachedVersion, versionConstraint) {
+			colors.GREEN.Printf("Current cached version %s satisfies constraint %s for %s\n",
+				currentCachedVersion, versionConstraint, repoPath)
+			return currentCachedVersion, nil
+		} else {
+			colors.YELLOW.Printf("Current cached version %s does not satisfy new constraint %s for %s\n",
+				currentCachedVersion, versionConstraint, repoPath)
+
+			// Need to find a version that satisfies the constraint
+			newVersion, err := findBestVersionForConstraint(repoPath, versionConstraint, ctxx)
+			if err != nil {
+				return "", fmt.Errorf("failed to find version satisfying constraint %s for %s: %w", versionConstraint, repoPath, err)
+			}
+
+			// If we found a different version, we'll need to upgrade/downgrade
+			if newVersion != currentCachedVersion {
+				colors.CYAN.Printf("Version change detected: %s -> %s for %s\n", currentCachedVersion, newVersion, repoPath)
+				err := handleVersionChange(repoPath, currentCachedVersion, newVersion, ctxx)
+				if err != nil {
+					return "", fmt.Errorf("failed to handle version change for %s: %w", repoPath, err)
+				}
+			}
+
+			return newVersion, nil
+		}
+	}
+
+	// No cached version, try to find in lockfile what actual version was resolved for this constraint
 	for flatName := range lockFile.Packages {
 		// Check if this lockfile entry matches our repo
 		if strings.HasPrefix(flatName, repoPath+"@") {
 			actualVersion := strings.TrimPrefix(flatName, repoPath+"@")
-			// For now, return the first matching version from lockfile
-			// In a more sophisticated implementation, we'd do proper semver resolution
-			return actualVersion, nil
+			// Validate that this locked version still satisfies the constraint
+			if versionSatisfiesConstraint(actualVersion, versionConstraint) {
+				return actualVersion, nil
+			}
 		}
 	}
 
-	// If not in lockfile, resolve constraint by looking at available cache
-	// For constraints like "^v0", we'll try to resolve to "v0"
-	if strings.HasPrefix(versionConstraint, "^") {
-		baseVersion := strings.TrimPrefix(versionConstraint, "^")
-		if ctxx.IsRemoteModuleCachedFlat(repoPath + "@" + baseVersion) {
-			return baseVersion, nil
-		}
-	}
-
-	// If "latest", we need to download to resolve it
+	// If "latest", we need to resolve it by checking GitHub
 	if versionConstraint == "latest" {
-		return "latest", nil
+		return resolveLatestVersion(repoPath)
 	}
 
-	// For now, return the constraint as-is and let the download logic handle it
+	// For constraints like "^v0", resolve to the best available version
+	if strings.HasPrefix(versionConstraint, "^") || strings.HasPrefix(versionConstraint, "~") {
+		return findBestVersionForConstraint(repoPath, versionConstraint, ctxx)
+	}
+
+	// Fallback: return the constraint as-is and let the download logic handle it
 	return versionConstraint, nil
+}
+
+// findCurrentCachedVersion finds the currently cached version for a repository
+func findCurrentCachedVersion(repoPath string, ctxx *ctx.CompilerContext) string {
+	cacheDir := ctxx.RemoteCachePath
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return ""
+	}
+
+	prefix := repoPath + "@"
+	var foundVersion string
+
+	// Walk through the cache directory to find any directory that matches repoPath@version
+	err := filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			// Get relative path from cache directory
+			relPath, err := filepath.Rel(cacheDir, path)
+			if err != nil {
+				return err
+			}
+
+			// Normalize path separators for consistent comparison
+			normalizedRelPath := filepath.ToSlash(relPath)
+
+			// Check if this directory matches our repo pattern
+			if strings.HasPrefix(normalizedRelPath, prefix) {
+				version := strings.TrimPrefix(normalizedRelPath, prefix)
+				// Make sure we found a version (not just a partial match)
+				if version != "" && !strings.Contains(version, "/") {
+					foundVersion = version
+					return filepath.SkipDir // Stop after finding the first match
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return ""
+	}
+
+	return foundVersion
+}
+
+// versionSatisfiesConstraint checks if a version satisfies a constraint
+func versionSatisfiesConstraint(version, constraint string) bool {
+	// Simple constraint checking - can be enhanced with proper semver library later
+	if constraint == "latest" {
+		return true // Any version satisfies latest
+	}
+
+	if constraint == version {
+		return true // Exact match
+	}
+
+	if strings.HasPrefix(constraint, "^") {
+		baseVersion := strings.TrimPrefix(constraint, "^")
+		// For caret constraints like ^v1.0.0, any v1.x.x satisfies it (same major version)
+		// Extract major version from base version
+		if strings.HasPrefix(baseVersion, "v") && strings.Contains(baseVersion, ".") {
+			dotIndex := strings.Index(baseVersion, ".")
+			majorVersion := baseVersion[:dotIndex]
+			return strings.HasPrefix(version, majorVersion+".")
+		}
+		// Fallback to simple prefix check for non-standard versions
+		return strings.HasPrefix(version, baseVersion)
+	}
+
+	if strings.HasPrefix(constraint, "~") {
+		baseVersion := strings.TrimPrefix(constraint, "~")
+		// For tilde constraints:
+		// ~v1.2.0 allows v1.2.x (same major.minor version)
+		// ~v1.2 allows v1.2.x (same major.minor version)
+		if strings.HasPrefix(baseVersion, "v") {
+			// Count dots to determine if we have major.minor or major.minor.patch
+			dotCount := strings.Count(baseVersion, ".")
+
+			if dotCount >= 1 {
+				// For ~v1.2 or ~v1.2.0, extract major.minor (v1.2)
+				parts := strings.Split(baseVersion, ".")
+				if len(parts) >= 2 {
+					majorMinor := parts[0] + "." + parts[1]
+					return strings.HasPrefix(version, majorMinor+".")
+				}
+			}
+		}
+		// Fallback to simple prefix check for non-standard versions
+		return strings.HasPrefix(version, baseVersion)
+	}
+
+	return false
+}
+
+// findBestVersionForConstraint finds the best version that satisfies a constraint
+func findBestVersionForConstraint(repoPath, constraint string, ctxx *ctx.CompilerContext) (string, error) {
+	if !strings.HasPrefix(repoPath, "github.com/") {
+		return "", fmt.Errorf("version constraint resolution only supported for GitHub repositories")
+	}
+
+	// Get all available versions from GitHub
+	parts := strings.Split(strings.TrimPrefix(repoPath, "github.com/"), "/")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid GitHub repository path: %s", repoPath)
+	}
+
+	owner, repo := parts[0], parts[1]
+	availableVersions, err := getAllAvailableVersionsFromGitHub(owner, repo)
+	if err != nil {
+		return "", fmt.Errorf("failed to get available versions: %w", err)
+	}
+
+	// Find the best version that satisfies the constraint
+	for _, version := range availableVersions {
+		if versionSatisfiesConstraint(version, constraint) {
+			return version, nil
+		}
+	}
+
+	return "", fmt.Errorf("no version found that satisfies constraint %s", constraint)
+}
+
+// handleVersionChange removes old cached version and prepares for new version download
+func handleVersionChange(repoPath, oldVersion, newVersion string, ctxx *ctx.CompilerContext) error {
+	colors.CYAN.Printf("Handling version change for %s: %s -> %s\n", repoPath, oldVersion, newVersion)
+
+	// Remove old cached version
+	oldFlatName := repoPath + "@" + oldVersion
+	oldCachePath := ctxx.GetRemoteModuleCachePathFlat(oldFlatName)
+
+	if _, err := os.Stat(oldCachePath); err == nil {
+		colors.YELLOW.Printf("Removing old cached version: %s\n", oldFlatName)
+		err := os.RemoveAll(oldCachePath)
+		if err != nil {
+			return fmt.Errorf("failed to remove old cache for %s: %w", oldFlatName, err)
+		}
+	}
+
+	// The new version will be downloaded by the calling logic
+	colors.GREEN.Printf("Prepared for version change: %s -> %s\n", oldVersion, newVersion)
+	return nil
+}
+
+// validateGitHubVersionExists validates that a version exists on GitHub
+func validateGitHubVersionExists(repoPath, version string) error {
+	parts := strings.Split(strings.TrimPrefix(repoPath, "github.com/"), "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid GitHub repository path: %s", repoPath)
+	}
+
+	owner, repo := parts[0], parts[1]
+
+	// Use the registry function to validate
+	return registry.ValidateGitHubVersion(owner, repo, version)
+}
+
+// resolveLatestVersion resolves "latest" to the actual latest version
+func resolveLatestVersion(repoPath string) (string, error) {
+	if !strings.HasPrefix(repoPath, "github.com/") {
+		return "", fmt.Errorf("latest version resolution only supported for GitHub repositories")
+	}
+
+	parts := strings.Split(strings.TrimPrefix(repoPath, "github.com/"), "/")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid GitHub repository path: %s", repoPath)
+	}
+
+	owner, repo := parts[0], parts[1]
+	_, version, err := registry.GetLatestGitHubRelease(owner, repo)
+	return version, err
+}
+
+// getAllAvailableVersionsFromGitHub gets all available versions for a GitHub repository
+func getAllAvailableVersionsFromGitHub(owner, repo string) ([]string, error) {
+	return registry.GetAllAvailableVersions(owner, repo)
 }
