@@ -4,7 +4,7 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantic/stype"
-	atype "compiler/internal/types"
+	"compiler/internal/types"
 	"fmt"
 )
 
@@ -23,7 +23,7 @@ func UnwrapType(t stype.Type) stype.Type {
 // IsStringType checks if a stype.Type is string
 func IsStringType(t stype.Type) bool {
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == atype.STRING
+		return prim.Name == types.STRING
 	}
 	return false
 }
@@ -31,7 +31,7 @@ func IsStringType(t stype.Type) bool {
 // IsBoolType checks if a stype.Type is boolean
 func IsBoolType(t stype.Type) bool {
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == atype.BOOL
+		return prim.Name == types.BOOL
 	}
 	return false
 }
@@ -56,17 +56,17 @@ func IsIntegerType(t stype.Type) bool {
 func IsVoidType(t stype.Type) bool {
 	t = UnwrapType(t) // Unwrap any type aliases
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == atype.VOID
+		return prim.Name == types.VOID
 	}
 	return false
 }
 
 // IsNumericTypeName checks if a type name is numeric
-func IsNumericTypeName(typeName atype.TYPE_NAME) bool {
+func IsNumericTypeName(typeName types.TYPE_NAME) bool {
 	switch typeName {
-	case atype.INT8, atype.INT16, atype.INT32, atype.INT64,
-		atype.UINT8, atype.UINT16, atype.UINT32, atype.UINT64,
-		atype.FLOAT32, atype.FLOAT64, atype.BYTE:
+	case types.INT8, types.INT16, types.INT32, types.INT64,
+		types.UINT8, types.UINT16, types.UINT32, types.UINT64,
+		types.FLOAT32, types.FLOAT64, types.BYTE:
 		return true
 	default:
 		return false
@@ -74,10 +74,10 @@ func IsNumericTypeName(typeName atype.TYPE_NAME) bool {
 }
 
 // IsIntegerTypeName checks if a type name is an integer type
-func IsIntegerTypeName(typeName atype.TYPE_NAME) bool {
+func IsIntegerTypeName(typeName types.TYPE_NAME) bool {
 	switch typeName {
-	case atype.INT8, atype.INT16, atype.INT32, atype.INT64,
-		atype.UINT8, atype.UINT16, atype.UINT32, atype.UINT64, atype.BYTE:
+	case types.INT8, types.INT16, types.INT32, types.INT64,
+		types.UINT8, types.UINT16, types.UINT32, types.UINT64, types.BYTE:
 		return true
 	default:
 		return false

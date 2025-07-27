@@ -19,7 +19,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		if currentPhase >= ctx.PhaseResolved {
 			// Already processed or in a later phase, skip
 			if r.Debug {
-				colors.GREEN.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
+				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
 			}
 			return
 		}
@@ -47,7 +47,6 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 
 // resolveNode dispatches resolution to the appropriate handler based on node type
 func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
-	colors.BRIGHT_BROWN.Printf("Resolving node of type <%T>\n", node)
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
@@ -71,8 +70,6 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 }
 
 func resolveExpressionStmt(r *analyzer.AnalyzerNode, n *ast.ExpressionStmt, cm *ctx.Module) {
-	colors.CYAN.Printf("Resolving expression statement: %v\n", n.Expressions)
-
 	for _, expr := range *n.Expressions {
 		resolveExpr(r, expr, cm)
 	}

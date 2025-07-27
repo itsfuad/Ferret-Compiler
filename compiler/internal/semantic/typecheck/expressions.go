@@ -7,7 +7,7 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
-	atype "compiler/internal/types"
+	"compiler/internal/types"
 	"fmt"
 )
 
@@ -23,15 +23,15 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 	switch e := expr.(type) {
 	// Literals
 	case *ast.StringLiteral:
-		resultType = &stype.PrimitiveType{Name: atype.STRING}
+		resultType = &stype.PrimitiveType{Name: types.STRING}
 	case *ast.IntLiteral:
-		resultType = &stype.PrimitiveType{Name: atype.INT32}
+		resultType = &stype.PrimitiveType{Name: types.INT32}
 	case *ast.FloatLiteral:
-		resultType = &stype.PrimitiveType{Name: atype.FLOAT64}
+		resultType = &stype.PrimitiveType{Name: types.FLOAT64}
 	case *ast.BoolLiteral:
-		resultType = &stype.PrimitiveType{Name: atype.BOOL}
+		resultType = &stype.PrimitiveType{Name: types.BOOL}
 	case *ast.ByteLiteral:
-		resultType = &stype.PrimitiveType{Name: atype.BYTE}
+		resultType = &stype.PrimitiveType{Name: types.BYTE}
 
 	// Complex expressions
 	case *ast.IdentifierExpr:
@@ -172,16 +172,16 @@ func isCastValid(sourceType, targetType stype.Type) bool {
 
 	// Allow ALL numeric to numeric casting with explicit "as" keyword
 	// The developer explicitly requests the conversion, so allow both widening and narrowing
-	if atype.IsNumericTypeName(sourcePrim.Name) && atype.IsNumericTypeName(targetPrim.Name) {
+	if types.IsNumericTypeName(sourcePrim.Name) && types.IsNumericTypeName(targetPrim.Name) {
 		return true
 	}
 
 	// Special case: byte can be cast to/from u8 and i8
-	if sourcePrim.Name == atype.BYTE {
-		return targetPrim.Name == atype.UINT8 || targetPrim.Name == atype.INT8
+	if sourcePrim.Name == types.BYTE {
+		return targetPrim.Name == types.UINT8 || targetPrim.Name == types.INT8
 	}
-	if targetPrim.Name == atype.BYTE {
-		return sourcePrim.Name == atype.UINT8 || sourcePrim.Name == atype.INT8
+	if targetPrim.Name == types.BYTE {
+		return sourcePrim.Name == types.UINT8 || sourcePrim.Name == types.INT8
 	}
 
 	// No valid cast found
