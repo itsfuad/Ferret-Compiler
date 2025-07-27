@@ -8,7 +8,7 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
-	atype "compiler/internal/types"
+	"compiler/internal/types"
 )
 
 // ===== CORE ASSIGNABILITY CHECK =====
@@ -26,31 +26,14 @@ func IsAssignableFrom(target, source stype.Type) bool {
 	resolvedTarget := semantic.UnwrapType(target)
 	resolvedSource := semantic.UnwrapType(source)
 
-	colors.MAGENTA.Printf("Checking assignability: %v → %v\n", resolvedSource, resolvedTarget)
+	colors.PURPLE.Printf("Checking assignability: %v → %v ", resolvedSource, resolvedTarget)
 
-	if resolvedTarget.Equals(resolvedSource) {
+	if resolvedTarget.Equals(resolvedSource) || isNumericPromotion(resolvedTarget, resolvedSource) || isArrayCompatible(resolvedTarget, resolvedSource) || isFunctionCompatible(resolvedTarget, resolvedSource) || isStructCompatible(resolvedTarget, resolvedSource) {
+		colors.GREEN.Println(" ✔ ")
 		return true
 	}
 
-	// Check numeric promotions
-	if isNumericPromotion(resolvedTarget, resolvedSource) {
-		return true
-	}
-
-	// Check array compatibility
-	if isArrayCompatible(resolvedTarget, resolvedSource) {
-		return true
-	}
-
-	// Check function compatibility
-	if isFunctionCompatible(resolvedTarget, resolvedSource) {
-		return true
-	}
-
-	// Check struct compatibility (structural typing)
-	if isStructCompatible(resolvedTarget, resolvedSource) {
-		return true
-	}
+	colors.RED.Println(" ✘ ")
 
 	return false
 }
@@ -67,18 +50,18 @@ func isNumericPromotion(target, source stype.Type) bool {
 	}
 
 	// Define promotion rules
-	promotions := map[atype.TYPE_NAME][]atype.TYPE_NAME{
+	promotions := map[types.TYPE_NAME][]types.TYPE_NAME{
 		// Integer promotions (smaller -> larger)
-		atype.INT16:  {atype.INT8},
-		atype.INT32:  {atype.INT8, atype.INT16},
-		atype.INT64:  {atype.INT8, atype.INT16, atype.INT32},
-		atype.UINT16: {atype.UINT8, atype.BYTE},
-		atype.UINT32: {atype.UINT8, atype.UINT16, atype.BYTE},
-		atype.UINT64: {atype.UINT8, atype.UINT16, atype.UINT32, atype.BYTE},
+		types.INT16:  {types.INT8},
+		types.INT32:  {types.INT8, types.INT16},
+		types.INT64:  {types.INT8, types.INT16, types.INT32},
+		types.UINT16: {types.UINT8, types.BYTE},
+		types.UINT32: {types.UINT8, types.UINT16, types.BYTE},
+		types.UINT64: {types.UINT8, types.UINT16, types.UINT32, types.BYTE},
 
 		// Float promotions (int -> float, smaller float -> larger float)
-		atype.FLOAT32: {atype.INT8, atype.INT16, atype.UINT8, atype.UINT16, atype.BYTE},
-		atype.FLOAT64: {atype.INT8, atype.INT16, atype.INT32, atype.UINT8, atype.UINT16, atype.UINT32, atype.BYTE, atype.FLOAT32},
+		types.FLOAT32: {types.INT8, types.INT16, types.UINT8, types.UINT16, types.BYTE},
+		types.FLOAT64: {types.INT8, types.INT16, types.INT32, types.UINT8, types.UINT16, types.UINT32, types.BYTE, types.FLOAT32},
 	}
 
 	if allowedSources, exists := promotions[targetPrim.Name]; exists {
@@ -211,7 +194,7 @@ func getBinaryOperationResultType(operator string, left, right stype.Type) stype
 func getArithmeticResultType(operator string, left, right stype.Type) stype.Type {
 	// String concatenation
 	if operator == "+" && semantic.IsStringType(left) && semantic.IsStringType(right) {
-		return &stype.PrimitiveType{Name: atype.STRING}
+		return &stype.PrimitiveType{Name: types.STRING}
 	}
 
 	// Numeric operations
@@ -225,7 +208,7 @@ func getArithmeticResultType(operator string, left, right stype.Type) stype.Type
 // getComparisonResultType handles comparison operations
 func getComparisonResultType(left, right stype.Type) stype.Type {
 	if IsAssignableFrom(left, right) || IsAssignableFrom(right, left) {
-		return &stype.PrimitiveType{Name: atype.BOOL}
+		return &stype.PrimitiveType{Name: types.BOOL}
 	}
 	return nil
 }
@@ -233,7 +216,7 @@ func getComparisonResultType(left, right stype.Type) stype.Type {
 // getLogicalResultType handles logical operations
 func getLogicalResultType(left, right stype.Type) stype.Type {
 	if semantic.IsBoolType(left) && semantic.IsBoolType(right) {
-		return &stype.PrimitiveType{Name: atype.BOOL}
+		return &stype.PrimitiveType{Name: types.BOOL}
 	}
 	return nil
 }
@@ -260,12 +243,12 @@ func getCommonNumericType(left, right stype.Type) stype.Type {
 	}
 
 	// Promotion hierarchy: higher numbers win
-	hierarchy := map[atype.TYPE_NAME]int{
-		atype.INT8: 1, atype.UINT8: 1, atype.BYTE: 1,
-		atype.INT16: 2, atype.UINT16: 2,
-		atype.INT32: 3, atype.UINT32: 3,
-		atype.INT64: 4, atype.UINT64: 4,
-		atype.FLOAT32: 5, atype.FLOAT64: 6,
+	hierarchy := map[types.TYPE_NAME]int{
+		types.INT8: 1, types.UINT8: 1, types.BYTE: 1,
+		types.INT16: 2, types.UINT16: 2,
+		types.INT32: 3, types.UINT32: 3,
+		types.INT64: 4, types.UINT64: 4,
+		types.FLOAT32: 5, types.FLOAT64: 6,
 	}
 
 	leftLevel, leftExists := hierarchy[leftPrim.Name]
@@ -322,7 +305,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 		}
 	}
 
-	return &stype.ArrayType{ElementType: elementType, Name: atype.ARRAY}
+	return &stype.ArrayType{ElementType: elementType, Name: types.ARRAY}
 }
 
 // checkIndexableType infers types for array/map indexing

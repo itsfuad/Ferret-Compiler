@@ -8,7 +8,7 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
-	atype "compiler/internal/types"
+	"compiler/internal/types"
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
@@ -41,7 +41,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 		}
 		returnType = retType
 	} else {
-		returnType = &stype.PrimitiveType{Name: atype.VOID}
+		returnType = &stype.PrimitiveType{Name: types.VOID}
 	}
 
 	// Resolve function body
@@ -103,7 +103,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 	}
 
 	symbolType := &stype.UserType{
-		Name:       atype.TYPE_NAME(aliasName),
+		Name:       types.TYPE_NAME(aliasName),
 		Definition: typeToDeclare,
 	}
 	symbol := ctx.NewSymbolWithLocation(aliasName, ctx.SymbolType, symbolType, decl.Alias.Loc())
