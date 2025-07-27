@@ -1,12 +1,18 @@
 {
   "version": "1.0",
-  "generated_at": "2025-07-26T18:45:11Z",
+  "generated_at": "2025-07-27T08:23:24Z",
   "packages": {
-    "github.com/itsfuad/ferret-mod@v0": {
-      "version": "v0",
-      "resolved_url": "https://github.com/itsfuad/ferret-mod/archive/refs/tags/v0.zip",
-      "checksum": "a07a9e7e794e6fedbf9abede725ead12474677f4e609f2de3eda915d8eb5263f",
-      "downloaded_at": "2025-07-26T18:45:11Z"
+    "github.com/itsfuad/ferret-mod@v1": {
+      "version": "v1",
+      "resolved_url": "https://github.com/itsfuad/ferret-mod/archive/refs/tags/v1.zip",
+      "checksum": "17d4902ce62a9dba41294ee874b439fc52862227fa40f42b3b50e9e49a7c1842",
+      "downloaded_at": "2025-07-27T08:23:24Z"
+    },
+    "github.com/itsfuad/ferret-remote-mod@v0.0.1": {
+      "version": "v0.0.1",
+      "resolved_url": "https://github.com/itsfuad/ferret-remote-mod/archive/refs/tags/v0.0.1.zip",
+      "checksum": "660ac1cb9b9e3290e75917e746b464d181c6b4b7a04dd82ddf495ca5ae11182b",
+      "downloaded_at": "2025-07-27T08:23:24Z"
     }
   }
 }

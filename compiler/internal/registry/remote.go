@@ -303,7 +303,7 @@ func installModuleDependencies(context *ctx.CompilerContext, repoPath, version s
 
 	// Install each dependency recursively
 	for depRepoPath, depVersion := range dependencies {
-		colors.BLUE.Printf("Installing dependency: %s@%s\n", depRepoPath, depVersion)
+		colors.BRIGHT_CYAN.Printf("Installing remote dependency: %s@%s\n", depRepoPath, depVersion)
 
 		// Check if already cached to avoid reinstalling
 		depFlatName := depRepoPath + "@" + depVersion
