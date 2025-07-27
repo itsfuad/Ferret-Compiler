@@ -218,7 +218,7 @@ func parseAdditive(p *Parser) ast.Expression {
 func parseMultiplicative(p *Parser) ast.Expression {
 	expr := parseUnary(p)
 
-	for p.match(lexer.MUL_TOKEN, lexer.DIV_TOKEN, lexer.MOD_TOKEN) {
+	for p.match(lexer.MUL_TOKEN, lexer.DIV_TOKEN, lexer.MOD_TOKEN, lexer.EXP_TOKEN) {
 		operator := p.advance()
 		right := parseUnary(p)
 		left := expr // Create a copy to avoid circular reference
