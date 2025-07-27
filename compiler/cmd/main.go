@@ -203,7 +203,7 @@ func handleRemoveCommand(module string) {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module]")
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module] | version 0.0.1")
 		os.Exit(1)
 	}
 

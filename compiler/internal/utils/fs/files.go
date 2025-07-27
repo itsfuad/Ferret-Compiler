@@ -536,7 +536,7 @@ func findBestVersionForConstraint(repoPath, constraint string) (string, error) {
 	}
 
 	owner, repo := parts[0], parts[1]
-	availableVersions, err := getAllAvailableVersionsFromGitHub(owner, repo)
+	availableVersions, err := registry.GetAllAvailableVersions(owner, repo)
 	if err != nil {
 		return "", fmt.Errorf("failed to get available versions: %w", err)
 	}
@@ -599,9 +599,4 @@ func resolveLatestVersion(repoPath string) (string, error) {
 	owner, repo := parts[0], parts[1]
 	_, version, err := registry.GetLatestGitHubRelease(owner, repo)
 	return version, err
-}
-
-// getAllAvailableVersionsFromGitHub gets all available versions for a GitHub repository
-func getAllAvailableVersionsFromGitHub(owner, repo string) ([]string, error) {
-	return registry.GetAllAvailableVersions(owner, repo)
 }
