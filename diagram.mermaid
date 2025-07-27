@@ -1,0 +1,81 @@
+flowchart TD
+    %% CLI Interface
+    subgraph "CLI Interface"
+        CLI_Main["CLI Entry\n(main.go)"]:::external
+        CLI_Flags["CLI Flags\n(flags.go)"]:::external
+    end
+
+    %% Configuration & Registry
+    subgraph "Configuration & Registry" 
+        Config["Config Loader\n(.fer.ret)"]:::io
+        Registry["Registry & Cache"]:::io
+    end
+
+    %% Compiler Pipeline
+    subgraph "Frontend Pipeline"
+        Lexer["Lexer\n(tokenizer.go, tokens.go)"]:::frontend
+        Parser["Parser\n(parser.go, expr.go, function.go)"]:::frontend
+        AST["AST Definitions\n(ast.go)"]:::frontend
+    end
+
+    subgraph "Semantic Analysis"
+        Collector["Collector\n(collector.go)"]:::semantic
+        Resolver["Resolver\n(resolver.go)"]:::semantic
+        TypeChecker["Type Checker\n(typecheck.go)"]:::semantic
+        STypes["Semantic Types\n(types.go)"]:::semantic
+    end
+
+    subgraph "Backend Generation"
+        CodeGen["Code Generator\n(x86-64 assembly)"]:::backend
+    end
+
+    %% I/O & External Services
+    SourceFiles["/Source Files (.fer)/"]:::io
+    Output["Assembly/Binary Output"]:::io
+    FSUtils["FS Utilities\n(files.go)"]:::io
+    RemoteReg[(Remote Module Registry)]:::external
+    GoRuntime[(Go Runtime & Tools)]:::external
+    Assembler[(Assembler/Linker)]:::external
+
+    %% Data Flow
+    CLI_Main -->|invoke| CLI_Flags
+    CLI_Flags -->|load| Config
+    CLI_Flags -->|resolve| Registry
+    Config --> Registry
+    Registry -->|fetch modules| RemoteReg
+    Registry -->|provide sources| SourceFiles
+
+    SourceFiles --> Lexer --> Parser --> AST
+    AST --> Collector --> Resolver --> TypeChecker --> CodeGen
+    CodeGen -->|write| Output
+
+    Config --> FSUtils
+    Registry --> FSUtils
+    CodeGen --> FSUtils
+    CodeGen -->|calls| Assembler
+    CLI_Main -->|uses| GoRuntime
+
+    %% Click Events
+    click CLI_Main "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/cmd/main.go"
+    click CLI_Flags "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/cmd/flags/flags.go"
+    click Config "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/config/project.go"
+    click Config "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/toml/parser.go"
+    click Registry "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/registry/config.go"
+    click Registry "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/registry/lockfile.go"
+    click Registry "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/registry/remote.go"
+    click Lexer "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/frontend/lexer/tokenizer.go"
+    click Lexer "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/frontend/lexer/tokens.go"
+    click Parser "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/frontend/parser/parser.go"
+    click AST "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/frontend/ast/ast.go"
+    click Collector "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/semantic/collector/collector.go"
+    click Resolver "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/semantic/resolver/resolver.go"
+    click TypeChecker "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/semantic/typecheck/typecheck.go"
+    click STypes "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/semantic/stype/types.go"
+    click FSUtils "https://github.com/itsfuad/ferret-compiler/blob/main/compiler/internal/utils/fs/files.go"
+
+    %% Styles
+    classDef frontend fill:#D0E8FF,stroke:#3B82F6,stroke-width:2px
+    classDef semantic fill:#DFFFE0,stroke:#10B981,stroke-width:2px
+    classDef backend fill:#FFE8D0,stroke:#F59E0B,stroke-width:2px
+    classDef io fill:#F3F4F6,stroke:#9CA3AF,stroke-width:2px,stroke-dasharray: 5 5
+    classDef external fill:#F5E1FF,stroke:#A855F7,stroke-width:2px,stroke-dasharray: 2 2
