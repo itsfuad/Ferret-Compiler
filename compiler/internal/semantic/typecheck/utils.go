@@ -194,7 +194,7 @@ func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Mo
 // getBinaryOperationResultType determines the result type of binary operations
 func getBinaryOperationResultType(operator string, left, right stype.Type) stype.Type {
 	switch operator {
-	case "+", "-", "*", "/", "%":
+	case "**", "+", "-", "*", "/", "%":
 		return getArithmeticResultType(operator, left, right)
 	case "==", "!=", "<", "<=", ">", ">=":
 		return getComparisonResultType(left, right)
