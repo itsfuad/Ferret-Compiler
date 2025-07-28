@@ -331,8 +331,19 @@ func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) er
 	repoName := strings.Join(parts[1:3], "/") // user/repo
 	moduleDir := filepath.Join(c.RemoteCachePath, "github.com", repoName+"@"+dependency.Version)
 
-	// Check share setting directly to avoid import cycle
-	canShare, err := modules.CheckRemoteModuleShareSetting(moduleDir)
+	// Get the specific module file path for project-level checking
+	var moduleFilePath string
+	if len(parts) > 3 {
+		// Has sub-path like github.com/user/repo/data/bigint
+		modulePath := strings.Join(parts[3:], "/")
+		moduleFilePath = filepath.Join(moduleDir, modulePath+".fer")
+	} else {
+		// Just the repo like github.com/user/repo
+		moduleFilePath = filepath.Join(moduleDir, "fer.ret")
+	}
+
+	// Use the modules package function for consistency
+	canShare, err := modules.CheckRemoteModuleShareSetting(moduleFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to check share settings for module %s: %w", repoPath, err)
 	}
