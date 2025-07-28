@@ -140,6 +140,9 @@ func generateDefaultConfig() string {
 	sb.WriteString("[compiler]\n")
 	sb.WriteString("version = \"0.1.0\"\n\n")
 
+	sb.WriteString("[cache]\n")
+	sb.WriteString("path = \".ferret/cache\"\n\n")
+
 	sb.WriteString("[remote]\n")
 	if remoteEnabled {
 		sb.WriteString("enabled = true\n")
@@ -151,6 +154,8 @@ func generateDefaultConfig() string {
 	} else {
 		sb.WriteString("share = false\n\n")
 	}
+
+	sb.WriteString("[dependencies]\n")
 
 	return sb.String()
 }
@@ -265,9 +270,12 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 
 func FindProjectRoot(entryFile string) (string, error) {
 	dir := filepath.Dir(entryFile)
+	originalDir := dir // Store original for better error message
+	
 	for {
 		configPath := filepath.Join(dir, CONFIG_FILE)
-		if _, err := os.Stat(filepath.FromSlash(configPath)); err == nil {
+		// Use the path as-is for file checking instead of converting slashes
+		if _, err := os.Stat(configPath); err == nil {
 			return filepath.ToSlash(dir), nil
 		}
 		parent := filepath.Dir(dir)
@@ -276,5 +284,5 @@ func FindProjectRoot(entryFile string) (string, error) {
 		}
 		dir = parent
 	}
-	return "", fmt.Errorf("%s not found", CONFIG_FILE)
+	return "", fmt.Errorf("%s not found (started search from: %s)", CONFIG_FILE, originalDir)
 }
