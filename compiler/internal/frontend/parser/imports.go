@@ -2,9 +2,11 @@ package parser
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"compiler/colors"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/registry"
@@ -47,9 +49,15 @@ func parseImport(p *Parser) ast.Node {
 		return nil
 	}
 
+	// If we're in a remote module and this is a local import, convert it to full GitHub path
+	actualImportPath := importpath
+	if isParserInRemoteCache(p.fullPath, p.ctx) && !strings.HasPrefix(importpath, "github.com/") {
+		actualImportPath = p.ctx.CachePathToImportPath(moduleFullPath)
+	}
+
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
-			Value:    importpath,
+			Value:    actualImportPath,
 			Location: loc,
 		},
 		ModuleName:     moduleName,
@@ -76,7 +84,7 @@ func parseImport(p *Parser) ast.Node {
 	}
 
 	// Check if the module is already parsed
-	if !p.ctx.IsModuleParsed(importpath) {
+	if !p.ctx.IsModuleParsed(actualImportPath) {
 		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
 		if module == nil {
 			p.ctx.Reports.AddSemanticError(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE)
@@ -107,4 +115,26 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE)
 		return nil, false
 	}
+}
+
+// isParserInRemoteCache checks if the given file path is inside the remote cache directory
+func isParserInRemoteCache(filePath string, ctxx *ctx.CompilerContext) bool {
+	// If file path is empty, it's not in remote cache
+	if filePath == "" {
+		return false
+	}
+
+	// Normalize paths for comparison
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return false
+	}
+
+	absCachePath, err := filepath.Abs(ctxx.RemoteCachePath)
+	if err != nil {
+		return false
+	}
+
+	// Check if the file is inside the remote cache directory
+	return strings.HasPrefix(absFilePath, absCachePath)
 }

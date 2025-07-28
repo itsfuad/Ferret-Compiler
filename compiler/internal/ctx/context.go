@@ -157,8 +157,8 @@ func (c *CompilerContext) IsRemoteModuleFile(fullPath string) bool {
 
 // CachePathToImportPath converts a remote module file path back to its import path
 func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
-	// Convert: D:\...\cache\github.com\user\repo@v1\sub\path\file.fer
-	// To: github.com/user/repo/sub/path/file
+	// Convert: D:\...\cache\github.com\itsfuad\ferret-mod\data\bigint.fer
+	// To: github.com/itsfuad/ferret-mod/data/bigint
 
 	absRemotePath, err := filepath.Abs(c.RemoteCachePath)
 	if err != nil {
@@ -181,13 +181,9 @@ func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 	// Remove file extension
 	relPath = strings.TrimSuffix(relPath, filepath.Ext(relPath))
 
-	// Parse the path structure: github.com/user/repo@version/sub/path
+	// Since we now store with full github.com path, we can use it directly
+	// Just remove any version suffixes from parts
 	parts := strings.Split(relPath, "/")
-	if len(parts) < 3 {
-		return ""
-	}
-
-	// Find the repo@version part and remove the @version
 	var result []string
 	for _, part := range parts {
 		if strings.Contains(part, "@") {
