@@ -1,15 +1,15 @@
-import "github.com/itsfuad/ferret-mod/data/bigint";
-import "github.com/itsfuad/ferret-mod/arrays/array";
-import "github.com/itsfuad/ferret-mod/external/importer";
+// import "github.com/itsfuad/ferret-mod/data/bigint";
+// import "github.com/itsfuad/ferret-mod/arrays/array";
+// import "github.com/itsfuad/ferret-mod/external/importer";
 
 import "std/io";
-import "math/constants";
+import "math/constants" as cc;
 import "math/geometry";
 
 import "myapp/cmd/expr";
 import "myapp/cmd/arrays";
 
-let valueOfPi = constants::PI;
+let valueOfPi = cc::PI;
 
 fn voidfn() {
 
