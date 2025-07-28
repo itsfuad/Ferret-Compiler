@@ -4,4 +4,4 @@ name = "test"
 # Another comment
 [section]
 # Comment in section
-value = 42
+value = 42 # This is a comment
