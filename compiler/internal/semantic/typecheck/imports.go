@@ -2,16 +2,15 @@ package typecheck
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/registry"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
 	"fmt"
 )
 
-func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Module) {
+func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.Module) {
 	if imp.ImportPath.Value == "" {
 		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.TYPECHECK_PHASE)
 		return
@@ -19,10 +18,10 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Modu
 
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
-	moduleKey := registry.ResolveImportPath(imp.ImportPath.Value, c.Program.FullPath, c.Ctx)
+	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, c.Program.FullPath, c.Ctx.RemoteCachePath)
 
 	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := registry.CheckCanImportRemoteModules(c.Ctx, moduleKey); err != nil {
+	if err := modules.CheckCanImportRemoteModules(c.Ctx.ProjectRoot, moduleKey); err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), err.Error(), report.TYPECHECK_PHASE)
 		return
 	}
@@ -40,7 +39,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Modu
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
 }
 
-func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) stype.Type {
+func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) stype.Type {
 
 	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
 	if !ok {

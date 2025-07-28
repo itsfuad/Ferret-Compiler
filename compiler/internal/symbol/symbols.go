@@ -1,4 +1,4 @@
-package ctx
+package symbol
 
 import (
 	"compiler/internal/semantic/stype"

@@ -1,4 +1,4 @@
-package registry
+package modules
 
 import (
 	"archive/zip"
@@ -67,7 +67,7 @@ func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) 
 	var latestVersion string
 	for _, release := range releases {
 		if !release.Draft && !release.Prerelease {
-			if latestVersion == "" || compareSemver(release.TagName, latestVersion) {
+			if latestVersion == "" || CompareSemver(release.TagName, latestVersion) {
 				latestVersion = release.TagName
 			}
 		}

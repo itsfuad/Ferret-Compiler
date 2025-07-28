@@ -1,4 +1,4 @@
-package registry
+package modules
 
 import (
 	"strconv"
@@ -44,7 +44,7 @@ func parseVersion(ver string) (int, int, int, string, bool) {
 
 // compareSemver returns true if a > b (semver compare, including pre-release)
 // Pre-release order: "" (stable) > rc > beta > alpha > others (lex order)
-func compareSemver(a, b string) bool {
+func CompareSemver(a, b string) bool {
 	amaj, amin, apat, apre, okA := parseVersion(a)
 	bmaj, bmin, bpat, bpre, okB := parseVersion(b)
 	if !okA || !okB {
@@ -79,9 +79,9 @@ func compareSemver(a, b string) bool {
 // If one is not semver, fallback to lexicographical comparison.
 // Returns the version string that is "greater".
 func LatestVersion(v1, v2 string) string {
-	if compareSemver(v1, v2) {
+	if CompareSemver(v1, v2) {
 		return v1
-	} else if compareSemver(v2, v1) {
+	} else if CompareSemver(v2, v1) {
 		return v2
 	}
 	// If semver comparison fails or equal, fallback lex order
@@ -92,7 +92,7 @@ func LatestVersion(v1, v2 string) string {
 }
 
 func prefferedVersion(v1, v2 string) string {
-	if compareSemver(v1, v2) {
+	if CompareSemver(v1, v2) {
 		return v1
 	} else {
 		return v2

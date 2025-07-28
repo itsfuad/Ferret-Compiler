@@ -269,20 +269,36 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 }
 
 func FindProjectRoot(entryFile string) (string, error) {
-	dir := filepath.Dir(entryFile)
+	// Get the absolute path of the entry file
+	absEntryFile, err := filepath.Abs(entryFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path of entry file: %w", err)
+	}
+
+	// Start from the directory containing the entry file
+	dir := filepath.Dir(absEntryFile)
 	originalDir := dir // Store original for better error message
 
+	// Walk up the directory tree until we find a fer.ret file
 	for {
 		configPath := filepath.Join(dir, CONFIG_FILE)
-		// Use the path as-is for file checking instead of converting slashes
+
+		// Check if fer.ret exists in this directory
 		if _, err := os.Stat(configPath); err == nil {
+			// Found the project root
 			return filepath.ToSlash(dir), nil
 		}
+
+		// Move up to parent directory
 		parent := filepath.Dir(dir)
+
+		// Stop if we can't go up further (reached filesystem root)
 		if parent == dir {
-			break // Reached root
+			break
 		}
+
 		dir = parent
 	}
-	return "", fmt.Errorf("%s not found (started search from: %s)", CONFIG_FILE, originalDir)
+
+	return "", fmt.Errorf("%s not found (searched from: %s up to filesystem root)", CONFIG_FILE, originalDir)
 }

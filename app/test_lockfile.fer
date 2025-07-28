@@ -1,0 +1,15 @@
+// Test file to demonstrate the new lockfile system
+// This file imports modules that will be managed by the lockfile
+
+import "std/io";
+import "math/constants";
+
+// This would import a remote module if it were installed
+// import "github.com/itsfuad/ferret-mod/data/bigint";
+
+let pi = constants::PI;
+io::print("Testing lockfile system with pi = ", pi);
+
+// The lockfile will track:
+// - Direct dependencies: std/io, math/constants
+// - Indirect dependencies: any modules that std/io or math/constants depend on 
