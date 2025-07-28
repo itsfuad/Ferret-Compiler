@@ -10,6 +10,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/config"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 )
 
@@ -43,34 +44,12 @@ func (p ModulePhase) String() string {
 	}
 }
 
-// ModuleType represents the category of a module
-type ModuleType int
-
-const (
-	LOCAL ModuleType = iota
-	BUILTIN
-	REMOTE
-)
-
-func (mt ModuleType) String() string {
-	switch mt {
-	case LOCAL:
-		return "LOCAL"
-	case BUILTIN:
-		return "BUILTIN"
-	case REMOTE:
-		return "REMOTE"
-	default:
-		return "UNKNOWN"
-	}
-}
-
 type Module struct {
 	AST         *ast.Program
 	SymbolTable *SymbolTable
 	Phase       ModulePhase // Current processing phase
 	IsBuiltin   bool        // Whether this is a builtin module
-	Type        ModuleType
+	Type        modules.ModuleType
 }
 
 type CompilerContext struct {
@@ -97,13 +76,13 @@ type CompilerContext struct {
 
 func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	// Check if this is a built-in module file
-	if c.isBuiltinModuleFile(fullPath) {
+	if c.IsBuiltinModuleFile(fullPath) {
 		return c.getBuiltinModuleImportPath(fullPath)
 	}
 
 	// Check if this is a remote module file
-	if c.isRemoteModuleFile(fullPath) {
-		return c.getRemoteModuleImportPath(fullPath)
+	if c.IsRemoteModuleFile(fullPath) {
+		return c.CachePathToImportPath(fullPath)
 	}
 
 	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
@@ -128,11 +107,6 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 
 // IsBuiltinModuleFile checks if the given file path is within the built-in modules directory
 func (c *CompilerContext) IsBuiltinModuleFile(fullPath string) bool {
-	return c.isBuiltinModuleFile(fullPath)
-}
-
-// isBuiltinModuleFile checks if the given file path is within the built-in modules directory
-func (c *CompilerContext) isBuiltinModuleFile(fullPath string) bool {
 	if c.ModulesPath == "" {
 		return false
 	}
@@ -167,11 +141,6 @@ func (c *CompilerContext) getBuiltinModuleImportPath(fullPath string) string {
 
 // IsRemoteModuleFile checks if the given file path is within the remote modules cache
 func (c *CompilerContext) IsRemoteModuleFile(fullPath string) bool {
-	return c.isRemoteModuleFile(fullPath)
-}
-
-// isRemoteModuleFile checks if the given file path is within the remote modules cache
-func (c *CompilerContext) isRemoteModuleFile(fullPath string) bool {
 	if c.RemoteCachePath == "" {
 		return false
 	}
@@ -186,13 +155,8 @@ func (c *CompilerContext) isRemoteModuleFile(fullPath string) bool {
 	return strings.HasPrefix(absFullPath, absRemotePath)
 }
 
-// GetRemoteModuleImportPath converts a remote module file path back to its import path
-func (c *CompilerContext) GetRemoteModuleImportPath(fullPath string) string {
-	return c.getRemoteModuleImportPath(fullPath)
-}
-
-// getRemoteModuleImportPath converts a remote module file path back to its import path
-func (c *CompilerContext) getRemoteModuleImportPath(fullPath string) string {
+// CachePathToImportPath converts a remote module file path back to its import path
+func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 	// Convert: D:\...\cache\github.com\user\repo@v1\sub\path\file.fer
 	// To: github.com/user/repo/sub/path/file
 
@@ -311,9 +275,9 @@ func (c *CompilerContext) ParseRemoteImport(importPath string) (string, string, 
 	return repoPath, version, subPath
 }
 
-// IsRemoteModuleCachedFlat checks if a remote module is cached using flat structure
+// IsRemoteModuleCached checks if a remote module is cached using flat structure
 // flatModuleName format: "github.com/user/repo@version"
-func (c *CompilerContext) IsRemoteModuleCachedFlat(flatModuleName string) bool {
+func (c *CompilerContext) IsRemoteModuleCached(flatModuleName string) bool {
 	// Return false for empty module names
 	if flatModuleName == "" {
 		return false
@@ -322,11 +286,6 @@ func (c *CompilerContext) IsRemoteModuleCachedFlat(flatModuleName string) bool {
 	cachePath := filepath.Join(c.RemoteCachePath, flatModuleName)
 	_, err := os.Stat(cachePath)
 	return err == nil
-}
-
-// GetRemoteModuleCachePathFlat returns the cache path for a flat-structured remote module
-func (c *CompilerContext) GetRemoteModuleCachePathFlat(flatModuleName string) string {
-	return filepath.Join(c.RemoteCachePath, flatModuleName)
 }
 
 func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
@@ -338,16 +297,6 @@ func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
 	return module, nil
-}
-
-func (c *CompilerContext) RemoveModule(importPath string) {
-	if c.Modules == nil {
-		return
-	}
-	if _, exists := c.Modules[importPath]; !exists {
-		return
-	}
-	delete(c.Modules, importPath)
 }
 
 func (c *CompilerContext) ModuleCount() int {
@@ -379,11 +328,11 @@ func (c *CompilerContext) PrintModules() {
 
 			// Color-code by module type
 			switch module.Type {
-			case LOCAL:
+			case modules.LOCAL:
 				colors.LIGHT_BLUE.Printf("(%s)", module.Type)
-			case REMOTE:
+			case modules.REMOTE:
 				colors.GREEN.Printf("(%s)", module.Type)
-			case BUILTIN:
+			case modules.BUILTIN:
 				colors.YELLOW.Printf("(%s)", module.Type)
 			default:
 				colors.WHITE.Printf("(%s)", module.Type)
@@ -466,22 +415,12 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
 
-	// Determine module type
-	var moduleType ModuleType
-	if isBuiltin {
-		moduleType = BUILTIN
-	} else if strings.HasPrefix(importPath, "github.com/") {
-		moduleType = REMOTE
-	} else {
-		moduleType = LOCAL
-	}
-
 	c.Modules[importPath] = &Module{
 		AST:         module,
 		SymbolTable: NewSymbolTable(c.Builtins),
 		Phase:       PhaseParsed, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
-		Type:        moduleType,
+		Type:        modules.GetModuleType(importPath, c.ProjectConfig.Name),
 	}
 }
 
@@ -499,8 +438,6 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 	// Normalize paths to handle forward/backward slash inconsistency
 	from = filepath.ToSlash(from)
 	to = filepath.ToSlash(to)
-
-
 
 	// Initialize DepGraph if needed
 	if c.DepGraph == nil {
