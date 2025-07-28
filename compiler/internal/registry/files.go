@@ -203,16 +203,6 @@ func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, 
 		return "", fmt.Errorf("module %s is listed in fer.ret but not found in cache. run ferret get %s to reinstall", fullRepoPath, fullRepoPath)
 	}
 
-	// ✅ SECURITY CHECK: Check if the target remote module allows sharing
-	moduleDir := filepath.Join(ctxx.RemoteCachePath, "github.com", repoName+"@"+dependency.Version)
-	canShare, err := modules.CheckRemoteModuleShareSetting(moduleDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to check share settings for module %s: %w", fullRepoPath, err)
-	}
-	if !canShare {
-		return "", fmt.Errorf("module %s has disabled sharing (share = false). Cannot import this module", fullRepoPath)
-	}
-
 	// Build the module file path within the cache
 	// The import path might include subdirectories after the repo name
 	// Example: "github.com/user/repo/folder1/folder2/module"
@@ -220,6 +210,7 @@ func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, 
 
 	// Remove the github.com/user/repo prefix to get the module path within the repo
 	// We already have fullRepoPath from above: github.com/user/repo
+	moduleDir := filepath.Join(ctxx.RemoteCachePath, "github.com", repoName+"@"+dependency.Version)
 
 	var modulePath string
 	if len(importPath) > len(fullRepoPath) {
@@ -239,6 +230,15 @@ func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, 
 		if _, err := os.Stat(moduleFullPath); os.IsNotExist(err) {
 			return "", fmt.Errorf("module file not found at %s", moduleFullPath)
 		}
+	}
+
+	// ✅ SECURITY CHECK: Check if the target remote module allows sharing at project level
+	canShare, err := modules.CheckRemoteModuleShareSetting(moduleFullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to check share settings for module %s: %w", fullRepoPath, err)
+	}
+	if !canShare {
+		return "", fmt.Errorf("module %s has disabled sharing (share = false). Cannot import this module", fullRepoPath)
 	}
 
 	return moduleFullPath, nil
