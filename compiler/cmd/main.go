@@ -124,6 +124,20 @@ func handleGetCommand(module string) {
 		os.Exit(1)
 	}
 
+	// Load and validate project configuration
+	projectConfig, err := config.LoadProjectConfig(projectRoot)
+	if err != nil {
+		colors.RED.Printf("Error loading project configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// ✅ SECURITY CHECK: Check if remote imports are enabled
+	if !projectConfig.Remote.Enabled {
+		colors.RED.Println("❌ Remote module imports are disabled in this project.")
+		colors.YELLOW.Println("To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret")
+		os.Exit(1)
+	}
+
 	if module == "" {
 		colors.RED.Println("No module specified. Usage: ferret get <module>")
 		colors.YELLOW.Println("Example: ferret get github.com/user/repo@v1.0.0")
