@@ -4,6 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/registry"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
@@ -12,18 +13,28 @@ import (
 
 func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Module) {
 	if imp.ImportPath.Value == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.TYPECHECK_PHASE)
+		return
+	}
+
+	// Resolve the import path based on context
+	// For local imports within remote modules, convert to full GitHub path
+	moduleKey := registry.ResolveImportPath(imp.ImportPath.Value, c.Program.FullPath, c.Ctx)
+
+	// ✅ SECURITY CHECK: Validate remote import permissions
+	if err := registry.CheckCanImportRemoteModules(c.Ctx, moduleKey); err != nil {
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), err.Error(), report.TYPECHECK_PHASE)
 		return
 	}
 
 	//module must be parses and stored already
-	module, err := c.Ctx.GetModule(imp.ImportPath.Value)
+	module, err := c.Ctx.GetModule(moduleKey)
 	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.TYPECHECK_PHASE)
 		return
 	}
 
-	// collect functions from the imported module
+	// process the imported module
 	anz := analyzer.NewAnalyzerNode(module.AST, c.Ctx, c.Debug)
 	CheckProgram(anz)
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable

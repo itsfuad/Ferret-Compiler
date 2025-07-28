@@ -4,6 +4,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/registry"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"fmt"
@@ -11,14 +12,24 @@ import (
 
 func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Module) {
 	if imp.ImportPath.Value == "" {
-		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Resolve the import path based on context
+	// For local imports within remote modules, convert to full GitHub path
+	moduleKey := registry.ResolveImportPath(imp.ImportPath.Value, r.Program.FullPath, r.Ctx)
+
+	// ✅ SECURITY CHECK: Validate remote import permissions
+	if err := registry.CheckCanImportRemoteModules(r.Ctx, moduleKey); err != nil {
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
 	//module must be parses and stored already
-	module, err := r.Ctx.GetModule(imp.ImportPath.Value)
+	module, err := r.Ctx.GetModule(moduleKey)
 	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
