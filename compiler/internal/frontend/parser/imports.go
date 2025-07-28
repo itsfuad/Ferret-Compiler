@@ -7,9 +7,9 @@ import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
+	"compiler/internal/registry"
 	"compiler/internal/report"
 	"compiler/internal/source"
-	"compiler/internal/utils/fs"
 )
 
 // parseImport parses an import statement
@@ -19,15 +19,6 @@ func parseImport(p *Parser) ast.Node {
 	importToken := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
 
 	importpath := importToken.Value
-
-	// If we're parsing a remote module file and this import doesn't look like a remote import,
-	// we need to convert it to a full remote import path
-	if p.ctx.IsRemoteModuleFile(p.fullPath) && !fs.IsRemote(importpath) && !fs.IsBuiltinModule(fs.FirstPart(importpath)) {
-		fullImportPath := p.convertLocalToRemoteImportPath(importpath)
-		if fullImportPath != "" {
-			importpath = fullImportPath
-		}
-	}
 
 	// Support: import "path" as Alias;
 	var moduleName string
@@ -49,7 +40,7 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importToken.End)
 
-	moduleFullPath, err := fs.ResolveModule(importpath, p.fullPath, p.ctx)
+	moduleFullPath, err := registry.ResolveModuleLocation(importpath, p.fullPath, p.ctx)
 	if err != nil {
 		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 		colors.RED.Println("Error resolving module:", err)
@@ -61,9 +52,9 @@ func parseImport(p *Parser) ast.Node {
 			Value:    importpath,
 			Location: loc,
 		},
-		ModuleName: moduleName,
-		FullPath:   moduleFullPath,
-		Location:   loc,
+		ModuleName:     moduleName,
+		LocationOnDisk: moduleFullPath,
+		Location:       loc,
 	}
 
 	// Check for circular dependency before adding the import
@@ -115,32 +106,5 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		token := p.peek()
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE)
 		return nil, false
-	}
-}
-
-// convertLocalToRemoteImportPath converts a local import path to a full remote import path
-// when parsing a file that's inside a remote module cache
-func (p *Parser) convertLocalToRemoteImportPath(localImportPath string) string {
-	// We need to figure out which remote repo this file belongs to and
-	// prepend the repo path to the local import
-
-	// Get the remote import path of the current file
-	currentRemoteImportPath := p.ctx.GetRemoteModuleImportPath(p.fullPath)
-	if currentRemoteImportPath == "" {
-		return ""
-	}
-
-	// Parse the current remote import to get repo and version info
-	repoPath, version, _ := p.ctx.ParseRemoteImport(currentRemoteImportPath)
-	if repoPath == "" {
-		return ""
-	}
-
-	// Construct the full remote import path
-	// e.g., "data/mods/constants" becomes "github.com/user/repo/data/mods/constants"
-	if version == "latest" {
-		return repoPath + "/" + localImportPath
-	} else {
-		return repoPath + "@" + version + "/" + localImportPath
 	}
 }

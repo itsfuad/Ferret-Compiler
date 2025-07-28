@@ -85,10 +85,9 @@ func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 
 // ImportStmt represents an import statement
 type ImportStmt struct {
-	ImportPath *StringLiteral // The import path as written in source (e.g., "code/data")
-	ModuleName string         // The alias or last part of the import path (e.g., "data")
-	FullPath   string         // The fully resolved, normalized file path (always with .fer)
-
+	ImportPath     *StringLiteral // The import path as written in source (e.g., "code/data")
+	ModuleName     string         // The alias or last part of the import path (e.g., "data")
+	LocationOnDisk string         // The fully resolved, normalized file path (always with .fer)
 	source.Location
 }
 

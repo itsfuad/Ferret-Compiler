@@ -9,7 +9,7 @@ import (
 	"compiler/cmd/flags"
 	"compiler/colors"
 	"compiler/internal/ctx"
-	"compiler/internal/registry"
+	//"compiler/internal/registry"
 
 	//"compiler/internal/backend"
 	"compiler/internal/config"
@@ -104,102 +104,102 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.Compi
 	return context
 }
 
-// handleGetCommand handles the "ferret get" command
-func handleGetCommand(module string) {
-	// Get current working directory to find project root
-	cwd, err := os.Getwd()
-	if err != nil {
-		colors.RED.Println(err)
-		os.Exit(1)
-	}
+// // handleGetCommand handles the "ferret get" command
+// func handleGetCommand(module string) {
+// 	// Get current working directory to find project root
+// 	cwd, err := os.Getwd()
+// 	if err != nil {
+// 		colors.RED.Println(err)
+// 		os.Exit(1)
+// 	}
 
-	// Create a temporary context to access remote module functionality
-	// We need to find a fer.ret file to establish project root
-	dummyFile := filepath.Join(cwd, "dummy.fer")
-	context := ctx.NewCompilerContext(dummyFile)
-	defer context.Destroy()
+// 	// Create a temporary context to access remote module functionality
+// 	// We need to find a fer.ret file to establish project root
+// 	dummyFile := filepath.Join(cwd, "dummy.fer")
+// 	context := ctx.NewCompilerContext(dummyFile)
+// 	defer context.Destroy()
 
-	if module == "" {
-		// Install all dependencies from fer.ret
-		colors.BLUE.Println("Installing all dependencies from fer.ret...")
-		err := registry.InstallDependencies(context)
-		if err != nil {
-			colors.RED.Printf("Failed to install dependencies: %s\n", err)
-			os.Exit(1)
-		}
-	} else {
-		// Install specific module
-		if !context.IsRemoteImport(module) {
-			colors.RED.Printf("Invalid remote module path: %s\n", module)
-			colors.YELLOW.Println("Remote modules should start with github.com/, gitlab.com/, etc.")
-			os.Exit(1)
-		}
+// 	if module == "" {
+// 		// Install all dependencies from fer.ret
+// 		colors.BLUE.Println("Installing all dependencies from fer.ret...")
+// 		err := registry.InstallDependencies(context)
+// 		if err != nil {
+// 			colors.RED.Printf("Failed to install dependencies: %s\n", err)
+// 			os.Exit(1)
+// 		}
+// 	} else {
+// 		// Install specific module
+// 		if !context.IsRemoteImport(module) {
+// 			colors.RED.Printf("Invalid remote module path: %s\n", module)
+// 			colors.YELLOW.Println("Remote modules should start with github.com/, gitlab.com/, etc.")
+// 			os.Exit(1)
+// 		}
 
-		repoPath, version, _ := context.ParseRemoteImport(module)
-		colors.BLUE.Printf("Installing module: %s@%s\n", repoPath, version)
+// 		repoPath, version, _ := context.ParseRemoteImport(module)
+// 		colors.BLUE.Printf("Installing module: %s@%s\n", repoPath, version)
 
-		err := registry.DownloadRemoteModule(context, repoPath, version)
-		if err != nil {
-			colors.RED.Printf("Failed to download module: %s\n", err)
-			os.Exit(1)
-		}
-	}
-}
+// 		err := registry.DownloadRemoteModule(context, repoPath, version)
+// 		if err != nil {
+// 			colors.RED.Printf("Failed to download module: %s\n", err)
+// 			os.Exit(1)
+// 		}
+// 	}
+// }
 
-func handleRemoveCommand(module string) {
-	if module == "" {
-		colors.RED.Println("No module specified. Usage: ferret remove [module]")
-		os.Exit(1)
-	}
+// func handleRemoveCommand(module string) {
+// 	if module == "" {
+// 		colors.RED.Println("No module specified. Usage: ferret remove [module]")
+// 		os.Exit(1)
+// 	}
 
-	// Get current working directory as project root
-	projectRoot, err := os.Getwd()
-	if err != nil {
-		colors.RED.Println(err)
-		os.Exit(1)
-	}
+// 	// Get current working directory as project root
+// 	projectRoot, err := os.Getwd()
+// 	if err != nil {
+// 		colors.RED.Println(err)
+// 		os.Exit(1)
+// 	}
 
-	// Check if fer.ret exists
-	ferRetPath := filepath.Join(projectRoot, "fer.ret")
-	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
-		colors.YELLOW.Println("No fer.ret file found in current directory.")
-		return
-	}
+// 	// Check if fer.ret exists
+// 	ferRetPath := filepath.Join(projectRoot, "fer.ret")
+// 	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
+// 		colors.YELLOW.Println("No fer.ret file found in current directory.")
+// 		return
+// 	}
 
-	// Parse dependencies from fer.ret to check if module exists
-	dependencies, err := registry.ParseFerRetDependencies(projectRoot)
-	if err != nil {
-		colors.RED.Printf("Failed to parse fer.ret dependencies: %s\n", err)
-		os.Exit(1)
-	}
+// 	// Parse dependencies from fer.ret to check if module exists
+// 	dependencies, err := registry.ParseFerRetDependencies(projectRoot)
+// 	if err != nil {
+// 		colors.RED.Printf("Failed to parse fer.ret dependencies: %s\n", err)
+// 		os.Exit(1)
+// 	}
 
-	// Check if the module is in dependencies
-	if _, exists := dependencies[module]; !exists {
-		colors.YELLOW.Printf("Module '%s' is not in fer.ret dependencies. Nothing to remove.\n", module)
-		return
-	}
+// 	// Check if the module is in dependencies
+// 	if _, exists := dependencies[module]; !exists {
+// 		colors.YELLOW.Printf("Module '%s' is not in fer.ret dependencies. Nothing to remove.\n", module)
+// 		return
+// 	}
 
-	// Remove from fer.ret file
-	err = registry.RemoveDependencyFromFerRet(ferRetPath, module)
-	if err != nil {
-		colors.RED.Printf("Failed to remove module from fer.ret: %s\n", err)
-		os.Exit(1)
-	}
+// 	// Remove from fer.ret file
+// 	err = registry.RemoveDependency(ferRetPath, module)
+// 	if err != nil {
+// 		colors.RED.Printf("Failed to remove module from fer.ret: %s\n", err)
+// 		os.Exit(1)
+// 	}
 
-	// Remove from cache if it exists
-	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
-	if err := registry.RemoveModuleFromCache(cachePath, module); err != nil {
-		colors.YELLOW.Printf("Warning: Failed to remove module from cache: %s\n", err)
-	}
+// 	// Remove from cache if it exists
+// 	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
+// 	if err := registry.RemoveModuleFromCache(cachePath, module); err != nil {
+// 		colors.YELLOW.Printf("Warning: Failed to remove module from cache: %s\n", err)
+// 	}
 
-	// Update lockfile
-	lockfilePath := filepath.Join(projectRoot, "ferret.lock")
-	if err := registry.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
-		colors.YELLOW.Printf("Warning: Failed to remove module from lockfile: %s\n", err)
-	}
+// 	// Update lockfile
+// 	lockfilePath := filepath.Join(projectRoot, "ferret.lock")
+// 	if err := registry.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
+// 		colors.YELLOW.Printf("Warning: Failed to remove module from lockfile: %s\n", err)
+// 	}
 
-	colors.GREEN.Printf("Successfully removed module: %s\n", module)
-}
+// 	colors.GREEN.Printf("Successfully removed module: %s\n", module)
+// }
 
 func main() {
 	if len(os.Args) < 2 {
@@ -209,17 +209,17 @@ func main() {
 
 	args := flags.ParseArgs()
 
-	// Handle remove command
-	if args.RemoveCommand {
-		handleRemoveCommand(args.RemoveModule)
-		return
-	}
+	// // Handle remove command
+	// if args.RemoveCommand {
+	// 	handleRemoveCommand(args.RemoveModule)
+	// 	return
+	// }
 
-	// Handle get command
-	if args.GetCommand {
-		handleGetCommand(args.GetModule)
-		return
-	}
+	// // Handle get command
+	// if args.GetCommand {
+	// 	handleGetCommand(args.GetModule)
+	// 	return
+	// }
 
 	// Handle init command
 	if args.InitProject {
