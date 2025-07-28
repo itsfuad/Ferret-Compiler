@@ -12,6 +12,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/report"
+	"compiler/toml"
 )
 
 var contextCreated = false
@@ -292,7 +293,98 @@ func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
 	if !exists {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
+
+	// ✅ SECURITY CHECK: For remote modules, verify share setting every time they're accessed
+	if strings.HasPrefix(importPath, "github.com/") {
+		if err := c.validateRemoteModuleShareSetting(importPath); err != nil {
+			return nil, err
+		}
+	}
+
 	return module, nil
+}
+
+// validateRemoteModuleShareSetting checks if a remote module allows sharing
+// This is called every time a remote module is accessed from cache
+func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) error {
+	// Extract repo name from import path
+	parts := strings.Split(importPath, "/")
+	if len(parts) < 3 {
+		return fmt.Errorf("invalid remote import path format: %s", importPath)
+	}
+
+	// Find the cached module directory
+	// We need to find the version from the dependencies
+	dependencies, err := c.readFerRetDependenciesDirect()
+	if err != nil {
+		return fmt.Errorf("failed to read dependencies: %w", err)
+	}
+
+	// Get repo path (github.com/user/repo)
+	repoPath := strings.Join(parts[:3], "/")
+	dependency, exists := dependencies[repoPath]
+	if !exists {
+		return fmt.Errorf("remote module %s not found in dependencies", repoPath)
+	}
+
+	// Build cache directory path
+	repoName := strings.Join(parts[1:3], "/") // user/repo
+	moduleDir := filepath.Join(c.RemoteCachePath, "github.com", repoName+"@"+dependency.Version)
+
+	// Check share setting directly to avoid import cycle
+	canShare, err := modules.CheckRemoteModuleShareSetting(moduleDir)
+	if err != nil {
+		return fmt.Errorf("failed to check share settings for module %s: %w", repoPath, err)
+	}
+
+	if !canShare {
+		return fmt.Errorf("module %s has disabled sharing (share = false). Cannot use this module", repoPath)
+	}
+
+	return nil
+}
+
+// readFerRetDependenciesDirect reads dependencies directly to avoid import cycle
+func (c *CompilerContext) readFerRetDependenciesDirect() (map[string]FerRetDependency, error) {
+	configPath := filepath.Join(c.ProjectRoot, "fer.ret")
+
+	// Parse the fer.ret file
+	tomlData, err := toml.ParseTOMLFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse fer.ret: %w", err)
+	}
+
+	dependencies := make(map[string]FerRetDependency)
+
+	// Parse dependencies section
+	if dependenciesSection, exists := tomlData["dependencies"]; exists {
+		for key, value := range dependenciesSection {
+			if strValue, ok := value.(string); ok {
+				// Check if this is a comment line (contains #)
+				var version, comment string
+				if strings.Contains(strValue, "#") {
+					parts := strings.SplitN(strValue, "#", 2)
+					version = strings.TrimSpace(parts[0])
+					comment = strings.TrimSpace(parts[1])
+				} else {
+					version = strings.TrimSpace(strValue)
+				}
+
+				dependencies[key] = FerRetDependency{
+					Version: version,
+					Comment: comment,
+				}
+			}
+		}
+	}
+
+	return dependencies, nil
+}
+
+// FerRetDependency represents a dependency entry in fer.ret
+type FerRetDependency struct {
+	Version string
+	Comment string // Optional comment like "used by X"
 }
 
 func (c *CompilerContext) ModuleCount() int {

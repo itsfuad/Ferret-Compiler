@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"compiler/colors"
+	"compiler/internal/config"
 	"compiler/internal/ctx"
 	"compiler/internal/modules"
 	"compiler/toml"
@@ -15,6 +16,12 @@ import (
 const EXT = ".fer"
 
 const INVALID_GITHUB_PATH_MSG = "invalid GitHub repository path: %s"
+
+// FerRetDependency represents a dependency entry in fer.ret
+type FerRetDependency struct {
+	Version string
+	Comment string // Optional comment like "used by X"
+}
 
 // ResolveModuleLocation resolves the full path of a module based on its import path
 // It returns the physical location of the module file on disk
@@ -196,9 +203,17 @@ func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, 
 		return "", fmt.Errorf("module %s is listed in fer.ret but not found in cache. run ferret get %s to reinstall", fullRepoPath, fullRepoPath)
 	}
 
-	// Build the module file path within the cache
+	// ✅ SECURITY CHECK: Check if the target remote module allows sharing
 	moduleDir := filepath.Join(ctxx.RemoteCachePath, "github.com", repoName+"@"+dependency.Version)
+	canShare, err := modules.CheckRemoteModuleShareSetting(moduleDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to check share settings for module %s: %w", fullRepoPath, err)
+	}
+	if !canShare {
+		return "", fmt.Errorf("module %s has disabled sharing (share = false). Cannot import this module", fullRepoPath)
+	}
 
+	// Build the module file path within the cache
 	// The import path might include subdirectories after the repo name
 	// Example: "github.com/user/repo/folder1/folder2/module"
 	// -> repo is "user/repo", module path is "folder1/folder2/module"
@@ -207,48 +222,69 @@ func resolveRemoteModule(importPath string, ctxx *ctx.CompilerContext) (string, 
 	// We already have fullRepoPath from above: github.com/user/repo
 
 	var modulePath string
-	if strings.HasPrefix(importPath, fullRepoPath+"/") {
-		// There's a subdirectory after the repo
-		modulePath = strings.TrimPrefix(importPath, fullRepoPath+"/")
+	if len(importPath) > len(fullRepoPath) {
+		modulePath = importPath[len(fullRepoPath)+1:] // +1 to skip the trailing slash
+	}
+
+	var moduleFullPath string
+	if modulePath == "" {
+		// Import is just the repo root, no specific module path
+		moduleFullPath = filepath.Join(moduleDir, "fer.ret")
+		if _, err := os.Stat(moduleFullPath); os.IsNotExist(err) {
+			return "", fmt.Errorf("module root file not found at %s", moduleFullPath)
+		}
 	} else {
-		// The import is just the repo itself, look for a main module file
-		// Check for common entry points
-		for _, candidate := range []string{"main", "index", repoName} {
-			candidatePath := filepath.Join(moduleDir, candidate+EXT)
-			if modules.IsValidFile(candidatePath) {
-				return candidatePath, nil
-			}
+		// Build full path to the specific module
+		moduleFullPath = filepath.Join(moduleDir, modulePath+".fer")
+		if _, err := os.Stat(moduleFullPath); os.IsNotExist(err) {
+			return "", fmt.Errorf("module file not found at %s", moduleFullPath)
 		}
-
-		// If no standard entry point found, look for any .fer file in the root
-		files, err := os.ReadDir(moduleDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to read module directory: %w", err)
-		}
-
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), EXT) {
-				return filepath.Join(moduleDir, file.Name()), nil
-			}
-		}
-
-		return "", fmt.Errorf("no valid module entry point found in %s", repoName)
 	}
 
-	// Build the full path to the requested module
-	moduleFilePath := filepath.Join(moduleDir, modulePath+EXT)
-
-	if modules.IsValidFile(moduleFilePath) {
-		return moduleFilePath, nil
-	}
-
-	return "", fmt.Errorf("module file not found: %s (expected at %s)", importPath, moduleFilePath)
+	return moduleFullPath, nil
 }
 
-// FerRetDependency represents a dependency entry in fer.ret
-type FerRetDependency struct {
-	Version string
-	Comment string // Optional comment like "used by X"
+// CheckCanImportRemoteModules validates if remote imports are allowed for the current project
+func CheckCanImportRemoteModules(ctx *ctx.CompilerContext, importPath string) error {
+	// Only check for remote imports (starting with github.com/)
+	if !strings.HasPrefix(importPath, "github.com/") {
+		return nil // Not a remote import, allow it
+	}
+
+	// Load project configuration to check remote settings
+	projectConfig, err := config.LoadProjectConfig(ctx.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load project configuration: %w", err)
+	}
+
+	// ✅ SECURITY CHECK: Check if remote imports are enabled
+	if !projectConfig.Remote.Enabled {
+		return fmt.Errorf("remote module imports are disabled in this project. To enable, set 'enabled = true' in the [remote] section of fer.ret")
+	}
+
+	return nil
+}
+
+// ResolveImportPath resolves import paths based on the current file context
+// This mirrors the logic in the collector phase
+func ResolveImportPath(importPath, currentFilePath string, ctx *ctx.CompilerContext) string {
+	// If this is already a full remote path, return as-is
+	if strings.HasPrefix(importPath, "github.com/") {
+		return importPath
+	}
+
+	// Check if the current file is in a remote module cache
+	if IsFileInRemoteCache(currentFilePath, ctx) {
+		// This is a local import within a remote module
+		// Convert it to the full GitHub path
+		remotePrefix := GetRemoteModulePrefix(currentFilePath, ctx)
+		if remotePrefix != "" {
+			return remotePrefix + "/" + importPath
+		}
+	}
+
+	// For all other cases (local project imports, builtin modules), return as-is
+	return importPath
 }
 
 // ParseRemoteImport extracts repo and version information from a remote import path

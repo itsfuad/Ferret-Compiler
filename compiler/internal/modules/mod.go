@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"compiler/toml"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,4 +109,33 @@ func LastPart(path string) string {
 		return parts[len(parts)-1]
 	}
 	return ""
+}
+
+// CheckRemoteModuleShareSetting checks if a remote module allows sharing
+// by reading its fer.ret configuration file
+func CheckRemoteModuleShareSetting(moduleDir string) (bool, error) {
+	configPath := filepath.Join(moduleDir, "fer.ret")
+
+	// If no fer.ret file exists, assume sharing is allowed (default behavior)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return true, nil
+	}
+
+	// Parse the fer.ret file in the remote module
+	tomlData, err := toml.ParseTOMLFile(configPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse fer.ret in remote module: %w", err)
+	}
+
+	// Check the [remote] section for share setting
+	if remoteSection, exists := tomlData["remote"]; exists {
+		if shareValue, ok := remoteSection["share"]; ok {
+			if shareBool, ok := shareValue.(bool); ok {
+				return shareBool, nil
+			}
+		}
+	}
+
+	// Default to allowing sharing if no explicit setting found
+	return true, nil
 }
