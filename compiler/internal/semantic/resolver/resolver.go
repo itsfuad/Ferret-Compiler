@@ -2,8 +2,8 @@ package resolver
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"fmt"
@@ -14,9 +14,9 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	importPath := r.Program.ImportPath
 
 	// Check if this module can be processed for resolution phase
-	if !r.Ctx.CanProcessPhase(importPath, ctx.PhaseResolved) {
+	if !r.Ctx.CanProcessPhase(importPath, modules.PhaseResolved) {
 		currentPhase := r.Ctx.GetModulePhase(importPath)
-		if currentPhase >= ctx.PhaseResolved {
+		if currentPhase >= modules.PhaseResolved {
 			// Already processed or in a later phase, skip
 			if r.Debug {
 				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
@@ -38,7 +38,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as resolved
-	r.Ctx.SetModulePhase(importPath, ctx.PhaseResolved)
+	r.Ctx.SetModulePhase(importPath, modules.PhaseResolved)
 
 	if r.Debug {
 		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)
@@ -46,7 +46,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 }
 
 // resolveNode dispatches resolution to the appropriate handler based on node type
-func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
+func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
@@ -69,7 +69,7 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 	}
 }
 
-func resolveExpressionStmt(r *analyzer.AnalyzerNode, n *ast.ExpressionStmt, cm *ctx.Module) {
+func resolveExpressionStmt(r *analyzer.AnalyzerNode, n *ast.ExpressionStmt, cm *modules.Module) {
 	for _, expr := range *n.Expressions {
 		resolveExpr(r, expr, cm)
 	}

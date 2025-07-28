@@ -1,14 +1,14 @@
 package resolver
 
 import (
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"fmt"
 )
 
-func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) {
+func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Module) {
 	if expr == nil {
 		panic("resolveExpr called with nil expression")
 	}
@@ -60,13 +60,13 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) 
 	}
 }
 
-func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *ctx.Module) {
+func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *modules.Module) {
 	if _, found := cm.SymbolTable.Lookup(id.Name); !found {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE)
 	}
 }
 
-func resolveExpressionList(r *analyzer.AnalyzerNode, exprList *ast.ExpressionList, cm *ctx.Module) {
+func resolveExpressionList(r *analyzer.AnalyzerNode, exprList *ast.ExpressionList, cm *modules.Module) {
 	for _, expr := range *exprList {
 		resolveExpr(r, expr, cm)
 	}

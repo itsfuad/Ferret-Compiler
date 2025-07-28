@@ -2,8 +2,8 @@ package typecheck
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"fmt"
@@ -13,9 +13,9 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 	importPath := r.Program.ImportPath
 
 	// Check if this module can be processed for type checking phase
-	if !r.Ctx.CanProcessPhase(importPath, ctx.PhaseTypeChecked) {
+	if !r.Ctx.CanProcessPhase(importPath, modules.PhaseTypeChecked) {
 		currentPhase := r.Ctx.GetModulePhase(importPath)
-		if currentPhase >= ctx.PhaseTypeChecked {
+		if currentPhase >= modules.PhaseTypeChecked {
 			// Already processed, skip
 			if r.Debug {
 				colors.GREEN.Printf("Skipping type checking for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
@@ -37,14 +37,14 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as type checked
-	r.Ctx.SetModulePhase(importPath, ctx.PhaseTypeChecked)
+	r.Ctx.SetModulePhase(importPath, modules.PhaseTypeChecked)
 
 	if r.Debug {
 		colors.GREEN.Printf("Type checked '%s'\n", r.Program.FullPath)
 	}
 }
 
-func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
+func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		checkImportStmt(r, n, cm)

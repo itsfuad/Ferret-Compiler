@@ -1,4 +1,4 @@
-package registry
+package modules
 
 import "testing"
 

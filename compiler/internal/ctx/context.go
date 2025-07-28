@@ -12,51 +12,15 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/report"
-	"compiler/toml"
+	"compiler/internal/symbol"
 )
 
 var contextCreated = false
 
-// ModulePhase represents the current processing phase of a module
-type ModulePhase int
-
-const (
-	PhaseNotStarted  ModulePhase = iota
-	PhaseParsed                  // Module has been parsed into AST
-	PhaseCollected               // Symbols have been collected
-	PhaseResolved                // Symbols have been resolved
-	PhaseTypeChecked             // Type checking completed
-)
-
-func (p ModulePhase) String() string {
-	switch p {
-	case PhaseNotStarted:
-		return "Not Started"
-	case PhaseParsed:
-		return "Parsed"
-	case PhaseCollected:
-		return "Collected"
-	case PhaseResolved:
-		return "Resolved"
-	case PhaseTypeChecked:
-		return "Type Checked"
-	default:
-		return "Unknown"
-	}
-}
-
-type Module struct {
-	AST         *ast.Program
-	SymbolTable *SymbolTable
-	Phase       ModulePhase // Current processing phase
-	IsBuiltin   bool        // Whether this is a builtin module
-	Type        modules.ModuleType
-}
-
 type CompilerContext struct {
-	EntryPoint string             // Entry point file
-	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules    map[string]*Module // key: import path
+	EntryPoint string                     // Entry point file
+	Builtins   *symbol.SymbolTable        // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules    map[string]*modules.Module // key: import path
 	Reports    report.Reports
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
@@ -285,7 +249,7 @@ func (c *CompilerContext) IsRemoteModuleCached(flatModuleName string) bool {
 	return err == nil
 }
 
-func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
+func (c *CompilerContext) GetModule(importPath string) (*modules.Module, error) {
 	if c.Modules == nil {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
@@ -313,23 +277,22 @@ func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) er
 		return fmt.Errorf("invalid remote import path format: %s", importPath)
 	}
 
-	// Find the cached module directory
-	// We need to find the version from the dependencies
-	dependencies, err := c.readFerRetDependenciesDirect()
+	// Load lockfile to get dependency information
+	lockfile, err := modules.LoadLockfile(c.ProjectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to read dependencies: %w", err)
+		return fmt.Errorf("failed to load lockfile: %w", err)
 	}
 
 	// Get repo path (github.com/user/repo)
 	repoPath := strings.Join(parts[:3], "/")
-	dependency, exists := dependencies[repoPath]
+	version, exists := lockfile.GetDependencyVersion(repoPath)
 	if !exists {
-		return fmt.Errorf("remote module %s not found in dependencies", repoPath)
+		return fmt.Errorf("remote module %s not found in lockfile", repoPath)
 	}
 
 	// Build cache directory path
 	repoName := strings.Join(parts[1:3], "/") // user/repo
-	moduleDir := filepath.Join(c.RemoteCachePath, "github.com", repoName+"@"+dependency.Version)
+	moduleDir := filepath.Join(c.RemoteCachePath, "github.com", repoName+"@"+version)
 
 	// Get the specific module file path for project-level checking
 	var moduleFilePath string
@@ -353,49 +316,6 @@ func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) er
 	}
 
 	return nil
-}
-
-// readFerRetDependenciesDirect reads dependencies directly to avoid import cycle
-func (c *CompilerContext) readFerRetDependenciesDirect() (map[string]FerRetDependency, error) {
-	configPath := filepath.Join(c.ProjectRoot, "fer.ret")
-
-	// Parse the fer.ret file
-	tomlData, err := toml.ParseTOMLFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse fer.ret: %w", err)
-	}
-
-	dependencies := make(map[string]FerRetDependency)
-
-	// Parse dependencies section
-	if dependenciesSection, exists := tomlData["dependencies"]; exists {
-		for key, value := range dependenciesSection {
-			if strValue, ok := value.(string); ok {
-				// Check if this is a comment line (contains #)
-				var version, comment string
-				if strings.Contains(strValue, "#") {
-					parts := strings.SplitN(strValue, "#", 2)
-					version = strings.TrimSpace(parts[0])
-					comment = strings.TrimSpace(parts[1])
-				} else {
-					version = strings.TrimSpace(strValue)
-				}
-
-				dependencies[key] = FerRetDependency{
-					Version: version,
-					Comment: comment,
-				}
-			}
-		}
-	}
-
-	return dependencies, nil
-}
-
-// FerRetDependency represents a dependency entry in fer.ret
-type FerRetDependency struct {
-	Version string
-	Comment string // Optional comment like "used by X"
 }
 
 func (c *CompilerContext) ModuleCount() int {
@@ -469,23 +389,23 @@ func (c *CompilerContext) IsModuleParsed(importPath string) bool {
 		return false
 	}
 	module, exists := c.Modules[importPath]
-	return exists && module.Phase >= PhaseParsed
+	return exists && module.Phase >= modules.PhaseParsed
 }
 
 // GetModulePhase returns the current processing phase of a module
-func (c *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+func (c *CompilerContext) GetModulePhase(importPath string) modules.ModulePhase {
 	if c.Modules == nil {
-		return PhaseNotStarted
+		return modules.PhaseNotStarted
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return PhaseNotStarted
+		return modules.PhaseNotStarted
 	}
 	return module.Phase
 }
 
 // SetModulePhase updates the processing phase of a module
-func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+func (c *CompilerContext) SetModulePhase(importPath string, phase modules.ModulePhase) {
 	if c.Modules == nil {
 		return
 	}
@@ -497,7 +417,7 @@ func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
 }
 
 // CanProcessPhase checks if a module is ready for a specific phase
-func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase modules.ModulePhase) bool {
 	currentPhase := c.GetModulePhase(importPath)
 	// Can only process the next phase in sequence
 	return currentPhase == requiredPhase-1
@@ -505,7 +425,7 @@ func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase Modul
 
 func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBuiltin bool) {
 	if c.Modules == nil {
-		c.Modules = make(map[string]*Module)
+		c.Modules = make(map[string]*modules.Module)
 	}
 	if _, exists := c.Modules[importPath]; exists {
 		return
@@ -514,10 +434,10 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
 
-	c.Modules[importPath] = &Module{
+	c.Modules[importPath] = &modules.Module{
 		AST:         module,
-		SymbolTable: NewSymbolTable(c.Builtins),
-		Phase:       PhaseParsed, // Module is parsed when added
+		SymbolTable: symbol.NewSymbolTable(c.Builtins),
+		Phase:       modules.PhaseParsed, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
 		Type:        modules.GetModuleType(importPath, c.ProjectConfig.Name),
 	}
@@ -700,8 +620,8 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 
 	return &CompilerContext{
 		EntryPoint:      entryPoint,
-		Builtins:        AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:         make(map[string]*Module),
+		Builtins:        symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:         make(map[string]*modules.Module),
 		Reports:         report.Reports{},
 		ProjectConfig:   projectConfig,
 		ProjectRoot:     root,

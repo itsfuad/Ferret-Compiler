@@ -9,9 +9,9 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 )
 
 type Parser struct {
@@ -39,7 +39,7 @@ func NewParserWithImportPath(filePath string, explicitImportPath string, ctxx *c
 
 	filePath = filepath.ToSlash(filePath) // Ensure forward slashes for consistency
 
-	if !modules.IsValidFile(filePath) {
+	if !fs.IsValidFile(filePath) {
 		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
 	}
 
