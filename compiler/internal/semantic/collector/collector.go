@@ -2,11 +2,11 @@ package collector
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/registry"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
+	"compiler/internal/symbol"
 	"fmt"
 )
 
@@ -14,9 +14,9 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	importPath := c.Program.ImportPath
 
 	// Check if this module can be processed for collection phase
-	if !c.Ctx.CanProcessPhase(importPath, ctx.PhaseCollected) {
+	if !c.Ctx.CanProcessPhase(importPath, modules.PhaseCollected) {
 		currentPhase := c.Ctx.GetModulePhase(importPath)
-		if currentPhase >= ctx.PhaseCollected {
+		if currentPhase >= modules.PhaseCollected {
 			// Already processed or in a later phase, skip
 			if c.Debug {
 				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase.String())
@@ -38,14 +38,14 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as collected
-	c.Ctx.SetModulePhase(importPath, ctx.PhaseCollected)
+	c.Ctx.SetModulePhase(importPath, modules.PhaseCollected)
 
 	if c.Debug {
 		colors.BLUE.Printf("Collected symbols for '%s'\n", c.Program.FullPath)
 	}
 }
 
-func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
+func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	// collect functions for forward declarations
 	switch n := node.(type) {
 	case *ast.ImportStmt:
@@ -55,7 +55,7 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
 	}
 }
 
-func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportStmt, parentModule *ctx.Module) {
+func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportStmt, parentModule *modules.Module) {
 	defer func() {
 		if r := recover(); r != nil {
 			collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("Panic while collecting symbols from import: %v", r), report.COLLECTOR_PHASE)
@@ -64,10 +64,10 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
-	moduleKey := registry.ResolveImportPath(imp.ImportPath.Value, collector.Program.FullPath, collector.Ctx)
+	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, collector.Program.FullPath, collector.Ctx.RemoteCachePath)
 
 	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := registry.CheckCanImportRemoteModules(collector.Ctx, moduleKey); err != nil {
+	if err := modules.CheckCanImportRemoteModules(collector.Ctx.ProjectRoot, moduleKey); err != nil {
 		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
@@ -80,7 +80,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	}
 
 	//if already analyzed don't analyze again
-	if module.Phase >= ctx.PhaseCollected {
+	if module.Phase >= modules.PhaseCollected {
 		return
 	}
 
@@ -91,14 +91,14 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	})
 }
 
-func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
+func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
 	if fn.Identifier.Name == "" {
 		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE)
 		return
 	}
 
 	// declare the function symbol
-	symbol := ctx.NewSymbolWithLocation(fn.Identifier.Name, ctx.SymbolFunc, nil, fn.Loc())
+	symbol := symbol.NewSymbolWithLocation(fn.Identifier.Name, symbol.SymbolFunc, nil, fn.Loc())
 	err := cm.SymbolTable.Declare(fn.Identifier.Name, symbol)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)

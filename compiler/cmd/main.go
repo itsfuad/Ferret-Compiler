@@ -9,7 +9,7 @@ import (
 	"compiler/cmd/flags"
 	"compiler/colors"
 	"compiler/internal/ctx"
-	"compiler/internal/registry"
+	"compiler/internal/modules"
 
 	//"compiler/internal/backend"
 	"compiler/internal/config"
@@ -19,7 +19,6 @@ import (
 	"compiler/internal/semantic/collector"
 	"compiler/internal/semantic/resolver"
 	"compiler/internal/semantic/typecheck"
-	"strings"
 )
 
 func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.CompilerContext {
@@ -138,310 +137,187 @@ func handleGetCommand(module string) {
 		os.Exit(1)
 	}
 
-	if module == "" {
-		colors.RED.Println("No module specified. Usage: ferret get <module>")
-		colors.YELLOW.Println("Example: ferret get github.com/user/repo@v1.0.0")
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
 		os.Exit(1)
 	}
 
+	if module == "" {
+		// No module specified, install all dependencies from fer.ret
+		colors.BLUE.Println("No module specified. Installing all dependencies from fer.ret...")
+		err = dm.InstallAllDependencies()
+		if err != nil {
+			colors.RED.Printf("Failed to install dependencies: %s\n", err)
+			os.Exit(1)
+		}
+		colors.GREEN.Println("All dependencies installed successfully!")
+		return
+	}
+
 	// Install specific module
-	err = installRemoteModule(projectRoot, module)
+	err = dm.InstallDirectDependency(module, "")
 	if err != nil {
 		colors.RED.Printf("Failed to install module: %s\n", err)
 		os.Exit(1)
 	}
+
+	colors.GREEN.Printf("Successfully installed %s\n", module)
 }
 
-// installRemoteModule installs a remote module and its dependencies
-func installRemoteModule(projectRoot, moduleSpec string) error {
-	// Parse the module specification (might include version like @v1.0.0)
-	_, requestedVersion, repoName, err := registry.ParseRemoteImport(moduleSpec)
+// handleRemoveCommand handles the "ferret remove" command
+func handleRemoveCommand(module string) {
+	// Get current working directory to find project root
+	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("invalid module specification: %w", err)
+		colors.RED.Println(err)
+		os.Exit(1)
 	}
 
-	colors.BLUE.Printf("Installing module: %s", moduleSpec)
-	if requestedVersion != "latest" {
-		colors.BLUE.Printf(" (version: %s)", requestedVersion)
-	}
-	colors.BLUE.Println()
-
-	// Check if the module exists on GitHub and get the actual version
-	actualVersion, err := registry.CheckRemoteModuleExists(repoName, requestedVersion)
+	// Find project root by looking for fer.ret
+	dummyFilePath := filepath.Join(cwd, "dummy.fer")
+	projectRoot, err := config.FindProjectRoot(dummyFilePath)
 	if err != nil {
-		return fmt.Errorf("module not found: %w", err)
+		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
+		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("Found version: %s\n", actualVersion)
-
-	// Set up cache path
-	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
-	err = os.MkdirAll(cachePath, 0755)
+	// Load and validate project configuration
+	projectConfig, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to create cache directory: %w", err)
+		colors.RED.Printf("Error loading project configuration: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Check if already cached
-	if registry.IsModuleCached(cachePath, repoName, actualVersion) {
-		colors.YELLOW.Printf("Module %s@%s is already cached\n", repoName, actualVersion)
-	} else {
-		// Download and cache the module
-		err = registry.DownloadRemoteModule(projectRoot, repoName, actualVersion, cachePath)
-		if err != nil {
-			return fmt.Errorf("failed to download module: %w", err)
-		}
+	// ✅ SECURITY CHECK: Check if remote imports are enabled
+	if !projectConfig.Remote.Enabled {
+		colors.RED.Println("❌ Remote module imports are disabled in this project.")
+		colors.YELLOW.Println("To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret")
+		os.Exit(1)
 	}
 
-	// Update fer.ret with the dependency using full repo path
-	fullRepoPath := "github.com/" + repoName
-	err = registry.WriteFerRetDependency(projectRoot, fullRepoPath, actualVersion, "")
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to update fer.ret: %w", err)
+		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("Successfully installed %s@%s\n", repoName, actualVersion)
+	if module == "" {
+		colors.RED.Println("No module specified. Usage: ferret remove <module>")
+		colors.YELLOW.Println("Example: ferret remove github.com/user/repo")
+		os.Exit(1)
+	}
 
-	// Parse the downloaded module for its dependencies and install them recursively
-	err = installTransitiveDependencies(projectRoot, repoName, cachePath)
+	// Remove the dependency
+	err = dm.RemoveDependency(module)
 	if err != nil {
-		colors.YELLOW.Printf("Warning: Failed to install transitive dependencies: %s\n", err)
-		// Don't fail the entire installation for transitive dependency issues
+		colors.RED.Printf("Failed to remove module: %s\n", err)
+		os.Exit(1)
 	}
 
-	return nil
+	colors.GREEN.Printf("Successfully removed %s\n", module)
 }
 
-// installTransitiveDependencies finds and installs dependencies of a downloaded module
-func installTransitiveDependencies(projectRoot, parentRepoName, cachePath string) error {
-	// We need to find the version of the parent repo from fer.ret to access its cache
-	dependencies, err := registry.ReadFerRetDependencies(projectRoot)
+// handleListCommand handles the "ferret list" command
+func handleListCommand() {
+	// Get current working directory to find project root
+	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to read dependencies: %w", err)
+		colors.RED.Println(err)
+		os.Exit(1)
 	}
 
-	parentFullPath := "github.com/" + parentRepoName
-	parentDep, exists := dependencies[parentFullPath]
-	if !exists {
-		return fmt.Errorf("parent module %s not found in dependencies", parentRepoName)
-	}
-
-	moduleDir := filepath.Join(cachePath, "github.com", parentRepoName+"@"+parentDep.Version)
-
-	// Find all .fer files in the module
-	ferFiles, err := findFerretFiles(moduleDir)
+	// Find project root by looking for fer.ret
+	dummyFilePath := filepath.Join(cwd, "dummy.fer")
+	projectRoot, err := config.FindProjectRoot(dummyFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to scan module files: %w", err)
+		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
+		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+		os.Exit(1)
 	}
 
-	// Extract remote imports from all .fer files
-	remoteImports := make(map[string]bool) // Use map to avoid duplicates
-
-	for _, ferFile := range ferFiles {
-		imports, err := extractRemoteImports(ferFile)
-		if err != nil {
-			colors.YELLOW.Printf("Warning: Failed to parse %s: %s\n", ferFile, err)
-			continue
-		}
-
-		for _, imp := range imports {
-			remoteImports[imp] = true
-		}
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		os.Exit(1)
 	}
 
-	// Install each unique remote dependency
-	for importPath := range remoteImports {
-		err := installTransitiveDependency(projectRoot, importPath, parentRepoName)
-		if err != nil {
-			colors.YELLOW.Printf("Warning: Failed to install transitive dependency %s: %s\n", importPath, err)
-		}
+	// List dependencies
+	err = dm.ListDependencies()
+	if err != nil {
+		colors.RED.Printf("Failed to list dependencies: %s\n", err)
+		os.Exit(1)
 	}
-
-	return nil
 }
 
-// installTransitiveDependency installs a single transitive dependency
-func installTransitiveDependency(projectRoot, importPath, parentRepoName string) error {
-	// Parse the import path
-	_, requestedVersion, repoName, err := registry.ParseRemoteImport(importPath)
+// handleCleanupCommand handles the "ferret cleanup" command
+func handleCleanupCommand() {
+	// Get current working directory to find project root
+	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("invalid import path: %w", err)
+		colors.RED.Println(err)
+		os.Exit(1)
 	}
 
-	// Check if already installed using full repo path
-	dependencies, err := registry.ReadFerRetDependencies(projectRoot)
+	// Find project root by looking for fer.ret
+	dummyFilePath := filepath.Join(cwd, "dummy.fer")
+	projectRoot, err := config.FindProjectRoot(dummyFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read dependencies: %w", err)
+		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
+		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+		os.Exit(1)
 	}
 
-	fullRepoPath := "github.com/" + repoName
-	if _, exists := dependencies[fullRepoPath]; exists {
-		colors.BLUE.Printf("Dependency %s already installed (required by %s)\n", repoName, parentRepoName)
-		return nil
-	}
-
-	colors.BLUE.Printf("Installing transitive dependency: %s (used by %s)\n", repoName, parentRepoName)
-
-	// Check if the module exists and get version
-	actualVersion, err := registry.CheckRemoteModuleExists(repoName, requestedVersion)
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
 	if err != nil {
-		return fmt.Errorf("transitive dependency not found: %w", err)
+		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		os.Exit(1)
 	}
 
-	// Set up cache path
-	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
-
-	// Download if not cached
-	if !registry.IsModuleCached(cachePath, repoName, actualVersion) {
-		err = registry.DownloadRemoteModule(projectRoot, repoName, actualVersion, cachePath)
-		if err != nil {
-			return fmt.Errorf("failed to download transitive dependency: %w", err)
-		}
-	}
-
-	// Update fer.ret with "used by" comment using full repo path
-	comment := fmt.Sprintf("used by %s", parentRepoName)
-	err = registry.WriteFerRetDependency(projectRoot, fullRepoPath, actualVersion, comment)
+	// Cleanup unused dependencies
+	err = dm.CleanupUnusedDependencies()
 	if err != nil {
-		return fmt.Errorf("failed to update fer.ret for transitive dependency: %w", err)
+		colors.RED.Printf("Failed to cleanup dependencies: %s\n", err)
+		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("Successfully installed transitive dependency %s@%s\n", repoName, actualVersion)
-
-	// Recursively install dependencies of this dependency (prevent infinite recursion with depth limit)
-	// For now, we'll limit to one level of transitive dependencies to avoid complexity
-	// TODO: Implement proper cycle detection if deeper recursion is needed
-
-	return nil
+	colors.GREEN.Println("Cleanup completed successfully!")
 }
-
-// findFerretFiles recursively finds all .fer files in a directory
-func findFerretFiles(dir string) ([]string, error) {
-	var ferFiles []string
-
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() && strings.HasSuffix(path, ".fer") {
-			ferFiles = append(ferFiles, path)
-		}
-
-		return nil
-	})
-
-	return ferFiles, err
-}
-
-// extractRemoteImports parses a .fer file and extracts remote import statements
-func extractRemoteImports(filePath string) ([]string, error) {
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	var remoteImports []string
-	lines := strings.Split(string(content), "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		// Look for import statements: import "github.com/..."
-		if strings.HasPrefix(line, "import") && strings.Contains(line, "github.com/") {
-			// Extract the import path from quotes
-			start := strings.Index(line, `"`)
-			if start == -1 {
-				continue
-			}
-			end := strings.Index(line[start+1:], `"`)
-			if end == -1 {
-				continue
-			}
-
-			importPath := line[start+1 : start+1+end]
-
-			// Check if it's a remote import
-			if strings.HasPrefix(importPath, "github.com/") {
-				remoteImports = append(remoteImports, importPath)
-			}
-		}
-	}
-
-	return remoteImports, nil
-}
-
-// func handleRemoveCommand(module string) {
-// 	if module == "" {
-// 		colors.RED.Println("No module specified. Usage: ferret remove [module]")
-// 		os.Exit(1)
-// 	}
-
-// 	// Get current working directory as project root
-// 	projectRoot, err := os.Getwd()
-// 	if err != nil {
-// 		colors.RED.Println(err)
-// 		os.Exit(1)
-// 	}
-
-// 	// Check if fer.ret exists
-// 	ferRetPath := filepath.Join(projectRoot, "fer.ret")
-// 	if _, err := os.Stat(ferRetPath); os.IsNotExist(err) {
-// 		colors.YELLOW.Println("No fer.ret file found in current directory.")
-// 		return
-// 	}
-
-// 	// Parse dependencies from fer.ret to check if module exists
-// 	dependencies, err := registry.ParseFerRetDependencies(projectRoot)
-// 	if err != nil {
-// 		colors.RED.Printf("Failed to parse fer.ret dependencies: %s\n", err)
-// 		os.Exit(1)
-// 	}
-
-// 	// Check if the module is in dependencies
-// 	if _, exists := dependencies[module]; !exists {
-// 		colors.YELLOW.Printf("Module '%s' is not in fer.ret dependencies. Nothing to remove.\n", module)
-// 		return
-// 	}
-
-// 	// Remove from fer.ret file
-// 	err = registry.RemoveDependency(ferRetPath, module)
-// 	if err != nil {
-// 		colors.RED.Printf("Failed to remove module from fer.ret: %s\n", err)
-// 		os.Exit(1)
-// 	}
-
-// 	// Remove from cache if it exists
-// 	cachePath := filepath.Join(projectRoot, ".ferret", "modules")
-// 	if err := registry.RemoveModuleFromCache(cachePath, module); err != nil {
-// 		colors.YELLOW.Printf("Warning: Failed to remove module from cache: %s\n", err)
-// 	}
-
-// 	// Update lockfile
-// 	lockfilePath := filepath.Join(projectRoot, "ferret.lock")
-// 	if err := registry.RemoveModuleFromLockfile(lockfilePath, module); err != nil {
-// 		colors.YELLOW.Printf("Warning: Failed to remove module from lockfile: %s\n", err)
-// 	}
-
-// 	colors.GREEN.Printf("Successfully removed module: %s\n", module)
-// }
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module] | version 0.0.1")
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
 		os.Exit(1)
 	}
 
 	args := flags.ParseArgs()
 
-	// // Handle remove command
-	// if args.RemoveCommand {
-	// 	handleRemoveCommand(args.RemoveModule)
-	// 	return
-	// }
+	// Handle remove command
+	if args.RemoveCommand {
+		handleRemoveCommand(args.RemoveModule)
+		return
+	}
 
 	// Handle get command
 	if args.GetCommand {
 		handleGetCommand(args.GetModule)
+		return
+	}
+
+	// Handle list command
+	if args.ListCommand {
+		handleListCommand()
+		return
+	}
+
+	// Handle cleanup command
+	if args.CleanupCommand {
+		handleCleanupCommand()
 		return
 	}
 
@@ -468,7 +344,7 @@ func main() {
 
 	// Check for filename argument
 	if args.Filename == "" {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <o>] | ferret init [path] | ferret get [module] | ferret remove [module] | ferret version 0.0.1")
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path] | ferret get [module] | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
 		os.Exit(1)
 	}
 

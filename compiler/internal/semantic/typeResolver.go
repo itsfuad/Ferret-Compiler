@@ -1,8 +1,8 @@
 package semantic
 
 import (
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/semantic/stype"
 	"compiler/internal/types"
 	"fmt"
@@ -85,7 +85,7 @@ func IsIntegerTypeName(typeName types.TYPE_NAME) bool {
 }
 
 // DeriveSemanticType converts an AST DataType to a semantic stype.Type
-func DeriveSemanticType(astType ast.DataType, module *ctx.Module) (stype.Type, error) {
+func DeriveSemanticType(astType ast.DataType, module *modules.Module) (stype.Type, error) {
 
 	if astType == nil {
 		return nil, fmt.Errorf("nil AST type provided")
@@ -115,7 +115,7 @@ func derivePrimitiveTypeFromAst(astType ast.DataType) (*stype.PrimitiveType, err
 	}, nil
 }
 
-func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (stype.Type, error) {
+func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Module) (stype.Type, error) {
 	symbol, found := module.SymbolTable.Lookup(string(userType.TypeName))
 	if !found {
 		return nil, fmt.Errorf("type '%s' does not exist", userType.TypeName)
@@ -126,7 +126,7 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *ctx.Module) (
 	return symbol.Type, nil
 }
 
-func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *ctx.Module) (stype.Type, error) {
+func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.Module) (stype.Type, error) {
 	// Handle type scope resolution (e.g., module::TypeName)
 	moduleName := res.Module.Name
 	typeName := res.TypeNode.Type()
@@ -144,7 +144,7 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *ctx.Modul
 	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 }
 
-func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) (*stype.FunctionType, error) {
+func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Module) (*stype.FunctionType, error) {
 	var params []stype.Type
 	for _, param := range function.Parameters {
 		paramType, err := DeriveSemanticType(param, module)
@@ -168,7 +168,7 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *ctx.Module) 
 	}, nil
 }
 
-func deriveSemanticStructFromAst(structType *ast.StructType, module *ctx.Module) (*stype.StructType, error) {
+func deriveSemanticStructFromAst(structType *ast.StructType, module *modules.Module) (*stype.StructType, error) {
 	fields := make(map[string]stype.Type)
 	for _, field := range structType.Fields {
 		if field.FieldType != nil {
@@ -186,7 +186,7 @@ func deriveSemanticStructFromAst(structType *ast.StructType, module *ctx.Module)
 	}, nil
 }
 
-func deriveSemanticArrayType(array *ast.ArrayType, module *ctx.Module) (stype.Type, error) {
+func deriveSemanticArrayType(array *ast.ArrayType, module *modules.Module) (stype.Type, error) {
 	elementType, err := DeriveSemanticType(array.ElementType, module)
 	if err != nil {
 		return nil, err

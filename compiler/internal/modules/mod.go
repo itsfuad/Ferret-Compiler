@@ -1,14 +1,48 @@
 package modules
 
 import (
-	"compiler/toml"
-	"fmt"
-	"os"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/symbol"
+	"compiler/internal/utils/fs"
 	"path/filepath"
 	"strings"
 )
 
-const REMOTE_HOST = "github.com/"
+// ModulePhase represents the current processing phase of a module
+type ModulePhase int
+
+const (
+	PhaseNotStarted  ModulePhase = iota
+	PhaseParsed                  // Module has been parsed into AST
+	PhaseCollected               // Symbols have been collected
+	PhaseResolved                // Symbols have been resolved
+	PhaseTypeChecked             // Type checking completed
+)
+
+func (p ModulePhase) String() string {
+	switch p {
+	case PhaseNotStarted:
+		return "Not Started"
+	case PhaseParsed:
+		return "Parsed"
+	case PhaseCollected:
+		return "Collected"
+	case PhaseResolved:
+		return "Resolved"
+	case PhaseTypeChecked:
+		return "Type Checked"
+	default:
+		return "Unknown"
+	}
+}
+
+type Module struct {
+	AST         *ast.Program
+	SymbolTable *symbol.SymbolTable
+	Phase       ModulePhase // Current processing phase
+	IsBuiltin   bool        // Whether this is a builtin module
+	Type        ModuleType
+}
 
 // ModuleType represents the category of a module
 type ModuleType int
@@ -45,13 +79,19 @@ var BUILTIN_MODULES = map[string]bool{
 	"time": true,
 }
 
+const REMOTE_HOST = "github.com/"
+
+func IsRemote(importPath string) bool {
+	return strings.HasPrefix(importPath, REMOTE_HOST)
+}
+
 func IsBuiltinModule(importRoot string) bool {
 	return BUILTIN_MODULES[importRoot]
 }
 
 // GetModuleType categorizes an import path
 func GetModuleType(importPath string, projectName string) ModuleType {
-	importRoot := FirstPart(importPath)
+	importRoot := fs.FirstPart(importPath)
 
 	if IsRemote(importPath) {
 		return REMOTE
@@ -69,117 +109,61 @@ func GetModuleType(importPath string, projectName string) ModuleType {
 	return UNKNOWN
 }
 
-func IsRemote(importPath string) bool {
-	return strings.HasPrefix(importPath, REMOTE_HOST)
-}
-
-// Check if file exists and is a regular file
-func IsValidFile(filename string) bool {
-	fileInfo, err := os.Stat(filepath.FromSlash(filename))
-	return err == nil && fileInfo.Mode().IsRegular()
-}
-
-func FirstPart(path string) string {
-	if path == "" {
+// GetRemoteModulePrefix extracts the GitHub repository prefix from a cached file path
+// Example: /cache/github.com/user/repo@v1/data/file.fer -> github.com/user/repo
+func GetRemoteModulePrefix(filePath string, cachePath string) string {
+	if !IsFileInRemoteCache(filePath, cachePath) {
 		return ""
 	}
 
-	// Handle both forward slashes and backslashes explicitly
-	// Replace all backslashes with forward slashes for uniform processing
-	normalized := strings.ReplaceAll(path, "\\", "/")
-	parts := strings.Split(normalized, "/")
-
-	if len(parts) > 0 && parts[0] != "" {
-		return parts[0]
-	}
-	return ""
-}
-
-func LastPart(path string) string {
-	if path == "" {
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
 		return ""
 	}
 
-	// Handle both forward slashes and backslashes explicitly
-	// Replace all backslashes with forward slashes for uniform processing
-	normalized := strings.ReplaceAll(path, "\\", "/")
-	parts := strings.Split(normalized, "/")
-
-	if len(parts) > 0 && parts[len(parts)-1] != "" {
-		return parts[len(parts)-1]
+	absCachePath, err := filepath.Abs(cachePath)
+	if err != nil {
+		return ""
 	}
+
+	// Get relative path within cache
+	relPath, err := filepath.Rel(absCachePath, absFilePath)
+	if err != nil {
+		return ""
+	}
+
+	// Normalize to forward slashes
+	relPath = filepath.ToSlash(relPath)
+
+	// Extract repo prefix: github.com/user/repo@version -> github.com/user/repo
+	parts := strings.Split(relPath, "/")
+	if len(parts) >= 3 {
+		// Take first 3 parts and remove version from repo name
+		if strings.Contains(parts[2], "@") {
+			// Remove version suffix from repo name
+			repoParts := strings.Split(parts[2], "@")
+			return parts[0] + "/" + parts[1] + "/" + repoParts[0]
+		}
+	}
+
 	return ""
 }
 
-// CheckRemoteModuleShareSetting checks if a remote module allows sharing
-// by reading its fer.ret configuration file at the project level
-func CheckRemoteModuleShareSetting(moduleFilePath string) (bool, error) {
-	// For project-level checking, we need to find the fer.ret file that applies to this specific module
-	// We'll walk up from the module file to find the nearest fer.ret file
+// IsFileInRemoteCache checks if a file is located in the remote module cache
+func IsFileInRemoteCache(filePath string, cachePath string) bool {
+	if filePath == "" {
+		return false
+	}
 
-	configPath, err := findProjectConfigForModule(moduleFilePath)
+	absFilePath, err := filepath.Abs(filePath)
 	if err != nil {
-		return false, err
+		return false
 	}
 
-	// If no fer.ret file found, assume sharing is allowed (default behavior)
-	if configPath == "" {
-		return true, nil
-	}
-
-	// Parse the fer.ret file in the remote module project
-	tomlData, err := toml.ParseTOMLFile(configPath)
+	absCachePath, err := filepath.Abs(cachePath)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse fer.ret in remote module: %w", err)
+		return false
 	}
 
-	// Check the [remote] section for share setting
-	if remoteSection, exists := tomlData["remote"]; exists {
-		if shareValue, ok := remoteSection["share"]; ok {
-			if shareBool, ok := shareValue.(bool); ok {
-				return shareBool, nil
-			}
-		}
-	}
-
-	// Default to allowing sharing if no explicit setting found
-	return true, nil
-}
-
-// findProjectConfigForModule finds the fer.ret file that applies to a specific module file
-// by walking up the directory tree from the module location
-func findProjectConfigForModule(moduleFilePath string) (string, error) {
-	// For import "github.com/user/repo/data/bigint", moduleFilePath might be:
-	// ".../cache/github.com/user/repo@v1/data/bigint.fer"
-	// We need to find the fer.ret that applies to this module
-
-	// Get the directory containing the module file
-	currentDir := filepath.Dir(moduleFilePath)
-
-	// Walk up the directory tree to find fer.ret
-	for {
-		configPath := filepath.Join(currentDir, "fer.ret")
-		if _, err := os.Stat(configPath); err == nil {
-			// Found fer.ret file
-			return configPath, nil
-		}
-
-		// Move up one directory
-		parentDir := filepath.Dir(currentDir)
-
-		// Stop if we can't go up further or reached root
-		if parentDir == currentDir {
-			break
-		}
-
-		// Stop if we've left the cache directory structure
-		if !strings.Contains(currentDir, "github.com") {
-			break
-		}
-
-		currentDir = parentDir
-	}
-
-	// No fer.ret found
-	return "", nil
+	return strings.HasPrefix(absFilePath, absCachePath)
 }

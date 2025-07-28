@@ -5,9 +5,10 @@ import (
 	"strings"
 
 	"compiler/colors"
+	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/registry"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/source"
 )
@@ -22,7 +23,7 @@ func parseImport(p *Parser) ast.Node {
 
 	// ✅ SECURITY CHECK: Validate remote import permissions in parser phase
 	if strings.HasPrefix(importpath, "github.com/") {
-		if err := registry.CheckCanImportRemoteModules(p.ctx, importpath); err != nil {
+		if err := modules.CheckCanImportRemoteModules(p.ctx.ProjectRoot, importpath); err != nil {
 			loc := *source.NewLocation(&start.Start, &importToken.End)
 			p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 			return nil
@@ -49,7 +50,7 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importToken.End)
 
-	moduleFullPath, err := registry.ResolveModuleLocation(importpath, p.fullPath, p.ctx)
+	moduleFullPath, err := ctx.ResolveModuleLocation(importpath, p.fullPath, p.ctx)
 	if err != nil {
 		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 		colors.RED.Println("Error resolving module:", err)
