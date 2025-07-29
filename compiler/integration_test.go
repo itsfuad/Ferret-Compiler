@@ -19,7 +19,7 @@ func TestInitCommand(t *testing.T) {
 		binaryName += ".exe"
 	}
 
-	buildCmd := exec.Command("go", "build", "-o", binaryName, "./cmd")
+	buildCmd := exec.Command("go", "build", "-o", binaryName, ".")
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build test binary: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestHelpMessage(t *testing.T) {
 		binaryName += ".exe"
 	}
 
-	buildCmd := exec.Command("go", "build", "-o", binaryName, "./cmd")
+	buildCmd := exec.Command("go", "build", "-o", binaryName, ".")
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build test binary: %v", err)
 	}

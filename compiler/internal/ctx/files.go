@@ -35,7 +35,7 @@ func ResolveModuleLocation(importPath, currentFileFullPath string, ctxx *Compile
 	// Route to appropriate resolver based on module type
 	switch moduleType {
 	case modules.REMOTE:
-		return modules.ResolveRemoteModule(importPath, ctxx.ProjectRoot, ctxx.RemoteCachePath)
+		return modules.ResolveRemoteModule(importPath, ctxx.ProjectRoot, ctxx.RemoteCachePath, currentFileFullPath)
 	case modules.BUILTIN:
 		return modules.ResolveBuiltinModule(importPath, ctxx.ModulesPath)
 	case modules.LOCAL:

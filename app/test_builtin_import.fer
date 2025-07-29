@@ -1,5 +1,0 @@
-// Test file demonstrating built-in module import handling
-import "std/io";
-import "math/geometry";
-
-let x: i32 = 42;

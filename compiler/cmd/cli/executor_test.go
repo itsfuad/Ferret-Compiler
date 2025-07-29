@@ -1,0 +1,46 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"compiler/cmd/flags"
+)
+
+// Integration test for the init functionality
+func TestInitFunctionality(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+
+	// Save original os.Args and restore after test
+	originalArgs := os.Args
+	defer func() { os.Args = originalArgs }()
+
+	// Test init in temporary directory
+	os.Args = []string{"ferret", "init", tempDir}
+
+	args := flags.ParseArgs()
+
+	if !args.InitProject {
+		t.Fatal("Expected initProject to be true")
+	}
+	if args.InitPath != tempDir {
+		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.InitPath)
+	}
+	if args.Filename != "" {
+		t.Errorf("Expected filename to be empty, got %s", args.Filename)
+	}
+	if args.Debug {
+		t.Error("Expected debug to be false")
+	}
+	if args.OutputPath != "" {
+		t.Errorf("Expected outputPath to be empty, got %s", args.OutputPath)
+	}
+
+	// Verify the config file path would be correct
+	expectedConfigPath := filepath.Join(tempDir, "fer.ret")
+	if _, err := os.Stat(filepath.FromSlash(expectedConfigPath)); err == nil {
+		t.Error("Config file should not exist yet (we only parsed args)")
+	}
+}
