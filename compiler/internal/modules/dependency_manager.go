@@ -140,22 +140,20 @@ func (dm *DependencyManager) InstallAllDependencies() error {
 
 // RemoveDependency removes a direct dependency and cleans up unused indirect dependencies
 func (dm *DependencyManager) RemoveDependency(moduleName string) error {
-	// Remove from fer.ret
-	err := RemoveFerRetDependency(dm.projectRoot, moduleName)
-	if err != nil {
-		return fmt.Errorf("failed to remove dependency from fer.ret: %w", err)
-	}
-
 	lockfile, err := LoadLockfile(dm.projectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to load lockfile: %w", err)
 	}
 
-	// Find all installed versions of this repo in the lockfile
+	// Only allow removal of direct dependencies
 	var foundAny bool
 	var errs []string
 	for key, entry := range lockfile.Dependencies {
-		if strings.HasPrefix(key, moduleName+"@") && entry.Direct {
+		if strings.HasPrefix(key, moduleName+"@") {
+			if !entry.Direct {
+				errs = append(errs, fmt.Sprintf("cannot remove indirect dependency: %s", key))
+				continue
+			}
 			foundAny = true
 			if len(entry.UsedBy) > 0 {
 				errs = append(errs, fmt.Sprintf("cannot delete %s. required by: %v", key, entry.UsedBy))
@@ -175,7 +173,7 @@ func (dm *DependencyManager) RemoveDependency(moduleName string) error {
 		}
 	}
 	if !foundAny {
-		return fmt.Errorf("module %s is not installed", moduleName)
+		return fmt.Errorf("module %s is not installed as a direct dependency", moduleName)
 	}
 	if len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
@@ -184,13 +182,13 @@ func (dm *DependencyManager) RemoveDependency(moduleName string) error {
 	return dm.saveLockfile()
 }
 
-// CleanupUnusedDependencies removes dependencies that are no longer used
+// CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
 func (dm *DependencyManager) CleanupUnusedDependencies() error {
-	// Remove all indirect dependencies (direct==false)
 	removed := 0
 	for key, entry := range dm.lockfile.Dependencies {
-		if !entry.Direct {
+		if !entry.Direct && len(entry.UsedBy) == 0 {
 			delete(dm.lockfile.Dependencies, key)
+			dm.deleteCacheForKey(key)
 			removed++
 		}
 	}
