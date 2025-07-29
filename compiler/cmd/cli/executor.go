@@ -12,22 +12,21 @@ import (
 
 // HandleGetCommand handles the "ferret get" command
 func HandleGetCommand(module string) {
-	// Get current working directory to find project root
+	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
 
-	// Find project root by looking for fer.ret
-	// FindProjectRoot expects a file path, so we create a dummy file path in the current directory
-	dummyFilePath := filepath.Join(cwd, "dummy.fer")
-	projectRoot, err := config.FindProjectRoot(dummyFilePath)
-	if err != nil {
-		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
-		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+	// Enforce: must be run from project root (directory containing fer.ret)
+	ferretPath := filepath.Join(cwd, "fer.ret")
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
 		os.Exit(1)
 	}
+
+	projectRoot := cwd
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -74,21 +73,17 @@ func HandleGetCommand(module string) {
 
 // HandleRemoveCommand handles the "ferret remove" command
 func HandleRemoveCommand(module string) {
-	// Get current working directory to find project root
 	cwd, err := os.Getwd()
 	if err != nil {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
-
-	// Find project root by looking for fer.ret
-	dummyFilePath := filepath.Join(cwd, "dummy.fer")
-	projectRoot, err := config.FindProjectRoot(dummyFilePath)
-	if err != nil {
-		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
-		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+	ferretPath := filepath.Join(cwd, "fer.ret")
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
 		os.Exit(1)
 	}
+	projectRoot := cwd
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -129,21 +124,17 @@ func HandleRemoveCommand(module string) {
 
 // HandleListCommand handles the "ferret list" command
 func HandleListCommand() {
-	// Get current working directory to find project root
 	cwd, err := os.Getwd()
 	if err != nil {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
-
-	// Find project root by looking for fer.ret
-	dummyFilePath := filepath.Join(cwd, "dummy.fer")
-	projectRoot, err := config.FindProjectRoot(dummyFilePath)
-	if err != nil {
-		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
-		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+	ferretPath := filepath.Join(cwd, "fer.ret")
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
 		os.Exit(1)
 	}
+	projectRoot := cwd
 
 	// Create dependency manager
 	dm, err := modules.NewDependencyManager(projectRoot)
@@ -162,21 +153,17 @@ func HandleListCommand() {
 
 // HandleCleanupCommand handles the "ferret cleanup" command
 func HandleCleanupCommand() {
-	// Get current working directory to find project root
 	cwd, err := os.Getwd()
 	if err != nil {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
-
-	// Find project root by looking for fer.ret
-	dummyFilePath := filepath.Join(cwd, "dummy.fer")
-	projectRoot, err := config.FindProjectRoot(dummyFilePath)
-	if err != nil {
-		colors.RED.Printf("Could not find project root (fer.ret file): %s\n", err)
-		colors.YELLOW.Println("Make sure you're in a Ferret project directory or run 'ferret init' first")
+	ferretPath := filepath.Join(cwd, "fer.ret")
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
 		os.Exit(1)
 	}
+	projectRoot := cwd
 
 	// Create dependency manager
 	dm, err := modules.NewDependencyManager(projectRoot)
@@ -212,4 +199,17 @@ func HandleInitCommand(path string) {
 		os.Exit(1)
 	}
 	colors.GREEN.Printf("Project configuration initialized at: %s\n", projectRoot)
+}
+
+// isInProjectRoot returns true if the current working directory contains fer.ret
+func isInProjectRoot() bool {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return false
+	}
+	ferretPath := filepath.Join(cwd, "fer.ret")
+	if _, err := os.Stat(ferretPath); err != nil {
+		return false
+	}
+	return true
 }
