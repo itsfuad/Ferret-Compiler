@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"compiler/colors"
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
@@ -53,7 +52,6 @@ func parseImport(p *Parser) ast.Node {
 	moduleFullPath, err := ctx.ResolveModuleLocation(importpath, p.fullPath, p.ctx)
 	if err != nil {
 		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
-		colors.RED.Println("Error resolving module:", err)
 		return nil
 	}
 

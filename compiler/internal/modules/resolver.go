@@ -249,7 +249,7 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 		}
 
 		if len(foundVersions) == 0 {
-			return "", fmt.Errorf("module %s is not installed. run ferret get %s to install", repo, repo)
+			return "", fmt.Errorf("module %s@%s is not installed\n%s %s %s", repo, version, colors.YELLOW.Sprintf("run"), colors.BLUE.Sprintf("ferret get %s", repo), colors.YELLOW.Sprintf("to install"))
 		}
 
 		if len(foundVersions) == 1 {
@@ -271,12 +271,12 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 	key := repo + "@" + version
 	entry, exists := lockfile.Dependencies[key]
 	if !exists {
-		return "", fmt.Errorf("module %s@%s is not installed. run ferret get %s to install", repo, version, repo)
+		return "", fmt.Errorf("module %s@%s is listed in fer.ret but not found in cache\n%s %s %s", repo, version, colors.YELLOW.Sprintf("run"), colors.BLUE.Sprintf("ferret get"), colors.YELLOW.Sprintf("to auto install"))
 	}
 
 	// Check if module is cached with the installed version
 	if !IsModuleCached(remoteCachePath, repoName, entry.Version) {
-		return "", fmt.Errorf("module %s@%s is listed in lockfile but not found in cache. run ferret get %s to reinstall", repo, version, repo)
+		return "", fmt.Errorf("module %s@%s is listed in lockfile but not found in cache\n%s %s", repo, version, colors.YELLOW.Sprintf("run"), colors.BLUE.Sprintf("ferret get to reinstall all dependencies"))
 	}
 
 	// Build the module file path within the cache
