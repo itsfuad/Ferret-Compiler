@@ -1,95 +1,108 @@
 @echo off
-REM Local CI simulation script for Windows
-REM This script runs the same checks that the CI pipeline will run
+setlocal enabledelayedexpansion
 
-echo 🚀 Running local CI simulation...
+REM Colors (for Windows, just plain text)
+set RED=
+set GREEN=
+set YELLOW=
+set NC=
 
-REM Change to compiler directory (we're in scripts, so go up one level then into compiler)
-cd ..\compiler
+echo %YELLOW%🚀 Running local CI workflow simulation...%NC%
 
-echo.
-echo 📦 Downloading dependencies...
-go mod download
+REM Set up directories
+set SCRIPT_DIR=%~dp0
+set ROOT_DIR=%SCRIPT_DIR%..
+set COMPILER_DIR=%ROOT_DIR%\compiler
+set BIN_DIR=%ROOT_DIR%\bin
 
-echo.
-echo 🎨 Checking code formatting...
-for /f "delims=" %%i in ('gofmt -s -l .') do (
-    echo ❌ The following files are not formatted correctly:
-    gofmt -s -l .
-    echo.
-    echo Please run 'gofmt -s -w .' to fix formatting issues.
+cd /d %ROOT_DIR%
+
+echo %YELLOW%📦 Step 1: Setting up environment...%NC%
+go version >nul 2>&1
+if errorlevel 1 (
+    echo %RED%❌ Go is not installed or not in PATH%NC%
     exit /b 1
 )
-echo ✅ All Go files are properly formatted
+echo %GREEN%✅ Go is available%NC%
 
-echo.
-echo 🔍 Running go vet...
+echo %YELLOW%📦 Step 2: Downloading dependencies...%NC%
+cd /d %COMPILER_DIR%
+go mod download
+if errorlevel 1 (
+    echo %RED%❌ Failed to download dependencies%NC%
+    exit /b 1
+)
+echo %GREEN%✅ Dependencies downloaded%NC%
+
+echo %YELLOW%🎨 Step 3: Checking code formatting...%NC%
+gofmt -s -l . > temp_fmt.txt
+for /f %%i in (temp_fmt.txt) do (
+    echo %RED%❌ The following files are not formatted correctly:%NC%
+    type temp_fmt.txt
+    echo %YELLOW%Please run: cd compiler && gofmt -s -w .%NC%
+    del temp_fmt.txt
+    exit /b 1
+)
+del temp_fmt.txt
+echo %GREEN%✅ All Go files are properly formatted%NC%
+
+echo %YELLOW%🔍 Step 4: Running go vet...%NC%
 go vet ./...
 if errorlevel 1 (
-    echo ❌ go vet failed
+    echo %RED%❌ go vet failed%NC%
     exit /b 1
 )
-echo ✅ go vet passed
+echo %GREEN%✅ go vet passed%NC%
 
-echo.
-echo 🧪 Running tests...
+echo %YELLOW%🧪 Step 5: Running tests...%NC%
 go test -v ./...
 if errorlevel 1 (
-    echo ❌ Tests failed
+    echo %RED%❌ Tests failed%NC%
     exit /b 1
 )
-echo ✅ All tests passed
+echo %GREEN%✅ All tests passed%NC%
 
-echo.
-echo 🔨 Building compiler...
-go build -v ./cmd
+echo %YELLOW%🔨 Step 6: Building compiler...%NC%
+mkdir "%BIN_DIR%" 2>nul
+go build -o "%BIN_DIR%\ferret.exe" -ldflags "-s -w" -trimpath -v
 if errorlevel 1 (
-    echo ❌ Build failed
+    echo %RED%❌ Build failed%NC%
     exit /b 1
 )
-echo ✅ Compiler built successfully
+echo %GREEN%✅ Compiler built successfully%NC%
 
-echo.
-echo 🚀 Testing CLI functionality...
-go build -o ferret-test.exe ./cmd
+echo %YELLOW%🚀 Step 7: Testing CLI functionality...%NC%
+cd /d %BIN_DIR%
 
 REM Test help message
-ferret-test.exe > temp_output.txt 2>&1
-findstr /C:"Usage: ferret" temp_output.txt >nul
+ferret.exe 2>&1 | findstr /C:"Usage: ferret" >nul
 if errorlevel 1 (
-    echo ❌ CLI help message test failed
-    del temp_output.txt
-    del ferret-test.exe
+    echo %RED%❌ CLI help message test failed%NC%
     exit /b 1
 )
 
-REM Test init command
-mkdir test-project 2>nul
-ferret-test.exe init test-project > temp_output.txt 2>&1
+REM Test init command (simulate interactive input)
+(echo myapp & echo true & echo true) | ferret.exe init > temp_output.txt 2>&1
 findstr /C:"Project configuration initialized" temp_output.txt >nul
 if errorlevel 1 (
-    echo ❌ CLI init command test failed
+    echo %RED%❌ CLI init command test failed%NC%
     del temp_output.txt
-    rmdir /s /q test-project 2>nul
-    del ferret-test.exe
     exit /b 1
 )
 
 REM Verify config file was created
-if not exist "test-project\fer.ret" (
-    echo ❌ Config file was not created
+if not exist "fer.ret" (
+    echo %RED%❌ Config file was not created%NC%
     del temp_output.txt
-    rmdir /s /q test-project 2>nul
-    del ferret-test.exe
     exit /b 1
 )
 
-echo ✅ CLI functionality tests passed
+del temp_output.txt
+
+echo %GREEN%✅ CLI functionality tests passed%NC%
 
 REM Cleanup
-del temp_output.txt
-rmdir /s /q test-project 2>nul
-del ferret-test.exe
+del fer.ret 2>nul
 
-echo.
-echo 🎉 All CI checks passed! Your code is ready for push.
+echo %GREEN%🎉 All CI workflow checks passed!%NC%
+endlocal

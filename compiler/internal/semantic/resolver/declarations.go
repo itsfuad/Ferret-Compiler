@@ -2,16 +2,17 @@ package resolver
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
+	"compiler/internal/symbol"
 	"compiler/internal/types"
 )
 
-func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
+func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
 
 	symbol, found := cm.SymbolTable.Lookup(fn.Identifier.Name)
 	if !found {
@@ -58,7 +59,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx
 	symbol.Type = &functionType
 }
 
-func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *ctx.Module) {
+func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
 	for i, variable := range decl.Variables {
 
 		var expType stype.Type
@@ -77,7 +78,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 			expType = got
 		}
 
-		err := cm.SymbolTable.Declare(variable.Identifier.Name, ctx.NewSymbolWithLocation(variable.Identifier.Name, ctx.SymbolVar, expType, variable.Identifier.Loc()))
+		err := cm.SymbolTable.Declare(variable.Identifier.Name, symbol.NewSymbolWithLocation(variable.Identifier.Name, symbol.SymbolVar, expType, variable.Identifier.Loc()))
 		if err != nil {
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.RESOLVER_PHASE)
 			return
@@ -89,7 +90,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 	}
 }
 
-func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *ctx.Module) {
+func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *modules.Module) {
 	aliasName := decl.Alias.Name
 	if aliasName == "" {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.RESOLVER_PHASE)
@@ -106,7 +107,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		Name:       types.TYPE_NAME(aliasName),
 		Definition: typeToDeclare,
 	}
-	symbol := ctx.NewSymbolWithLocation(aliasName, ctx.SymbolType, symbolType, decl.Alias.Loc())
+	symbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, symbolType, decl.Alias.Loc())
 
 	err = cm.SymbolTable.Declare(aliasName, symbol)
 	if err != nil {
@@ -118,7 +119,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 	}
 }
 
-func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
+func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *modules.Module) {
 	// Resolve left-hand side expressions (assignees)
 	if assign.Left != nil {
 		resolveExpressionList(r, assign.Left, cm)

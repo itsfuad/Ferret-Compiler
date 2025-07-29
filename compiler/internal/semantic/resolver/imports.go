@@ -2,23 +2,33 @@ package resolver
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
 	"fmt"
 )
 
-func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Module) {
+func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.Module) {
 	if imp.ImportPath.Value == "" {
-		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Resolve the import path based on context
+	// For local imports within remote modules, convert to full GitHub path
+	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, r.Program.FullPath, r.Ctx.RemoteCachePath)
+
+	// ✅ SECURITY CHECK: Validate remote import permissions
+	if err := modules.CheckCanImportRemoteModules(r.Ctx.ProjectRoot, moduleKey); err != nil {
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
 	//module must be parses and stored already
-	module, err := r.Ctx.GetModule(imp.ImportPath.Value)
+	module, err := r.Ctx.GetModule(moduleKey)
 	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -28,7 +38,7 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Mo
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
 }
 
-func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) {
+func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) {
 
 	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
 	if !ok {

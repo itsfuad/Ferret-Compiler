@@ -59,39 +59,38 @@ echo "✅ All tests passed"
 echo ""
 echo "🔨 Step 6: Building compiler..."
 mkdir -p "$BIN_DIR"
-cd cmd
+cd "$COMPILER_DIR"
 go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v
+chmod +x "$BIN_DIR/ferret"
 echo "✅ Compiler built successfully"
 
 echo ""
 echo "🚀 Step 7: Testing CLI functionality..."
 cd "$ROOT_DIR"
-FERRET_BIN="$BIN_DIR/ferret"
+cd $BIN_DIR
 
 # Test help message
-if ! $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
+if ! "./ferret" 2>&1 | grep -q "Usage: ferret"; then
     echo "❌ CLI help message test failed"
     exit 1
 fi
 
 # Test init command
-rm -rf test-project
-mkdir -p test-project
-if ! $FERRET_BIN init test-project 2>&1 | grep -q "Project configuration initialized"; then
-    echo "❌ CLI init command test failed"
+if ! (echo -e "myapp\ntrue\ntrue" | ./ferret init) | grep -q "Project configuration initialized"; then
+    echo -e "${RED}❌ CLI init command test failed${NC}"
     exit 1
 fi
 
 # Verify config file was created
-if [ ! -f "test-project/fer.ret" ]; then
-    echo "❌ Config file was not created"
+if [ ! -f "fer.ret" ]; then
+    echo -e "${RED}❌ Config file was not created${NC}"
     exit 1
 fi
 
 echo "✅ CLI functionality tests passed"
 
 # Cleanup
-rm -rf test-project
+rm -rf fer.ret
 
 echo ""
 echo "🔒 Step 8: Security scan (gosec)..."

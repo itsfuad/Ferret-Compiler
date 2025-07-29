@@ -1,2 +1,0 @@
-let s: str = "hello";
-let invalid: i32 = s as i32;  // Should still fail

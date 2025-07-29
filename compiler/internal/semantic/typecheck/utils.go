@@ -2,8 +2,8 @@ package typecheck
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
@@ -142,7 +142,7 @@ func isStructCompatible(target, source stype.Type) bool {
 // ===== EXPRESSION TYPE INFERENCE HELPERS =====
 
 // checkIdentifierType gets the type of an identifier from the symbol table
-func checkIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) stype.Type {
+func checkIdentifierType(e *ast.IdentifierExpr, cm *modules.Module) stype.Type {
 	if sym, found := cm.SymbolTable.Lookup(e.Name); found {
 		return sym.Type
 	}
@@ -150,7 +150,7 @@ func checkIdentifierType(e *ast.IdentifierExpr, cm *ctx.Module) stype.Type {
 }
 
 // checkBinaryExprType infers the result type of binary expressions
-func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *ctx.Module) stype.Type {
+func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *modules.Module) stype.Type {
 	leftType := evaluateExpressionType(r, *e.Left, cm)
 	rightType := evaluateExpressionType(r, *e.Right, cm)
 
@@ -265,7 +265,7 @@ func getCommonNumericType(left, right stype.Type) stype.Type {
 }
 
 // checkArrayLiteralType infers array literal types
-func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *ctx.Module) stype.Type {
+func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm *modules.Module) stype.Type {
 	if len(e.Elements) == 0 {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -309,7 +309,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 }
 
 // checkIndexableType infers types for array/map indexing
-func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *ctx.Module) stype.Type {
+func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modules.Module) stype.Type {
 	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
 	if indexableType == nil {
 		return nil

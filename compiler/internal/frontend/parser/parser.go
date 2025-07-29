@@ -9,9 +9,9 @@ import (
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 )
 
 type Parser struct {
@@ -25,6 +25,10 @@ type Parser struct {
 }
 
 func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
+	return NewParserWithImportPath(filePath, "", ctxx, debug)
+}
+
+func NewParserWithImportPath(filePath string, explicitImportPath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 
 	if ctxx == nil {
 		panic("Cannot create parser: Compiler context is nil")
@@ -35,12 +39,17 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 
 	filePath = filepath.ToSlash(filePath) // Ensure forward slashes for consistency
 
-	if !modules.IsValidFile(filePath) {
+	if !fs.IsValidFile(filePath) {
 		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
 	}
 
 	//relative path to the file
-	importPath := ctxx.FullPathToImportPath(filePath)
+	var importPath string
+	if explicitImportPath != "" {
+		importPath = explicitImportPath
+	} else {
+		importPath = ctxx.FullPathToImportPath(filePath)
+	}
 	modulename := ctxx.FullPathToModuleName(filePath)
 
 	tokens := lexer.Tokenize(filePath, false)

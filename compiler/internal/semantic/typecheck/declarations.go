@@ -2,8 +2,8 @@ package typecheck
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
@@ -11,7 +11,7 @@ import (
 	"fmt"
 )
 
-func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt, cm *ctx.Module) {
+func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt, cm *modules.Module) {
 	// If no initializers, skip inference
 	if len(varDecl.Initializers) == 0 {
 		return
@@ -22,7 +22,7 @@ func checkVariableDeclaration(r *analyzer.AnalyzerNode, varDecl *ast.VarDeclStmt
 	}
 }
 
-func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, initializer ast.Expression, cm *ctx.Module) {
+func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, initializer ast.Expression, cm *modules.Module) {
 	variableInModule, _ := cm.SymbolTable.Lookup(variable.Identifier.Name)
 	inferredType := evaluateExpressionType(r, initializer, cm)
 
@@ -47,7 +47,7 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	checkExplicitTypeCompatibility(r, variable, inferredType, initializer, cm)
 }
 
-func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, inferredType stype.Type, initializer ast.Expression, cm *ctx.Module) {
+func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, inferredType stype.Type, initializer ast.Expression, cm *modules.Module) {
 	explicitType, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(
@@ -85,7 +85,7 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 	}
 }
 
-func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *ctx.Module) {
+func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *modules.Module) {
 	// Check that we have both left and right hand sides
 	if assign.Left == nil || assign.Right == nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(), "Assignment statement must have both left and right hand sides", report.TYPECHECK_PHASE)
@@ -136,11 +136,11 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 	}
 }
 
-func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module) []stype.Type {
+func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *modules.Module) []stype.Type {
 	return checkExprListTypeWithContext(r, exprs, cm, false) // Don't allow void by default (for assignments)
 }
 
-func checkExprListTypeWithContext(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *ctx.Module, allowVoid bool) []stype.Type {
+func checkExprListTypeWithContext(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *modules.Module, allowVoid bool) []stype.Type {
 	var types []stype.Type
 	for _, expr := range *exprs {
 		exprType := evaluateExpressionType(r, expr, cm)

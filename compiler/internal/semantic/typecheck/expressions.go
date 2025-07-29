@@ -1,8 +1,8 @@
 package typecheck
 
 import (
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
@@ -12,7 +12,7 @@ import (
 )
 
 // evaluateExpressionType infers the semantic type from an AST expression
-func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *ctx.Module) stype.Type {
+func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Module) stype.Type {
 
 	if expr == nil {
 		return nil
@@ -62,7 +62,7 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *c
 	return resultType
 }
 
-func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *ctx.Module) stype.Type {
+func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *modules.Module) stype.Type {
 	// Get the type of the function being called
 	functionType := evaluateExpressionType(r, *call.Caller, cm)
 	if functionType == nil {
@@ -118,7 +118,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 }
 
 // checkCastExprType validates type cast expressions and returns the target type
-func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *ctx.Module) stype.Type {
+func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules.Module) stype.Type {
 	// Evaluate the source expression type
 	sourceType := evaluateExpressionType(r, *cast.Value, cm)
 	if sourceType == nil {

@@ -1,15 +1,15 @@
-[default]
-name = "myapp"
-version = "1.0.0"
+name = myapp
+version = 1.0.0
 
 [compiler]
-version = "0.1.0"
+version = 0.1.0
 
 [cache]
-path = ".ferret/cache"
+path = .ferret/cache
 
 [remote]
 enabled = true
-share = false
+share = true
 
 [dependencies]
+github.com/itsfuad/ferret-mod = v1
