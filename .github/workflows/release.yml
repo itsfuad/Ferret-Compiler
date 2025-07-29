@@ -46,7 +46,7 @@ jobs:
               output_name="$output_name.exe"
             fi
             echo "Building for $OS/$ARCH..."
-            GOOS=$OS GOARCH=$ARCH go build -ldflags="-s -w" -o "$output_name" ./cmd
+            GOOS=$OS GOARCH=$ARCH go build -ldflags="-s -w" -o "$output_name" .
           done
           
           # Make binaries executable

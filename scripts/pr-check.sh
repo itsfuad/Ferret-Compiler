@@ -59,8 +59,9 @@ echo "✅ All tests passed"
 echo ""
 echo "🔨 Step 6: Building compiler..."
 mkdir -p "$BIN_DIR"
-cd cmd
+cd "$COMPILER_DIR"
 go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v
+chmod +x "$BIN_DIR/ferret"
 echo "✅ Compiler built successfully"
 
 echo ""
@@ -68,8 +69,10 @@ echo "🚀 Step 7: Testing CLI functionality..."
 cd "$ROOT_DIR"
 FERRET_BIN="$BIN_DIR/ferret"
 
+echo "FERRET_BIN: $FERRET_BIN"
+
 # Test help message
-if ! $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
+if ! timeout 5 $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
     echo "❌ CLI help message test failed"
     exit 1
 fi

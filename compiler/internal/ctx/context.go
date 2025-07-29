@@ -285,8 +285,16 @@ func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) er
 
 	// Get repo path (github.com/user/repo)
 	repoPath := strings.Join(parts[:3], "/")
-	version, exists := lockfile.GetDependencyVersion(repoPath)
-	if !exists {
+	var version string
+	found := false
+	for key := range lockfile.Dependencies {
+		if strings.HasPrefix(key, repoPath+"@") {
+			version = lockfile.Dependencies[key].Version
+			found = true
+			break
+		}
+	}
+	if !found {
 		return fmt.Errorf("remote module %s not found in lockfile", repoPath)
 	}
 

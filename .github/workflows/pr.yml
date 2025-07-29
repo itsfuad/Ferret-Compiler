@@ -69,8 +69,7 @@ jobs:
       run: |
         echo "🔨 Building compiler..."
         mkdir -p ../bin
-        cd cmd
-        go build -o ../../bin/ferret -ldflags "-s -w" -trimpath -v
+        go build -o ../bin/ferret -ldflags "-s -w" -trimpath -v
         echo "✅ Compiler built successfully"
     
     - name: Test CLI functionality

@@ -1,9 +1,9 @@
 @echo off
-cd ..\compiler\cmd
+cd ..\compiler
 
-go build -o ../../bin/ferret.exe -ldflags "-s -w" -trimpath -v
+go build -o ..\bin\ferret.exe -ldflags "-s -w" -trimpath -v
 
 echo Running project
 
-cd ..\..\app
-ferret.exe cmd/start.fer --debug
+cd ..\app
+..\bin\ferret.exe cmd/start.fer --debug
