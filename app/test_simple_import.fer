@@ -1,4 +1,0 @@
-// Test file demonstrating project-name-based imports (simple version)
-import "myapp/maths/math";
-
-let radius: i32 = 7;

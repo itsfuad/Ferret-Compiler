@@ -37,13 +37,12 @@ func CheckRemoteModuleShareSetting(moduleFilePath string) (bool, error) {
 	}
 
 	// Parse the fer.ret file in the remote module project
-	tomlData, err := toml.ParseTOMLFile(configPath)
+	// Properly parse the TOML file and use the result
+	configData, err := toml.ParseTOMLFile(configPath)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse fer.ret in remote module: %w", err)
+		return false, fmt.Errorf("failed to parse TOML file: %w", err)
 	}
-
-	// Check the [remote] section for share setting
-	if remoteSection, exists := tomlData["remote"]; exists {
+	if remoteSection, exists := configData["remote"]; exists {
 		if shareValue, ok := remoteSection["share"]; ok {
 			if shareBool, ok := shareValue.(bool); ok {
 				return shareBool, nil
@@ -156,7 +155,7 @@ func ResolveModuleInRemoteContext(importPath, currentFileFullPath string, projec
 	// Check if this is a remote import (starts with github.com, etc.)
 	if strings.HasPrefix(importPath, REMOTE_HOST) {
 		// This is a remote import, handle it normally
-		return ResolveRemoteModule(importPath, projectRoot, remoteCachePath)
+		return ResolveRemoteModule(importPath, projectRoot, remoteCachePath, currentFileFullPath)
 	}
 
 	// This is a local import within the remote module
@@ -213,40 +212,51 @@ func findRemoteModuleRoot(filePath string, remoteCachePath string) (string, erro
 }
 
 // ResolveRemoteModule resolves remote module imports
-func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string) (string, error) {
+func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string, importingFile string) (string, error) {
 	// Parse the remote import to get repo information
 	_, _, repoName, err := SplitRemotePath(importPath)
 	if err != nil {
 		return "", fmt.Errorf("invalid remote import path: %w", err)
 	}
 
-	// Load lockfile to check if this repo is installed
+	// Walk up from the importing file to find the nearest fer.ret
+	ferretPath := FindNearestFerRet(filepath.Dir(importingFile), projectRoot)
+
+	// Read dependencies from the found fer.ret
+	deps, err := readDependenciesFromFerRetFile(ferretPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read fer.ret: %w", err)
+	}
+
+	// Get the version for the imported repo
+	repo := REMOTE_HOST + repoName
+	dep, ok := deps[repo]
+	if !ok || dep.Version == "" {
+		return "", fmt.Errorf("module %s is not a declared dependency in fer.ret at %s", repo, ferretPath)
+	}
+	version := dep.Version
+
+	// Load lockfile to check if this repo@version is installed
 	lockfile, err := LoadLockfile(projectRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to load lockfile: %w", err)
 	}
-
-	// Check if the repo is listed in lockfile using full repo path
-	fullRepoPath := REMOTE_HOST + repoName
-	version, exists := lockfile.GetDependencyVersion(fullRepoPath)
+	key := repo + "@" + version
+	entry, exists := lockfile.Dependencies[key]
 	if !exists {
-		return "", fmt.Errorf("module %s is not installed. run ferret get %s to install", fullRepoPath, fullRepoPath)
+		return "", fmt.Errorf("module %s@%s is not installed. run ferret get %s to install", repo, version, repo)
 	}
 
 	// Check if module is cached with the installed version
-	if !IsModuleCached(remoteCachePath, repoName, version) {
-		return "", fmt.Errorf("module %s is listed in lockfile but not found in cache. run ferret get %s to reinstall", fullRepoPath, fullRepoPath)
+	if !IsModuleCached(remoteCachePath, repoName, entry.Version) {
+		return "", fmt.Errorf("module %s@%s is listed in lockfile but not found in cache. run ferret get %s to reinstall", repo, version, repo)
 	}
 
 	// Build the module file path within the cache
-	// The import path might include subdirectories after the repo name
-	// Example: "github.com/user/repo/folder1/folder2/module"
-	// -> repo is "user/repo", module path is "folder1/folder2/module"
-
-	// Remove the github.com/user/repo prefix to get the module path within the repo
-	// We already have fullRepoPath from above: github.com/user/repo
 	moduleDir := filepath.Join(remoteCachePath, "github.com", repoName+"@"+version)
 
+	// Remove the github.com/user/repo prefix to get the module path within the repo
+	fullRepoPath := repo
 	var modulePath string
 	if len(importPath) > len(fullRepoPath) {
 		modulePath = importPath[len(fullRepoPath)+1:] // +1 to skip the trailing slash
@@ -270,13 +280,41 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string)
 	// ✅ SECURITY CHECK: Check if the target remote module allows sharing at project level
 	canShare, err := CheckRemoteModuleShareSetting(moduleFullPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to check share settings for module %s: %w", fullRepoPath, err)
+		return "", fmt.Errorf("failed to check share settings for module %s: %w", repo, err)
 	}
 	if !canShare {
-		return "", fmt.Errorf("module %s has disabled sharing (share = false). Cannot import this module", fullRepoPath)
+		return "", fmt.Errorf("module %s has disabled sharing (share = false). Cannot import this module", repo)
 	}
 
 	return moduleFullPath, nil
+}
+
+// Helper to read dependencies from a specific fer.ret file
+func readDependenciesFromFerRetFile(ferretPath string) (map[string]FerRetDependency, error) {
+	// Use the existing TOML parser
+	data, err := toml.ParseTOMLFile(ferretPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse fer.ret at %s: %w", ferretPath, err)
+	}
+	dependencies := make(map[string]FerRetDependency)
+	if depsSection, exists := data["dependencies"]; exists {
+		for key, value := range depsSection {
+			if strings.HasPrefix(key, "#") {
+				continue
+			}
+			var version string
+			if versionStr, ok := value.(string); ok {
+				version = versionStr
+			} else {
+				version = fmt.Sprintf("%v", value)
+			}
+			dependencies[key] = FerRetDependency{
+				Version: version,
+				Comment: "",
+			}
+		}
+	}
+	return dependencies, nil
 }
 
 // CheckCanImportRemoteModules validates if remote imports are allowed for the current project
@@ -417,4 +455,22 @@ func RemoveFerRetDependency(projectRoot, repoName string) error {
 
 	// Write back to file
 	return toml.WriteTOMLFile(ferRetPath, data, nil)
+}
+
+// FindNearestFerRet walks up from a starting directory to find the nearest fer.ret file.
+func FindNearestFerRet(startingDir, projectRoot string) string {
+	dir := startingDir
+	for {
+		ferretPath := filepath.Join(dir, "fer.ret")
+		if _, err := os.Stat(ferretPath); err == nil {
+			return ferretPath
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir || dir == projectRoot {
+			break
+		}
+		dir = parent
+	}
+	// Fallback to project root
+	return filepath.Join(projectRoot, "fer.ret")
 }

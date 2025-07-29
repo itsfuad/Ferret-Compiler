@@ -1,5 +1,0 @@
-// Test file demonstrating project-name-based imports
-import "myapp/maths/math";
-
-let radius: i32 = 7;
-let area: f64 = math.area(radius);

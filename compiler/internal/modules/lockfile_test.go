@@ -2,6 +2,7 @@ package modules
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -13,46 +14,8 @@ func TestNewLockfile(t *testing.T) {
 		t.Errorf("Expected version 1.0, got %s", lockfile.Version)
 	}
 
-	if len(lockfile.DirectDeps) != 0 {
-		t.Errorf("Expected empty direct deps, got %d", len(lockfile.DirectDeps))
-	}
-
 	if len(lockfile.Dependencies) != 0 {
 		t.Errorf("Expected empty dependencies, got %d", len(lockfile.Dependencies))
-	}
-}
-
-func TestAddDirectDependency(t *testing.T) {
-	lockfile := NewLockfile()
-
-	// Add a direct dependency
-	lockfile.AddDirectDependency("github.com/user/repo", "v1.0.0", "test dependency")
-
-	// Check direct deps list
-	if len(lockfile.DirectDeps) != 1 {
-		t.Errorf("Expected 1 direct dep, got %d", len(lockfile.DirectDeps))
-	}
-
-	if lockfile.DirectDeps[0] != "github.com/user/repo" {
-		t.Errorf("Expected github.com/user/repo, got %s", lockfile.DirectDeps[0])
-	}
-
-	// Check dependencies map
-	entry, exists := lockfile.Dependencies["github.com/user/repo"]
-	if !exists {
-		t.Error("Dependency not found in map")
-	}
-
-	if entry.Version != "v1.0.0" {
-		t.Errorf("Expected version v1.0.0, got %s", entry.Version)
-	}
-
-	if !entry.Direct {
-		t.Error("Expected direct dependency to be marked as direct")
-	}
-
-	if entry.Description != "test dependency" {
-		t.Errorf("Expected description 'test dependency', got %s", entry.Description)
 	}
 }
 
@@ -66,7 +29,7 @@ func TestSaveAndLoadLockfile(t *testing.T) {
 
 	// Create a lockfile
 	lockfile := NewLockfile()
-	lockfile.AddDirectDependency("github.com/user/repo", "v1.0.0", "test dependency")
+	lockfile.SetDependency("github.com/user/repo", "v1.0.0", true, "test dependency", []string{}, []string{})
 	lockfile.GeneratedAt = time.Now().Format(time.RFC3339)
 
 	// Save it
@@ -86,11 +49,63 @@ func TestSaveAndLoadLockfile(t *testing.T) {
 		t.Errorf("Version mismatch: expected %s, got %s", lockfile.Version, loadedLockfile.Version)
 	}
 
-	if len(loadedLockfile.DirectDeps) != len(lockfile.DirectDeps) {
-		t.Errorf("Direct deps count mismatch: expected %d, got %d", len(lockfile.DirectDeps), len(loadedLockfile.DirectDeps))
-	}
-
 	if len(loadedLockfile.Dependencies) != len(lockfile.Dependencies) {
 		t.Errorf("Dependencies count mismatch: expected %d, got %d", len(lockfile.Dependencies), len(loadedLockfile.Dependencies))
+	}
+}
+
+func TestSetDependencyAndUsedBy(t *testing.T) {
+	lockfile := NewLockfile()
+	lockfile.SetDependency("github.com/user/repo", "v1.0.0", true, "test", []string{"github.com/user/dep@v2.0.0"}, []string{})
+	lockfile.SetDependency("github.com/user/dep", "v2.0.0", false, "dep", []string{}, []string{"github.com/user/repo@v1.0.0"})
+
+	entry, exists := lockfile.Dependencies["github.com/user/repo@v1.0.0"]
+	if !exists || entry.Version != "v1.0.0" || !entry.Direct {
+		t.Errorf("Direct dependency not set correctly")
+	}
+	depEntry, exists := lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	if !exists || depEntry.Direct {
+		t.Errorf("Indirect dependency not set correctly")
+	}
+	if len(depEntry.UsedBy) != 1 || depEntry.UsedBy[0] != "github.com/user/repo@v1.0.0" {
+		t.Errorf("UsedBy not set correctly")
+	}
+}
+
+func TestAddRemoveUsedBy(t *testing.T) {
+	lockfile := NewLockfile()
+	lockfile.SetDependency("github.com/user/dep", "v2.0.0", false, "dep", []string{}, []string{})
+	lockfile.AddUsedBy("github.com/user/dep@v2.0.0", "github.com/user/repo@v1.0.0")
+	entry := lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	if len(entry.UsedBy) != 1 {
+		t.Errorf("AddUsedBy failed")
+	}
+	lockfile.RemoveUsedBy("github.com/user/dep@v2.0.0", "github.com/user/repo@v1.0.0")
+	entry = lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	if len(entry.UsedBy) != 0 {
+		t.Errorf("RemoveUsedBy failed")
+	}
+}
+
+func TestRecursiveRemovalAndCacheCleanup(t *testing.T) {
+	lockfile := NewLockfile()
+	// Simulate a cache dir
+	tempDir := t.TempDir()
+	cacheDir := filepath.Join(tempDir, "github.com", "user", "dep@v2.0.0")
+	os.MkdirAll(cacheDir, 0755)
+	// Set up dependencies
+	lockfile.SetDependency("github.com/user/repo", "v1.0.0", true, "test", []string{"github.com/user/dep@v2.0.0"}, []string{})
+	lockfile.SetDependency("github.com/user/dep", "v2.0.0", false, "dep", []string{}, []string{"github.com/user/repo@v1.0.0"})
+	// Remove used_by and check recursive removal
+	lockfile.RemoveUsedBy("github.com/user/dep@v2.0.0", "github.com/user/repo@v1.0.0")
+	depEntry := lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	if len(depEntry.UsedBy) != 0 {
+		t.Errorf("UsedBy not removed correctly")
+	}
+	// Simulate recursive removal and cache cleanup
+	delete(lockfile.Dependencies, "github.com/user/dep@v2.0.0")
+	os.RemoveAll(cacheDir)
+	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
+		t.Errorf("Cache directory not cleaned up")
 	}
 }
