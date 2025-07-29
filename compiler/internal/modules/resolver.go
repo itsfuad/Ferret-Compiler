@@ -231,10 +231,37 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 	// Get the version for the imported repo
 	repo := REMOTE_HOST + repoName
 	dep, ok := deps[repo]
+	var version string
+
 	if !ok || dep.Version == "" {
-		return "", fmt.Errorf("module %s is not a declared dependency in fer.ret at %s", repo, ferretPath)
+		// Module not found in fer.ret - check lockfile for any installed version
+		lockfile, err := LoadLockfile(projectRoot)
+		if err != nil {
+			return "", fmt.Errorf("failed to load lockfile: %w", err)
+		}
+
+		// Search for any installed version of this repo
+		var foundVersions []string
+		for key, entry := range lockfile.Dependencies {
+			if strings.HasPrefix(key, repo+"@") {
+				foundVersions = append(foundVersions, entry.Version)
+			}
+		}
+
+		if len(foundVersions) == 0 {
+			return "", fmt.Errorf("module %s is not installed. run ferret get %s to install", repo, repo)
+		}
+
+		if len(foundVersions) == 1 {
+			// Exactly one version found - use it
+			version = foundVersions[0]
+		} else {
+			// Multiple versions found - ask user to specify
+			return "", fmt.Errorf("multiple versions of %s are installed: %v. Please specify the version in your fer.ret file", repo, foundVersions)
+		}
+	} else {
+		version = dep.Version
 	}
-	version := dep.Version
 
 	// Load lockfile to check if this repo@version is installed
 	lockfile, err := LoadLockfile(projectRoot)
@@ -308,6 +335,10 @@ func readDependenciesFromFerRetFile(ferretPath string) (map[string]FerRetDepende
 			} else {
 				version = fmt.Sprintf("%v", value)
 			}
+
+			// Strip common version prefixes for lockfile compatibility
+			version = stripVersionPrefix(version)
+
 			dependencies[key] = FerRetDependency{
 				Version: version,
 				Comment: "",
@@ -315,6 +346,19 @@ func readDependenciesFromFerRetFile(ferretPath string) (map[string]FerRetDepende
 		}
 	}
 	return dependencies, nil
+}
+
+// stripVersionPrefix removes common version prefixes like ^, ~, >=, etc.
+func stripVersionPrefix(version string) string {
+	// Remove common prefixes
+	prefixes := []string{"^", "~", ">=", "<=", ">", "<", "="}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(version, prefix) {
+			version = strings.TrimPrefix(version, prefix)
+			break
+		}
+	}
+	return version
 }
 
 // CheckCanImportRemoteModules validates if remote imports are allowed for the current project
