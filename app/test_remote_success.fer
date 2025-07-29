@@ -1,6 +1,0 @@
-import "github.com/itsfuad/ferret-mod/data/types";
-
-let myBigInt: types::BigInt = 42;
-
-print("Remote module import successful!");
-print("BigInt value: ", myBigInt);

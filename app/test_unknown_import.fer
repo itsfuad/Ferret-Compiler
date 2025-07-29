@@ -1,4 +1,0 @@
-// Test file demonstrating unknown module import handling
-import "app/cmd/expr";
-
-let x: i32 = 42;

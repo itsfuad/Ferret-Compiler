@@ -6,15 +6,17 @@ import (
 
 // Args holds the parsed command line arguments
 type Args struct {
-	Filename      string
-	Debug         bool
-	InitProject   bool
-	InitPath      string
-	OutputPath    string
-	GetCommand    bool
-	GetModule     string
-	RemoveCommand bool
-	RemoveModule  string
+	Filename       string
+	Debug          bool
+	InitProject    bool
+	InitPath       string
+	OutputPath     string
+	GetCommand     bool
+	GetModule      string
+	RemoveCommand  bool
+	RemoveModule   string
+	ListCommand    bool
+	CleanupCommand bool
 }
 
 // parseCommand processes command-specific arguments
@@ -71,11 +73,15 @@ func ParseArgs() *Args {
 		case "remove":
 			result.RemoveCommand = true
 			i = parseCommand(args, i, result)
+		case "list":
+			result.ListCommand = true
+		case "cleanup":
+			result.CleanupCommand = true
 		case "-debug", "-o", "-output":
 			i = parseFlag(args, i, result)
 		default:
 			// If it's not a flag and we haven't set filename yet, this is the filename
-			if !result.InitProject && !result.GetCommand && !result.RemoveCommand && result.Filename == "" && len(arg) > 0 && arg[:1] != "-" {
+			if !result.InitProject && !result.GetCommand && !result.RemoveCommand && !result.ListCommand && !result.CleanupCommand && result.Filename == "" && len(arg) > 0 && arg[:1] != "-" {
 				result.Filename = arg
 			}
 		}

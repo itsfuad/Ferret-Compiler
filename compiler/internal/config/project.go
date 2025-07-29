@@ -140,6 +140,9 @@ func generateDefaultConfig() string {
 	sb.WriteString("[compiler]\n")
 	sb.WriteString("version = \"0.1.0\"\n\n")
 
+	sb.WriteString("[cache]\n")
+	sb.WriteString("path = \".ferret/cache\"\n\n")
+
 	sb.WriteString("[remote]\n")
 	if remoteEnabled {
 		sb.WriteString("enabled = true\n")
@@ -151,6 +154,8 @@ func generateDefaultConfig() string {
 	} else {
 		sb.WriteString("share = false\n\n")
 	}
+
+	sb.WriteString("[dependencies]\n")
 
 	return sb.String()
 }
@@ -264,17 +269,36 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 }
 
 func FindProjectRoot(entryFile string) (string, error) {
-	dir := filepath.Dir(entryFile)
+	// Get the absolute path of the entry file
+	absEntryFile, err := filepath.Abs(entryFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path of entry file: %w", err)
+	}
+
+	// Start from the directory containing the entry file
+	dir := filepath.Dir(absEntryFile)
+	originalDir := dir // Store original for better error message
+
+	// Walk up the directory tree until we find a fer.ret file
 	for {
 		configPath := filepath.Join(dir, CONFIG_FILE)
-		if _, err := os.Stat(filepath.FromSlash(configPath)); err == nil {
+
+		// Check if fer.ret exists in this directory
+		if _, err := os.Stat(configPath); err == nil {
+			// Found the project root
 			return filepath.ToSlash(dir), nil
 		}
+
+		// Move up to parent directory
 		parent := filepath.Dir(dir)
+
+		// Stop if we can't go up further (reached filesystem root)
 		if parent == dir {
-			break // Reached root
+			break
 		}
+
 		dir = parent
 	}
-	return "", fmt.Errorf("%s not found", CONFIG_FILE)
+
+	return "", fmt.Errorf("%s not found (searched from: %s up to filesystem root)", CONFIG_FILE, originalDir)
 }

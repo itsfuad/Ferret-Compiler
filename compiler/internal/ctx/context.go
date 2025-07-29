@@ -12,50 +12,15 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/report"
+	"compiler/internal/symbol"
 )
 
 var contextCreated = false
 
-// ModulePhase represents the current processing phase of a module
-type ModulePhase int
-
-const (
-	PhaseNotStarted  ModulePhase = iota
-	PhaseParsed                  // Module has been parsed into AST
-	PhaseCollected               // Symbols have been collected
-	PhaseResolved                // Symbols have been resolved
-	PhaseTypeChecked             // Type checking completed
-)
-
-func (p ModulePhase) String() string {
-	switch p {
-	case PhaseNotStarted:
-		return "Not Started"
-	case PhaseParsed:
-		return "Parsed"
-	case PhaseCollected:
-		return "Collected"
-	case PhaseResolved:
-		return "Resolved"
-	case PhaseTypeChecked:
-		return "Type Checked"
-	default:
-		return "Unknown"
-	}
-}
-
-type Module struct {
-	AST         *ast.Program
-	SymbolTable *SymbolTable
-	Phase       ModulePhase // Current processing phase
-	IsBuiltin   bool        // Whether this is a builtin module
-	Type        modules.ModuleType
-}
-
 type CompilerContext struct {
-	EntryPoint string             // Entry point file
-	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules    map[string]*Module // key: import path
+	EntryPoint string                     // Entry point file
+	Builtins   *symbol.SymbolTable        // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules    map[string]*modules.Module // key: import path
 	Reports    report.Reports
 	// Project configuration
 	ProjectConfig *config.ProjectConfig
@@ -157,8 +122,8 @@ func (c *CompilerContext) IsRemoteModuleFile(fullPath string) bool {
 
 // CachePathToImportPath converts a remote module file path back to its import path
 func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
-	// Convert: D:\...\cache\github.com\user\repo@v1\sub\path\file.fer
-	// To: github.com/user/repo/sub/path/file
+	// Convert: D:\...\cache\github.com\itsfuad\ferret-mod\data\bigint.fer
+	// To: github.com/itsfuad/ferret-mod/data/bigint
 
 	absRemotePath, err := filepath.Abs(c.RemoteCachePath)
 	if err != nil {
@@ -181,13 +146,9 @@ func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 	// Remove file extension
 	relPath = strings.TrimSuffix(relPath, filepath.Ext(relPath))
 
-	// Parse the path structure: github.com/user/repo@version/sub/path
+	// Since we now store with full github.com path, we can use it directly
+	// Just remove any version suffixes from parts
 	parts := strings.Split(relPath, "/")
-	if len(parts) < 3 {
-		return ""
-	}
-
-	// Find the repo@version part and remove the @version
 	var result []string
 	for _, part := range parts {
 		if strings.Contains(part, "@") {
@@ -288,7 +249,7 @@ func (c *CompilerContext) IsRemoteModuleCached(flatModuleName string) bool {
 	return err == nil
 }
 
-func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
+func (c *CompilerContext) GetModule(importPath string) (*modules.Module, error) {
 	if c.Modules == nil {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
@@ -296,7 +257,73 @@ func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
 	if !exists {
 		return nil, fmt.Errorf("module '%s' not found in context", importPath)
 	}
+
+	// ✅ SECURITY CHECK: For remote modules, verify share setting every time they're accessed
+	if strings.HasPrefix(importPath, "github.com/") {
+		if err := c.validateRemoteModuleShareSetting(importPath); err != nil {
+			return nil, err
+		}
+	}
+
 	return module, nil
+}
+
+// validateRemoteModuleShareSetting checks if a remote module allows sharing
+// This is called every time a remote module is accessed from cache
+func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) error {
+	// Extract repo name from import path
+	parts := strings.Split(importPath, "/")
+	if len(parts) < 3 {
+		return fmt.Errorf("invalid remote import path format: %s", importPath)
+	}
+
+	// Load lockfile to get dependency information
+	lockfile, err := modules.LoadLockfile(c.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load lockfile: %w", err)
+	}
+
+	// Get repo path (github.com/user/repo)
+	repoPath := strings.Join(parts[:3], "/")
+	var version string
+	found := false
+	for key := range lockfile.Dependencies {
+		if strings.HasPrefix(key, repoPath+"@") {
+			version = lockfile.Dependencies[key].Version
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("remote module %s not found in lockfile", repoPath)
+	}
+
+	// Build cache directory path
+	repoName := strings.Join(parts[1:3], "/") // user/repo
+	moduleDir := filepath.Join(c.RemoteCachePath, "github.com", repoName+"@"+version)
+
+	// Get the specific module file path for project-level checking
+	var moduleFilePath string
+	if len(parts) > 3 {
+		// Has sub-path like github.com/user/repo/data/bigint
+		modulePath := strings.Join(parts[3:], "/")
+		moduleFilePath = filepath.Join(moduleDir, modulePath+".fer")
+	} else {
+		// Just the repo like github.com/user/repo
+		moduleFilePath = filepath.Join(moduleDir, "fer.ret")
+	}
+
+	// Use the modules package function for consistency
+	canShare, err := modules.CheckRemoteModuleShareSetting(moduleFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to check share settings for module %s: %w", repoPath, err)
+	}
+
+	if !canShare {
+		return fmt.Errorf("module %s has disabled sharing (share = false). Cannot use this module", repoPath)
+	}
+
+	return nil
 }
 
 func (c *CompilerContext) ModuleCount() int {
@@ -370,23 +397,23 @@ func (c *CompilerContext) IsModuleParsed(importPath string) bool {
 		return false
 	}
 	module, exists := c.Modules[importPath]
-	return exists && module.Phase >= PhaseParsed
+	return exists && module.Phase >= modules.PhaseParsed
 }
 
 // GetModulePhase returns the current processing phase of a module
-func (c *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+func (c *CompilerContext) GetModulePhase(importPath string) modules.ModulePhase {
 	if c.Modules == nil {
-		return PhaseNotStarted
+		return modules.PhaseNotStarted
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return PhaseNotStarted
+		return modules.PhaseNotStarted
 	}
 	return module.Phase
 }
 
 // SetModulePhase updates the processing phase of a module
-func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+func (c *CompilerContext) SetModulePhase(importPath string, phase modules.ModulePhase) {
 	if c.Modules == nil {
 		return
 	}
@@ -398,7 +425,7 @@ func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
 }
 
 // CanProcessPhase checks if a module is ready for a specific phase
-func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase modules.ModulePhase) bool {
 	currentPhase := c.GetModulePhase(importPath)
 	// Can only process the next phase in sequence
 	return currentPhase == requiredPhase-1
@@ -406,7 +433,7 @@ func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase Modul
 
 func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBuiltin bool) {
 	if c.Modules == nil {
-		c.Modules = make(map[string]*Module)
+		c.Modules = make(map[string]*modules.Module)
 	}
 	if _, exists := c.Modules[importPath]; exists {
 		return
@@ -415,10 +442,10 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
 	}
 
-	c.Modules[importPath] = &Module{
+	c.Modules[importPath] = &modules.Module{
 		AST:         module,
-		SymbolTable: NewSymbolTable(c.Builtins),
-		Phase:       PhaseParsed, // Module is parsed when added
+		SymbolTable: symbol.NewSymbolTable(c.Builtins),
+		Phase:       modules.PhaseParsed, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
 		Type:        modules.GetModuleType(importPath, c.ProjectConfig.Name),
 	}
@@ -601,8 +628,8 @@ func NewCompilerContext(entrypointFullpath string) *CompilerContext {
 
 	return &CompilerContext{
 		EntryPoint:      entryPoint,
-		Builtins:        AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:         make(map[string]*Module),
+		Builtins:        symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:         make(map[string]*modules.Module),
 		Reports:         report.Reports{},
 		ProjectConfig:   projectConfig,
 		ProjectRoot:     root,
