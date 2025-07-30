@@ -3,10 +3,10 @@ package typecheck
 import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/semantic/analyzer"
+	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/modules"
 	"compiler/internal/report"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/stype"
 	"fmt"
 )
 

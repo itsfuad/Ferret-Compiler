@@ -3,7 +3,7 @@ package symbol
 import (
 	"testing"
 
-	"compiler/internal/semantic/stype"
+	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/types"
 )
 

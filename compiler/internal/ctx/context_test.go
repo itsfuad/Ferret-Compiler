@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestFullPathToImportPath_Local(t *testing.T) {
+func TestFullPathToImportPathLocal(t *testing.T) {
 	ctx := &CompilerContext{
 		ProjectRoot:   "/project",
 		ProjectConfig: &config.ProjectConfig{Name: "myapp"},

@@ -2,8 +2,8 @@ package semantic
 
 import (
 	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/modules"
-	"compiler/internal/semantic/stype"
 	"compiler/internal/types"
 	"fmt"
 )
