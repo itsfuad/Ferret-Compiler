@@ -10,10 +10,10 @@ import (
 
 	"compiler/internal/frontend/parser"
 
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/collector"
-	"compiler/internal/semantic/resolver"
-	"compiler/internal/semantic/typecheck"
+	"compiler/internal/frontend/semantic/analyzer"
+	"compiler/internal/frontend/semantic/collector"
+	"compiler/internal/frontend/semantic/resolver"
+	"compiler/internal/frontend/semantic/typecheck"
 )
 
 func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.CompilerContext {

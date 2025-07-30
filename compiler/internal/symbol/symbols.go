@@ -1,7 +1,7 @@
 package symbol
 
 import (
-	"compiler/internal/semantic/stype"
+	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/source"
 )
 
