@@ -13,9 +13,9 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 	importPath := r.Program.ImportPath
 
 	// Check if this module can be processed for type checking phase
-	if !r.Ctx.CanProcessPhase(importPath, modules.PhaseTypeChecked) {
+	if !r.Ctx.CanProcessPhase(importPath, modules.PHASE_TYPECHECKED) {
 		currentPhase := r.Ctx.GetModulePhase(importPath)
-		if currentPhase >= modules.PhaseTypeChecked {
+		if currentPhase >= modules.PHASE_TYPECHECKED {
 			// Already processed, skip
 			if r.Debug {
 				colors.GREEN.Printf("Skipping type checking for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
@@ -37,7 +37,7 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as type checked
-	r.Ctx.SetModulePhase(importPath, modules.PhaseTypeChecked)
+	r.Ctx.SetModulePhase(importPath, modules.PHASE_TYPECHECKED)
 
 	if r.Debug {
 		colors.GREEN.Printf("Type checked '%s'\n", r.Program.FullPath)

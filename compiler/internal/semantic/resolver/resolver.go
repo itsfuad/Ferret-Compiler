@@ -14,9 +14,9 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	importPath := r.Program.ImportPath
 
 	// Check if this module can be processed for resolution phase
-	if !r.Ctx.CanProcessPhase(importPath, modules.PhaseResolved) {
+	if !r.Ctx.CanProcessPhase(importPath, modules.PHASE_RESOLVED) {
 		currentPhase := r.Ctx.GetModulePhase(importPath)
-		if currentPhase >= modules.PhaseResolved {
+		if currentPhase >= modules.PHASE_RESOLVED {
 			// Already processed or in a later phase, skip
 			if r.Debug {
 				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
@@ -38,7 +38,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as resolved
-	r.Ctx.SetModulePhase(importPath, modules.PhaseResolved)
+	r.Ctx.SetModulePhase(importPath, modules.PHASE_RESOLVED)
 
 	if r.Debug {
 		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)

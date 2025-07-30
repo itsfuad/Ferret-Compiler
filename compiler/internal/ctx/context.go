@@ -397,17 +397,17 @@ func (c *CompilerContext) IsModuleParsed(importPath string) bool {
 		return false
 	}
 	module, exists := c.Modules[importPath]
-	return exists && module.Phase >= modules.PhaseParsed
+	return exists && module.Phase >= modules.PHASE_PARSED
 }
 
 // GetModulePhase returns the current processing phase of a module
 func (c *CompilerContext) GetModulePhase(importPath string) modules.ModulePhase {
 	if c.Modules == nil {
-		return modules.PhaseNotStarted
+		return modules.PHASE_NOT_STARTED
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return modules.PhaseNotStarted
+		return modules.PHASE_NOT_STARTED
 	}
 	return module.Phase
 }
@@ -445,7 +445,7 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 	c.Modules[importPath] = &modules.Module{
 		AST:         module,
 		SymbolTable: symbol.NewSymbolTable(c.Builtins),
-		Phase:       modules.PhaseParsed, // Module is parsed when added
+		Phase:       modules.PHASE_PARSED, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
 		Type:        modules.GetModuleType(importPath, c.ProjectConfig.Name),
 	}
