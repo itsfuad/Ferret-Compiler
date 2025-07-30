@@ -19,73 +19,66 @@ type Args struct {
 	CleanupCommand bool
 }
 
-// parseCommand processes command-specific arguments
-func parseCommand(args []string, i int, result *Args) int {
-	if i+1 >= len(args) || args[i+1][:1] == "-" {
-		return i
+// parseCommandWithValue handles commands that expect a subsequent value (e.g., "init <path>").
+// It takes a pointer to 'i' so it can advance the loop in the calling function.
+func parseCommandWithValue(command string, args []string, i *int, result *Args) {
+	// Check if a value exists and it's not another flag
+	value := ""
+	if (*i)+1 < len(args) && args[(*i)+1][:1] != "-" {
+		(*i)++ // Consume the value argument
+		value = args[*i]
 	}
 
-	switch args[i] {
+	switch command {
 	case "init":
 		result.InitProject = true
-		result.InitPath = args[i+1]
-		return i + 1
+		result.InitPath = value
 	case "get":
 		result.GetCommand = true
-		result.GetModule = args[i+1]
-		return i + 1
+		result.GetModule = value
 	case "remove":
 		result.RemoveCommand = true
-		result.RemoveModule = args[i+1]
-		return i + 1
+		result.RemoveModule = value
+	case "-o", "--output", "-output":
+		result.OutputPath = value
 	}
-	return i
 }
 
-// parseFlag processes flag arguments
-func parseFlag(args []string, i int, result *Args) int {
-	switch args[i] {
-	case "-debug":
-		result.Debug = true
-	case "-o", "-output":
-		if i+1 < len(args) {
-			result.OutputPath = args[i+1]
-			return i + 1
-		}
-	}
-	return i
-}
-
+// ParseArgs processes all command-line arguments, dispatching to helpers.
 func ParseArgs() *Args {
 	args := os.Args[1:]
 	result := &Args{}
+	var commandSet bool
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
 		switch arg {
-		case "init":
-			result.InitProject = true
-			i = parseCommand(args, i, result)
-		case "get":
-			result.GetCommand = true
-			i = parseCommand(args, i, result)
-		case "remove":
-			result.RemoveCommand = true
-			i = parseCommand(args, i, result)
+		// Dispatch commands that take a value to the helper
+		case "init", "get", "remove":
+			parseCommandWithValue(arg, args, &i, result)
+			commandSet = true
+
+		// Dispatch flags that take a value to the same helper
+		case "-o", "--output", "-output":
+			parseCommandWithValue(arg, args, &i, result)
+
+		// Handle simple boolean commands/flags directly
 		case "list":
 			result.ListCommand = true
+			commandSet = true
 		case "cleanup":
 			result.CleanupCommand = true
-		case "-debug", "-o", "-output":
-			i = parseFlag(args, i, result)
+			commandSet = true
+		case "-d", "--debug", "-debug":
+			result.Debug = true
+
+		// Default case for the filename
 		default:
-			// If it's not a flag and we haven't set filename yet, this is the filename
-			if !result.InitProject && !result.GetCommand && !result.RemoveCommand && !result.ListCommand && !result.CleanupCommand && result.Filename == "" && len(arg) > 0 && arg[:1] != "-" {
+			if arg[:1] != "-" && !commandSet && result.Filename == "" {
 				result.Filename = arg
 			}
 		}
 	}
-
 	return result
 }
