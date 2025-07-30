@@ -10,6 +10,12 @@ import (
 	"compiler/internal/config"
 )
 
+const (
+	CONFIG_FILE = "fer.ret"
+	INVALID_LOCATION_ERROR = "You must run this command from the directory containing fer.ret (the project root)."
+	DEPENDENCY_ERROR = "Failed to create dependency manager: %s\n"
+)
+
 // HandleGetCommand handles the "ferret get" command
 func HandleGetCommand(module string) {
 	// Get current working directory
@@ -20,9 +26,9 @@ func HandleGetCommand(module string) {
 	}
 
 	// Enforce: must be run from project root (directory containing fer.ret)
-	ferretPath := filepath.Join(cwd, "fer.ret")
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
+		colors.RED.Println(INVALID_LOCATION_ERROR)
 		os.Exit(1)
 	}
 
@@ -45,7 +51,7 @@ func HandleGetCommand(module string) {
 	// Create dependency manager
 	dm, err := modules.NewDependencyManager(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
 		os.Exit(1)
 	}
 
@@ -78,9 +84,9 @@ func HandleRemoveCommand(module string) {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
-	ferretPath := filepath.Join(cwd, "fer.ret")
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
+		colors.RED.Println(INVALID_LOCATION_ERROR)
 		os.Exit(1)
 	}
 	projectRoot := cwd
@@ -102,7 +108,7 @@ func HandleRemoveCommand(module string) {
 	// Create dependency manager
 	dm, err := modules.NewDependencyManager(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
 		os.Exit(1)
 	}
 
@@ -129,9 +135,9 @@ func HandleListCommand() {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
-	ferretPath := filepath.Join(cwd, "fer.ret")
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
+		colors.RED.Println(INVALID_LOCATION_ERROR)
 		os.Exit(1)
 	}
 	projectRoot := cwd
@@ -139,7 +145,7 @@ func HandleListCommand() {
 	// Create dependency manager
 	dm, err := modules.NewDependencyManager(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
 		os.Exit(1)
 	}
 
@@ -158,9 +164,9 @@ func HandleCleanupCommand() {
 		colors.RED.Println(err)
 		os.Exit(1)
 	}
-	ferretPath := filepath.Join(cwd, "fer.ret")
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println("You must run this command from the directory containing fer.ret (the project root).")
+		colors.RED.Println(INVALID_LOCATION_ERROR)
 		os.Exit(1)
 	}
 	projectRoot := cwd
@@ -168,7 +174,7 @@ func HandleCleanupCommand() {
 	// Create dependency manager
 	dm, err := modules.NewDependencyManager(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Failed to create dependency manager: %s\n", err)
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
 		os.Exit(1)
 	}
 
@@ -183,22 +189,21 @@ func HandleCleanupCommand() {
 }
 
 func HandleInitCommand(path string) {
-	projectRoot := path
-	if projectRoot == "" {
+	if path == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			colors.RED.Println(err)
 			os.Exit(1)
 		}
-		projectRoot = cwd
+		path = cwd
 	}
 
 	// Create the configuration file
-	if err := config.CreateDefaultProjectConfig(projectRoot); err != nil {
+	if err := config.CreateDefaultProjectConfig(path); err != nil {
 		colors.RED.Println("Failed to initialize project configuration:", err)
 		os.Exit(1)
 	}
-	colors.GREEN.Printf("Project configuration initialized at: %s\n", projectRoot)
+	colors.GREEN.Printf("Project configuration initialized at: %s\n", path)
 }
 
 // isInProjectRoot returns true if the current working directory contains fer.ret
@@ -207,7 +212,7 @@ func isInProjectRoot() bool {
 	if err != nil {
 		return false
 	}
-	ferretPath := filepath.Join(cwd, "fer.ret")
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
 		return false
 	}

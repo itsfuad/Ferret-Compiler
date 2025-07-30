@@ -49,6 +49,11 @@ type DependencyConfig struct {
 func CreateDefaultProjectConfig(projectRoot string) error {
 	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 
+	//create the directory if it doesn't exist
+	if err := os.MkdirAll(projectRoot, 0755); err != nil {
+		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+
 	// Generate config content using strings
 	configContent := generateDefaultConfig()
 
