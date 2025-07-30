@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	CONFIG_FILE = "fer.ret"
+	CONFIG_FILE            = "fer.ret"
 	INVALID_LOCATION_ERROR = "You must run this command from the directory containing fer.ret (the project root)."
-	DEPENDENCY_ERROR = "Failed to create dependency manager: %s\n"
+	DEPENDENCY_ERROR       = "Failed to create dependency manager: %s\n"
 )
 
 // HandleGetCommand handles the "ferret get" command
