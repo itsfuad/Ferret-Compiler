@@ -7,15 +7,23 @@ import (
 	"testing"
 )
 
-func TestResolveRemoteModule_VersionFromFerRet(t *testing.T) {
+const (
+	CACHE_DIR = ".ferret"
+	LOCK_FILE = "ferret.lock"
+	MAIN_FILE = "main.fer"
+
+	TEST_MODULE = "github.com/itsfuad/ferret-mod/data/bigint"
+)
+
+func TestResolveRemoteModuleVersionFromFerRet(t *testing.T) {
 	tempDir := t.TempDir()
 	// Create a fer.ret with a dependency
-	ferretPath := filepath.Join(tempDir, "fer.ret")
+	ferretPath := filepath.Join(tempDir, CONFIG_FILE)
 	os.WriteFile(ferretPath, []byte(`[dependencies]
 github.com/itsfuad/ferret-mod = "v1"
 `), 0644)
 	// Create a lockfile with the correct version
-	lockfilePath := filepath.Join(tempDir, "ferret.lock")
+	lockfilePath := filepath.Join(tempDir, LOCK_FILE)
 	os.WriteFile(lockfilePath, []byte(`{
   "version": "1.0",
   "dependencies": {
@@ -30,15 +38,15 @@ github.com/itsfuad/ferret-mod = "v1"
   "generated_at": "2025-07-29T14:53:25+06:00"
 }`), 0644)
 	// Simulate cache
-	cacheDir := filepath.Join(tempDir, ".ferret", "modules", "github.com", "itsfuad", "ferret-mod@v1")
+	cacheDir := filepath.Join(tempDir, CACHE_DIR, "modules", "github.com", "itsfuad", "ferret-mod@v1")
 	os.MkdirAll(cacheDir, 0755)
 	moduleFile := filepath.Join(cacheDir, "data", "bigint.fer")
 	os.MkdirAll(filepath.Dir(moduleFile), 0755)
 	os.WriteFile(moduleFile, []byte("let x = 1;"), 0644)
 
 	// Should resolve successfully
-	importPath := "github.com/itsfuad/ferret-mod/data/bigint"
-	resolved, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, ".ferret", "modules"), filepath.Join(tempDir, "main.fer"))
+	importPath := TEST_MODULE
+	resolved, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, CACHE_DIR, "modules"), filepath.Join(tempDir, MAIN_FILE))
 	if err != nil {
 		t.Fatalf("Failed to resolve remote module: %v", err)
 	}
@@ -47,30 +55,30 @@ github.com/itsfuad/ferret-mod = "v1"
 	}
 }
 
-func TestResolveRemoteModule_MissingDependency(t *testing.T) {
+func TestResolveRemoteModuleMissingDependency(t *testing.T) {
 	tempDir := t.TempDir()
-	ferretPath := filepath.Join(tempDir, "fer.ret")
+	ferretPath := filepath.Join(tempDir, CONFIG_FILE)
 	os.WriteFile(ferretPath, []byte(`[dependencies]
 `), 0644)
-	lockfilePath := filepath.Join(tempDir, "ferret.lock")
+	lockfilePath := filepath.Join(tempDir, LOCK_FILE)
 	os.WriteFile(lockfilePath, []byte(`{"version": "1.0", "dependencies": {}, "generated_at": "now"}`), 0644)
-	importPath := "github.com/itsfuad/ferret-mod/data/bigint"
-	_, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, ".ferret", "modules"), filepath.Join(tempDir, "main.fer"))
+	importPath := TEST_MODULE
+	_, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, CACHE_DIR, "modules"), filepath.Join(tempDir, MAIN_FILE))
 	if err == nil || err.Error() == "" {
 		t.Errorf("Expected error for missing dependency, got nil")
 	}
 }
 
-func TestResolveRemoteModule_IndirectDependency(t *testing.T) {
+func TestResolveRemoteModuleIndirectDependency(t *testing.T) {
 	tempDir := t.TempDir()
 	// Create a fer.ret with only one dependency (not the one we're testing)
-	ferretPath := filepath.Join(tempDir, "fer.ret")
+	ferretPath := filepath.Join(tempDir, CONFIG_FILE)
 	os.WriteFile(ferretPath, []byte(`[dependencies]
 github.com/itsfuad/ferret-mod = "v1"
 `), 0644)
 
 	// Create a lockfile with both direct and indirect dependencies
-	lockfilePath := filepath.Join(tempDir, "ferret.lock")
+	lockfilePath := filepath.Join(tempDir, LOCK_FILE)
 	os.WriteFile(lockfilePath, []byte(`{
   "version": "1.0",
   "dependencies": {
@@ -93,7 +101,7 @@ github.com/itsfuad/ferret-mod = "v1"
 }`), 0644)
 
 	// Simulate cache for the indirect dependency
-	cacheDir := filepath.Join(tempDir, ".ferret", "modules", "github.com", "itsfuad", "ferret-remote-mod@v0.0.1")
+	cacheDir := filepath.Join(tempDir, CACHE_DIR, "modules", "github.com", "itsfuad", "ferret-remote-mod@v0.0.1")
 	os.MkdirAll(cacheDir, 0755)
 	moduleFile := filepath.Join(cacheDir, "external", "importer.fer")
 	os.MkdirAll(filepath.Dir(moduleFile), 0755)
@@ -101,7 +109,7 @@ github.com/itsfuad/ferret-mod = "v1"
 
 	// Should resolve successfully even though it's not in fer.ret
 	importPath := "github.com/itsfuad/ferret-remote-mod/external/importer"
-	resolved, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, ".ferret", "modules"), filepath.Join(tempDir, "main.fer"))
+	resolved, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, CACHE_DIR, "modules"), filepath.Join(tempDir, MAIN_FILE))
 	if err != nil {
 		t.Fatalf("Failed to resolve indirect dependency: %v", err)
 	}
@@ -110,15 +118,15 @@ github.com/itsfuad/ferret-mod = "v1"
 	}
 }
 
-func TestResolveRemoteModule_MultipleVersions(t *testing.T) {
+func TestResolveRemoteModuleMultipleVersions(t *testing.T) {
 	tempDir := t.TempDir()
 	// Create a fer.ret with no dependencies
-	ferretPath := filepath.Join(tempDir, "fer.ret")
+	ferretPath := filepath.Join(tempDir, CONFIG_FILE)
 	os.WriteFile(ferretPath, []byte(`[dependencies]
 `), 0644)
 
 	// Create a lockfile with multiple versions of the same module
-	lockfilePath := filepath.Join(tempDir, "ferret.lock")
+	lockfilePath := filepath.Join(tempDir, LOCK_FILE)
 	os.WriteFile(lockfilePath, []byte(`{
   "version": "1.0",
   "dependencies": {
@@ -141,8 +149,8 @@ func TestResolveRemoteModule_MultipleVersions(t *testing.T) {
 }`), 0644)
 
 	// Should fail with multiple versions error
-	importPath := "github.com/itsfuad/ferret-mod/data/bigint"
-	_, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, ".ferret", "modules"), filepath.Join(tempDir, "main.fer"))
+	importPath := TEST_MODULE
+	_, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, CACHE_DIR, "modules"), filepath.Join(tempDir, MAIN_FILE))
 	if err == nil {
 		t.Fatalf("Expected error for multiple versions, got nil")
 	}
