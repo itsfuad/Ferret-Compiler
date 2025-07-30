@@ -12,24 +12,24 @@ import (
 type ModulePhase int
 
 const (
-	PhaseNotStarted  ModulePhase = iota
-	PhaseParsed                  // Module has been parsed into AST
-	PhaseCollected               // Symbols have been collected
-	PhaseResolved                // Symbols have been resolved
-	PhaseTypeChecked             // Type checking completed
+	PHASE_NOT_STARTED ModulePhase = iota
+	PHASE_PARSED                  // Module has been parsed into AST
+	PHASE_COLLECTED               // Symbols have been collected
+	PHASE_RESOLVED                // Symbols have been resolved
+	PHASE_TYPECHECKED             // Type checking completed
 )
 
 func (p ModulePhase) String() string {
 	switch p {
-	case PhaseNotStarted:
+	case PHASE_NOT_STARTED:
 		return "Not Started"
-	case PhaseParsed:
+	case PHASE_PARSED:
 		return "Parsed"
-	case PhaseCollected:
+	case PHASE_COLLECTED:
 		return "Collected"
-	case PhaseResolved:
+	case PHASE_RESOLVED:
 		return "Resolved"
-	case PhaseTypeChecked:
+	case PHASE_TYPECHECKED:
 		return "Type Checked"
 	default:
 		return "Unknown"

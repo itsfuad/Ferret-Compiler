@@ -14,9 +14,9 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	importPath := c.Program.ImportPath
 
 	// Check if this module can be processed for collection phase
-	if !c.Ctx.CanProcessPhase(importPath, modules.PhaseCollected) {
+	if !c.Ctx.CanProcessPhase(importPath, modules.PHASE_COLLECTED) {
 		currentPhase := c.Ctx.GetModulePhase(importPath)
-		if currentPhase >= modules.PhaseCollected {
+		if currentPhase >= modules.PHASE_COLLECTED {
 			// Already processed or in a later phase, skip
 			if c.Debug {
 				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase.String())
@@ -38,7 +38,7 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as collected
-	c.Ctx.SetModulePhase(importPath, modules.PhaseCollected)
+	c.Ctx.SetModulePhase(importPath, modules.PHASE_COLLECTED)
 
 	if c.Debug {
 		colors.BLUE.Printf("Collected symbols for '%s'\n", c.Program.FullPath)
@@ -80,7 +80,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	}
 
 	//if already analyzed don't analyze again
-	if module.Phase >= modules.PhaseCollected {
+	if module.Phase >= modules.PHASE_COLLECTED {
 		return
 	}
 

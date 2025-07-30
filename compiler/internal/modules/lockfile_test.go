@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+const (
+	TEST_REPO = "github.com/user/repo"
+	TEST_DEP  = "github.com/user/dep"
+	VER1      = "v1.0.0"
+	VER2      = "v2.0.0"
+)
+
 func TestNewLockfile(t *testing.T) {
 	lockfile := NewLockfile()
 
@@ -29,7 +36,7 @@ func TestSaveAndLoadLockfile(t *testing.T) {
 
 	// Create a lockfile
 	lockfile := NewLockfile()
-	lockfile.SetDependency("github.com/user/repo", "v1.0.0", true, "test dependency", []string{}, []string{})
+	lockfile.SetDependency(TEST_REPO, VER1, true, "test dependency", []string{}, []string{})
 	lockfile.GeneratedAt = time.Now().Format(time.RFC3339)
 
 	// Save it
@@ -56,32 +63,32 @@ func TestSaveAndLoadLockfile(t *testing.T) {
 
 func TestSetDependencyAndUsedBy(t *testing.T) {
 	lockfile := NewLockfile()
-	lockfile.SetDependency("github.com/user/repo", "v1.0.0", true, "test", []string{"github.com/user/dep@v2.0.0"}, []string{})
-	lockfile.SetDependency("github.com/user/dep", "v2.0.0", false, "dep", []string{}, []string{"github.com/user/repo@v1.0.0"})
+	lockfile.SetDependency(TEST_REPO, VER1, true, "test", []string{TEST_DEP + "@" + VER2}, []string{})
+	lockfile.SetDependency(TEST_DEP, VER2, false, "dep", []string{}, []string{TEST_REPO + "@" + VER1})
 
-	entry, exists := lockfile.Dependencies["github.com/user/repo@v1.0.0"]
-	if !exists || entry.Version != "v1.0.0" || !entry.Direct {
+	entry, exists := lockfile.Dependencies[TEST_REPO+"@"+VER1]
+	if !exists || entry.Version != VER1 || !entry.Direct {
 		t.Errorf("Direct dependency not set correctly")
 	}
-	depEntry, exists := lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	depEntry, exists := lockfile.Dependencies[TEST_DEP+"@"+VER2]
 	if !exists || depEntry.Direct {
 		t.Errorf("Indirect dependency not set correctly")
 	}
-	if len(depEntry.UsedBy) != 1 || depEntry.UsedBy[0] != "github.com/user/repo@v1.0.0" {
+	if len(depEntry.UsedBy) != 1 || depEntry.UsedBy[0] != TEST_REPO+"@"+VER1 {
 		t.Errorf("UsedBy not set correctly")
 	}
 }
 
 func TestAddRemoveUsedBy(t *testing.T) {
 	lockfile := NewLockfile()
-	lockfile.SetDependency("github.com/user/dep", "v2.0.0", false, "dep", []string{}, []string{})
-	lockfile.AddUsedBy("github.com/user/dep@v2.0.0", "github.com/user/repo@v1.0.0")
-	entry := lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	lockfile.SetDependency(TEST_DEP, VER2, false, "dep", []string{}, []string{})
+	lockfile.AddUsedBy(TEST_DEP+"@"+VER2, TEST_REPO+"@"+VER1)
+	entry := lockfile.Dependencies[TEST_DEP+"@"+VER2]
 	if len(entry.UsedBy) != 1 {
 		t.Errorf("AddUsedBy failed")
 	}
-	lockfile.RemoveUsedBy("github.com/user/dep@v2.0.0", "github.com/user/repo@v1.0.0")
-	entry = lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	lockfile.RemoveUsedBy(TEST_DEP+"@"+VER2, TEST_REPO+"@"+VER1)
+	entry = lockfile.Dependencies[TEST_DEP+"@"+VER2]
 	if len(entry.UsedBy) != 0 {
 		t.Errorf("RemoveUsedBy failed")
 	}
@@ -94,16 +101,16 @@ func TestRecursiveRemovalAndCacheCleanup(t *testing.T) {
 	cacheDir := filepath.Join(tempDir, "github.com", "user", "dep@v2.0.0")
 	os.MkdirAll(cacheDir, 0755)
 	// Set up dependencies
-	lockfile.SetDependency("github.com/user/repo", "v1.0.0", true, "test", []string{"github.com/user/dep@v2.0.0"}, []string{})
-	lockfile.SetDependency("github.com/user/dep", "v2.0.0", false, "dep", []string{}, []string{"github.com/user/repo@v1.0.0"})
+	lockfile.SetDependency(TEST_REPO, VER1, true, "test", []string{TEST_DEP + "@" + VER2}, []string{})
+	lockfile.SetDependency(TEST_DEP, VER2, false, "dep", []string{}, []string{TEST_REPO + "@" + VER1})
 	// Remove used_by and check recursive removal
-	lockfile.RemoveUsedBy("github.com/user/dep@v2.0.0", "github.com/user/repo@v1.0.0")
-	depEntry := lockfile.Dependencies["github.com/user/dep@v2.0.0"]
+	lockfile.RemoveUsedBy(TEST_DEP+"@"+VER2, TEST_REPO+"@"+VER1)
+	depEntry := lockfile.Dependencies[TEST_DEP+"@"+VER2]
 	if len(depEntry.UsedBy) != 0 {
 		t.Errorf("UsedBy not removed correctly")
 	}
 	// Simulate recursive removal and cache cleanup
-	delete(lockfile.Dependencies, "github.com/user/dep@v2.0.0")
+	delete(lockfile.Dependencies, TEST_DEP+"@"+VER2)
 	os.RemoveAll(cacheDir)
 	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
 		t.Errorf("Cache directory not cleaned up")

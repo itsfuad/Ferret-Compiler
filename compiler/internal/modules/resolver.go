@@ -13,6 +13,7 @@ import (
 )
 
 const EXT = ".fer"
+const CONFIG_FILE = "fer.ret"
 
 // FerRetDependency represents a dependency entry in fer.ret
 type FerRetDependency struct {
@@ -66,7 +67,7 @@ func findProjectConfigForModule(moduleFilePath string) (string, error) {
 
 	// Walk up the directory tree to find fer.ret
 	for {
-		configPath := filepath.Join(currentDir, "fer.ret")
+		configPath := filepath.Join(currentDir, CONFIG_FILE)
 		if _, err := os.Stat(configPath); err == nil {
 			// Found fer.ret file
 			return configPath, nil
@@ -292,15 +293,15 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 	var moduleFullPath string
 	if modulePath == "" {
 		// Import is just the repo root, no specific module path
-		moduleFullPath = filepath.Join(moduleDir, "fer.ret")
+		moduleFullPath = filepath.Join(moduleDir, CONFIG_FILE)
 		if _, err := os.Stat(moduleFullPath); os.IsNotExist(err) {
-			return "", fmt.Errorf("module root file not found at %s", moduleFullPath)
+			return "", fmt.Errorf("no project found for module %s", importPath)
 		}
 	} else {
 		// Build full path to the specific module
 		moduleFullPath = filepath.Join(moduleDir, modulePath+".fer")
 		if _, err := os.Stat(moduleFullPath); os.IsNotExist(err) {
-			return "", fmt.Errorf("module file not found at %s", moduleFullPath)
+			return "", fmt.Errorf("module %s not found in %s", importPath, repo)
 		}
 	}
 
@@ -505,7 +506,7 @@ func RemoveFerRetDependency(projectRoot, repoName string) error {
 func FindNearestFerRet(startingDir, projectRoot string) string {
 	dir := startingDir
 	for {
-		ferretPath := filepath.Join(dir, "fer.ret")
+		ferretPath := filepath.Join(dir, CONFIG_FILE)
 		if _, err := os.Stat(ferretPath); err == nil {
 			return ferretPath
 		}
@@ -516,5 +517,5 @@ func FindNearestFerRet(startingDir, projectRoot string) string {
 		dir = parent
 	}
 	// Fallback to project root
-	return filepath.Join(projectRoot, "fer.ret")
+	return filepath.Join(projectRoot, CONFIG_FILE)
 }

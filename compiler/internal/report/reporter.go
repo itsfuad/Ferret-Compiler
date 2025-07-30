@@ -119,10 +119,6 @@ func printReport(r *Report) {
 
 	reportColor := colorMap[r.Level]
 
-	// The error message type and the message itself are printed in the same color.
-	reportColor.Print(reportMsgType)
-	reportColor.Println(r.Message)
-
 	//numlen is the length of the line number
 	numlen := len(fmt.Sprint(r.Location.Start.Line))
 
@@ -138,6 +134,10 @@ func printReport(r *Report) {
 	} else {
 		reportColor.Println(underline)
 	}
+
+	// The error message type and the message itself are printed in the same color.
+	reportColor.Print(reportMsgType)
+	reportColor.Println(r.Message)
 }
 
 // makeParts reads the source file and generates a code snippet and underline
@@ -170,8 +170,20 @@ func makeParts(r *Report) (snippet, underline string) {
 
 	padding := strings.Repeat(" ", (((r.Location.Start.Column - 1) + len(lineNumber)) - len(bar)))
 
-	snippet = colors.GREY.Sprint(bar) + "\n" + colors.GREY.Sprint(lineNumber) + line + "\n"
+	snippet += colors.GREY.Sprintln(bar)
+	// show previous max 2 lines if available, else show empty lines
+	if r.Location.Start.Line > 1 {
+		if r.Location.Start.Line > 2 {
+			snippet += colors.GREY.Sprintf("%s %s\n", bar, lines[r.Location.Start.Line-3])
+		}
+		snippet += colors.GREY.Sprintf("%s %s\n", bar, lines[r.Location.Start.Line-2])
+	} else {
+		snippet += colors.GREY.Sprintf("%s\n", bar)
+	}
+
+	snippet += colors.GREY.Sprint(lineNumber) + line + "\n"
 	snippet += colors.GREY.Sprint(bar)
+
 	underline = fmt.Sprintf("%s^%s", padding, strings.Repeat("~", hLen))
 
 	return snippet, underline
