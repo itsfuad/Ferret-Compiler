@@ -3,12 +3,13 @@ package typecheck
 import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/semantic"
-	"compiler/internal/frontend/semantic/analyzer"
-	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/modules"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/stype"
 	"compiler/internal/types"
+	"fmt"
 )
 
 // ===== CORE ASSIGNABILITY CHECK =====
@@ -290,18 +291,19 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 		}
 
 		if !IsAssignableFrom(elementType, elemType) {
-			// Try to find common type
-			commonType := getCommonNumericType(elementType, elemType)
-			if commonType == nil {
-				r.Ctx.Reports.AddSemanticError(
-					r.Program.FullPath,
-					element.Loc(),
-					"array element type mismatch",
-					report.TYPECHECK_PHASE,
-				)
-				return nil
+
+			err := r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				element.Loc(),
+				fmt.Sprintf("array elements must be of type %s, but got %s", elementType, elemType),
+				report.TYPECHECK_PHASE,
+			)
+
+			if isCastValid(elemType, elementType) {
+				err.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", elementType))
 			}
-			elementType = commonType
+
+			return nil
 		}
 	}
 
@@ -338,7 +340,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 	r.Ctx.Reports.AddSemanticError(
 		r.Program.FullPath,
 		(*e.Indexable).Loc(),
-		"cannot index non-array type",
+		fmt.Sprintf("type '%s' is not indexable", indexableType),
 		report.TYPECHECK_PHASE,
 	)
 	return nil

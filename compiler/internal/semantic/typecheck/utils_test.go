@@ -1,7 +1,7 @@
 package typecheck
 
 import (
-	"compiler/internal/frontend/semantic/stype"
+	"compiler/internal/semantic/stype"
 	"compiler/internal/types"
 	"testing"
 )
