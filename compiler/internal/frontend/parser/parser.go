@@ -50,6 +50,7 @@ func NewParserWithImportPath(filePath string, explicitImportPath string, ctxx *c
 	} else {
 		importPath = ctxx.FullPathToImportPath(filePath)
 	}
+
 	modulename := ctxx.FullPathToModuleName(filePath)
 
 	tokens := lexer.Tokenize(filePath, false)
@@ -216,6 +217,10 @@ func (p *Parser) Parse() *ast.Program {
 
 	if p.debug {
 		colors.BLUE.Printf("Parsed '%s'\n", p.fullPath)
+	}
+
+	if p.modulename == "" {
+		panic("Module name cannot be empty, please check the file path: " + p.fullPath)
 	}
 
 	program := &ast.Program{

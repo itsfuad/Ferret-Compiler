@@ -3,11 +3,11 @@ package typecheck
 import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/semantic"
-	"compiler/internal/frontend/semantic/analyzer"
-	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/modules"
 	"compiler/internal/report"
+	"compiler/internal/semantic"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/stype"
 	"fmt"
 )
 
@@ -75,12 +75,12 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 			r.Program.FullPath,
 			initializer.Loc(),
 			fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'",
-				inferredType.String(), variable.Identifier.Name, explicitType.String()),
+				inferredType.String(), variable.Identifier.Name, explicitType),
 			report.TYPECHECK_PHASE,
 		)
 
 		if isCastValid(inferredType, explicitType) {
-			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType.String()))
+			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
 		}
 	}
 }
@@ -145,7 +145,7 @@ func checkExprListTypeWithContext(r *analyzer.AnalyzerNode, exprs *ast.Expressio
 	for _, expr := range *exprs {
 		exprType := evaluateExpressionType(r, expr, cm)
 		if exprType == nil {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, expr.Loc(), "undefined expression type", report.TYPECHECK_PHASE)
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, expr.Loc(), "invalid expression", report.TYPECHECK_PHASE)
 			continue
 		}
 

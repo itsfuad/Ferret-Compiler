@@ -3,10 +3,10 @@ package typecheck
 import (
 	"compiler/colors"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/semantic/analyzer"
-	"compiler/internal/frontend/semantic/stype"
 	"compiler/internal/modules"
 	"compiler/internal/report"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/stype"
 	"fmt"
 )
 
@@ -58,7 +58,7 @@ func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResoluti
 	}
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
-		colors.AQUA.Printf("Resolved imported symbol '%s' of type '%s' from module '%s' imported from '%s'\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, cm.AST.Modulename)
+		colors.AQUA.Printf("Type Checked imported symbol '%s' of type '%s' from module '%s' imported from '%s'\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, cm.AST.Modulename)
 	}
 
 	return resIdentifier.Type

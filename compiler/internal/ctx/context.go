@@ -164,10 +164,11 @@ func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 }
 
 func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
+	// Removed: For modules outside the project root, like built-in modules, it cannot match with the project root.
+	// relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	// if err != nil || strings.HasPrefix(relPath, "..") {
+	// 	return ""
+	// }
 	filename := filepath.Base(fullPath)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
@@ -451,14 +452,6 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 	}
 }
 
-// isModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) isModuleParsing(importPath string) bool {
-	if c._parsingModules == nil {
-		return false
-	}
-	return c._parsingModules[importPath]
-}
-
 // DetectCycle detects if adding an edge from 'from' to 'to' would create a cycle
 // Returns the cycle path starting from the original module if a cycle is detected
 func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
@@ -485,7 +478,9 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 	c.DepGraph[from] = append(c.DepGraph[from], to)
 
 	return nil, false
-} // findCyclePath uses DFS to find if there's a path from 'start' to 'target'
+}
+
+// findCyclePath uses DFS to find if there's a path from 'start' to 'target'
 // If found, returns the complete cycle path
 func (c *CompilerContext) findCyclePath(start, target string, visited map[string]bool, path []string) []string {
 	// Normalize paths
