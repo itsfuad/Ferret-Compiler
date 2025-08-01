@@ -105,15 +105,47 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 		return
 	}
 
-	// declare the function symbol
-	symbol := symbol.NewSymbolWithLocation(fn.Identifier.Name, symbol.SymbolFunc, nil, fn.Loc())
-	err := cm.SymbolTable.Declare(fn.Identifier.Name, symbol)
+	// declare the function symbol in the module's symbol table
+	sym := symbol.NewSymbolWithLocation(fn.Identifier.Name, symbol.SymbolFunc, nil, fn.Loc())
+	err := cm.SymbolTable.Declare(fn.Identifier.Name, sym)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
 	if c.Debug {
 		colors.GREEN.Printf("Declared function symbol '%s' at %s\n", fn.Identifier.Name, fn.Loc().String())
+	}
+
+	// Create a local symbol table for this function with the module as parent
+	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
+
+	// Store the function scope in the module
+	cm.FunctionScopes[fn.Identifier.Name] = functionScope
+
+	// Collect symbols from function parameters in the function's local scope
+	if fn.Function != nil {
+		for _, param := range fn.Function.Params {
+			if param.Identifier != nil {
+				paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, nil, param.Identifier.Loc())
+				paramErr := functionScope.Declare(param.Identifier.Name, paramSymbol)
+				if paramErr != nil {
+					c.Ctx.Reports.AddCriticalError(c.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+paramErr.Error(), report.COLLECTOR_PHASE)
+					continue
+				}
+				if c.Debug {
+					colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc().String())
+				}
+			}
+		}
+
+		// Collect symbols from function body in the function's local scope
+		if fn.Function.Body != nil {
+			// Temporarily switch to function scope for body collection
+			originalTable := cm.SymbolTable
+			cm.SymbolTable = functionScope
+			collectSymbolsFromBlock(c, fn.Function.Body, cm)
+			cm.SymbolTable = originalTable // Restore module scope
+		}
 	}
 }
 

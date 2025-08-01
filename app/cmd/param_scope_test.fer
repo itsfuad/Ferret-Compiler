@@ -1,0 +1,19 @@
+fn function1(x: i32) {
+    let y = x + 10;
+}
+
+fn function2(x: str) {
+    let y = x + " world";
+}
+
+fn function3(x: bool) {
+    let ex = 10;
+    ex++;
+    let y = !x;
+}
+
+fn main() {
+    function1(5);
+    function2("hello"); 
+    function3(true);
+}

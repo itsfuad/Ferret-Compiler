@@ -34,3 +34,11 @@ func resolveBlock(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module
 		resolveNode(r, node, cm)
 	}
 }
+
+// resolveReturnStmt resolves a return statement
+func resolveReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *modules.Module) {
+	// Resolve the return value expression if present
+	if returnStmt.Value != nil {
+		resolveExpr(r, *returnStmt.Value, cm)
+	}
+}

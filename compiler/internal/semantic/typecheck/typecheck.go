@@ -49,7 +49,7 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.ImportStmt:
 		checkImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
-		//checkFunctionDecl(r, n, cm)
+		checkFunctionDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		checkVariableDeclaration(r, n, cm)
 	case *ast.TypeDeclStmt:
@@ -62,6 +62,10 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		checkIfStmt(r, n, cm)
 	case *ast.Block:
 		checkBlock(r, n, cm)
+	case *ast.ReturnStmt:
+		// Return statements are checked in the context of function declarations
+		// Standalone return statements are an error
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), "Return statement outside function", report.TYPECHECK_PHASE)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for type checking", n), report.TYPECHECK_PHASE)
 	}
