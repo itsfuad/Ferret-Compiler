@@ -1,4 +1,4 @@
-// Test if-else control flow
+// Test if-else control flow and functions
 
 let x: i32 = 10;
 let y: i32 = 20;
@@ -25,7 +25,112 @@ if x < 5 {
     y = 3;
 }
 
+// Function declarations with if-else control flow
+fn max(a: i32, b: i32) -> i32 {
+    if a > b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+fn min(a: i32, b: i32) -> i32 {
+    if a < b {
+        return a;
+    }
+    return b;
+}
+
+fn absolute(value: i32) -> i32 {
+    if value < 0 {
+        return -value;
+    } else {
+        return value;
+    }
+}
+
+fn isEven(number: i32) -> bool {
+    if number % 2 == 0 {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+fn classify(score: i32) -> i32 {
+    if score >= 90 {
+        return 1; // A grade
+    } else if score >= 80 {
+        return 2; // B grade
+    } else if score >= 70 {
+        return 3; // C grade
+    } else if score >= 60 {
+        return 4; // D grade
+    } else {
+        return 5; // F grade
+    }
+}
+
+// Function with nested if statements
+fn complexLogic(x: i32, y: i32, z: i32) -> i32 {
+    if x > 0 {
+        if y > 0 {
+            if z > 0 {
+                return 1; // All positive
+            } else {
+                return 2; // x and y positive, z non-positive
+            }
+        } else {
+            return 3; // x positive, y non-positive
+        }
+    } else {
+        return 4; // x non-positive
+    }
+}
+
+// Function that uses other functions
+fn testFunctions() -> i32 {
+    let a: i32 = 15;
+    let b: i32 = 25;
+    let result: i32 = max(a, b);
+    
+    if isEven(result) {
+        return absolute(-10);
+    } else {
+        return min(a, b);
+    }
+}
+
+// Main function to test everything
+fn main() {
+    let test1: i32 = max(10, 20);
+    let test2: i32 = min(10, 20);
+    let test3: i32 = absolute(-15);
+    let test4: bool = isEven(10);
+    let test5: i32 = classify(85);
+    let test6: i32 = complexLogic(1, 1, 1);
+    let test7: i32 = testFunctions();
+    
+    // Test variable scoping in if statements
+    if test1 > 15 {
+        let localVar: i32 = 100;
+        if localVar > 50 {
+            let nestedVar: i32 = 200;
+        }
+    }
+    
+    // Test if with function calls
+    if isEven(test1) {
+        let evenResult: i32 = max(test1, test2);
+    } else {
+        let oddResult: i32 = min(test1, test2);
+    }
+}
+
 // This should fail - non-boolean condition
-if x {
-    y = 100;
+fn testError() {
+    let x: i32 = 10;
+    if x {
+        x = 100;
+    }
 }
