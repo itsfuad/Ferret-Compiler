@@ -20,5 +20,10 @@ func AddPreludeSymbols(table *SymbolTable) *SymbolTable {
 	table.Declare("str", NewSymbol("str", SymbolType, &stype.PrimitiveType{Name: types.STRING}))
 	table.Declare("bool", NewSymbol("bool", SymbolType, &stype.PrimitiveType{Name: types.BOOL}))
 	table.Declare("byte", NewSymbol("byte", SymbolType, &stype.PrimitiveType{Name: types.BYTE}))
+
+	// Add boolean literals
+	table.Declare("true", NewSymbol("true", SymbolVar, &stype.PrimitiveType{Name: types.BOOL}))
+	table.Declare("false", NewSymbol("false", SymbolVar, &stype.PrimitiveType{Name: types.BOOL}))
+
 	return table
 }

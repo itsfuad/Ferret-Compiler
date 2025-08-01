@@ -58,8 +58,10 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		resolveTypeDeclaration(r, n, cm)
 	case *ast.AssignmentStmt:
 		resolveAssignmentStmt(r, n, cm)
+	case *ast.IfStmt:
+		resolveIfStmt(r, n, cm)
 	case *ast.Block:
-		//pass
+		resolveBlock(r, n, cm)
 	case *ast.ExpressionList:
 		resolveExpressionList(r, n, cm)
 	case *ast.ExpressionStmt:
