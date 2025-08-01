@@ -58,6 +58,10 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		checkAssignmentStmt(r, n, cm)
 	case *ast.ExpressionStmt:
 		checkExprListTypeWithContext(r, n.Expressions, cm, true) // Allow void in expression statements
+	case *ast.IfStmt:
+		checkIfStmt(r, n, cm)
+	case *ast.Block:
+		checkBlock(r, n, cm)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for type checking", n), report.TYPECHECK_PHASE)
 	}

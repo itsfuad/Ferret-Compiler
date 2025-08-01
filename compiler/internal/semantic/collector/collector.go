@@ -56,6 +56,10 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		collectVariableSymbols(c, n, cm)
 	case *ast.TypeDeclStmt:
 		collectTypeSymbol(c, n, cm)
+	case *ast.IfStmt:
+		collectSymbolsFromIfStmt(c, n, cm)
+	case *ast.Block:
+		collectSymbolsFromBlock(c, n, cm)
 	}
 }
 
@@ -149,5 +153,29 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 	}
 	if c.Debug {
 		colors.GREEN.Printf("Declared type symbol '%s' (incomplete) at %s\n", aliasName, decl.Alias.Loc().String())
+	}
+}
+
+// collectSymbolsFromIfStmt collects symbols from an if statement and its branches
+func collectSymbolsFromIfStmt(c *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Module) {
+	// Collect symbols from the main body
+	if ifStmt.Body != nil {
+		collectSymbolsFromBlock(c, ifStmt.Body, cm)
+	}
+
+	// Collect symbols from alternative (else/else-if)
+	if ifStmt.Alternative != nil {
+		collectSymbols(c, ifStmt.Alternative, cm)
+	}
+}
+
+// collectSymbolsFromBlock collects symbols from all nodes in a block
+func collectSymbolsFromBlock(c *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module) {
+	if block == nil {
+		return
+	}
+
+	for _, node := range block.Nodes {
+		collectSymbols(c, node, cm)
 	}
 }

@@ -1,0 +1,36 @@
+package resolver
+
+import (
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
+)
+
+// resolveIfStmt resolves an if statement and its branches
+func resolveIfStmt(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Module) {
+	// Resolve condition expression
+	if ifStmt.Condition != nil {
+		resolveExpr(r, *ifStmt.Condition, cm)
+	}
+
+	// Resolve body block
+	if ifStmt.Body != nil {
+		resolveBlock(r, ifStmt.Body, cm)
+	}
+
+	// Resolve alternative (else/else-if)
+	if ifStmt.Alternative != nil {
+		resolveNode(r, ifStmt.Alternative, cm)
+	}
+}
+
+// resolveBlock resolves all nodes in a block
+func resolveBlock(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module) {
+	if block == nil {
+		return
+	}
+
+	for _, node := range block.Nodes {
+		resolveNode(r, node, cm)
+	}
+}
