@@ -1,5 +1,7 @@
 // Test return statement validation - all valid cases (no params)
 
+let huh: bool = true;
+
 fn voidFunc() {
     let a = 10;
     // No return needed for void function

@@ -10,11 +10,13 @@ import (
 	"compiler/internal/semantic/stype"
 	"compiler/internal/symbol"
 	"compiler/internal/types"
+	"fmt"
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
 	functionSymbol, found := cm.SymbolTable.Lookup(fn.Identifier.Name)
 	if !found {
+		colors.RED.Printf("Function '%s' not found in symbol table\n", fn.Identifier.Name)
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function '"+fn.Identifier.Name+"' is not declared", report.RESOLVER_PHASE)
 		return
 	}
@@ -22,15 +24,18 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 	// Resolve parameter types and update function scope symbols
 	paramTypes := resolveParameterTypes(r, fn, cm)
 	if paramTypes == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function '"+fn.Identifier.Name+"'", report.RESOLVER_PHASE)
 		return // Error occurred during parameter resolution
 	}
 
 	// Resolve return type
 	returnType := resolveReturnType(r, fn, cm)
 	if returnType == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function '"+fn.Identifier.Name+"'", report.RESOLVER_PHASE)
 		return // Error occurred during return type resolution
 	}
 
+	fmt.Printf("Resolved function '%s' with parameters: %v and return type: %v\n", fn.Identifier.Name, paramTypes, returnType)
 	// Resolve function body
 	resolveFunctionBody(r, fn, cm)
 
@@ -43,17 +48,25 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 }
 
 func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) []stype.Type {
-	var paramTypes []stype.Type
-	if fn.Function.Params == nil {
-		return paramTypes
+	paramTypes := make([]stype.Type, 0) // Initialize as empty slice, not nil slice
+	
+	// Check if function has no parameters
+	if fn.Function == nil || fn.Function.Params == nil || len(fn.Function.Params) == 0 {
+		return paramTypes // Return empty slice for functions with no parameters
 	}
 
 	functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
+	if !exists {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function scope for '"+fn.Identifier.Name+"' not found", report.RESOLVER_PHASE)
+		return nil // Return nil to indicate error
+	}
+
 	for _, param := range fn.Function.Params {
 		paramType, err := semantic.DeriveSemanticType(param.Type, cm)
 		if err != nil {
+			colors.RED.Printf("Error deriving type for parameter '%s': %s\n", param.Identifier.Name, err.Error())
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
-			return nil
+			return nil // Return nil to indicate error
 		}
 		paramTypes = append(paramTypes, paramType)
 
@@ -72,7 +85,7 @@ func updateParameterSymbol(param *ast.Parameter, paramType stype.Type, functionS
 }
 
 func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) stype.Type {
-	if fn.Function.ReturnType != nil {
+	if fn.Function != nil && fn.Function.ReturnType != nil {
 		retType, err := semantic.DeriveSemanticType(fn.Function.ReturnType, cm)
 		if err != nil {
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Function.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
@@ -84,25 +97,35 @@ func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modul
 }
 
 func resolveFunctionBody(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
-	if fn.Function.Body == nil {
+	// Check if function has a body
+	if fn.Function == nil || fn.Function.Body == nil {
 		return
 	}
+	
+	colors.PINK.Printf("Resolving function body for '%s' at %s\n", fn.Identifier.Name, fn.Function.Body.Loc().String())
 
 	functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
 	if exists {
+		colors.LIGHT_GREEN.Printf("Resolving function body for '%s' at %s\n", fn.Identifier.Name, fn.Function.Body.Loc().String())
 		// Temporarily switch to function scope for body resolution
 		originalTable := cm.SymbolTable
 		cm.SymbolTable = functionScope
 		resolveNode(r, fn.Function.Body, cm)
 		cm.SymbolTable = originalTable // Restore module scope
 	} else {
+		colors.RED.Printf("Function scope for '%s' not found, resolving in module scope\n", fn.Identifier.Name)
 		// Fallback to module scope if function scope not found
 		resolveNode(r, fn.Function.Body, cm)
 	}
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
+	
+	colors.ORANGE.Printf("Resolving variable declaration\n")
+	
 	for i, variable := range decl.Variables {
+
+		colors.BLUE.Printf("Resolving variable declaration '%s' at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
@@ -112,13 +135,15 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 		// Look up the already-declared symbol from the collector phase
 		symbol, found := cm.SymbolTable.Lookup(variable.Identifier.Name)
 		if !found {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.Identifier.Loc(), "Variable '"+variable.Identifier.Name+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
+			colors.RED.Printf("Variable '%s' not found in symbol table\n", variable.Identifier.Name)
+			r.Ctx.Reports.AddCriticalError(r.Program.FullPath, variable.Identifier.Loc(), "Variable '"+variable.Identifier.Name+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
 			continue
 		}
 
 		if variable.ExplicitType != nil {
 			got, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
+				colors.RED.Printf("Error deriving type for variable '%s': %s\n", variable.Identifier.Name, err.Error())
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
 				continue
 			}

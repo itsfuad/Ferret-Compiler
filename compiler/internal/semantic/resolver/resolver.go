@@ -51,6 +51,7 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
+		colors.PINK.Printf("Resolving function declaration '%s' at %s\n", n.Identifier.Name, n.Loc().String())
 		resolveFunctionDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		resolveVariableDeclaration(r, n, cm)

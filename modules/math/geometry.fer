@@ -1,4 +1,4 @@
-import "math/constants";
+import "math/constants" as constants;
 // Math module with geometric functions
 
 fn area_circle(radius: f64) -> f64 {
