@@ -1,0 +1,10 @@
+title = "Main Config"
+
+[database]
+host = "localhost"
+port = 5432
+enabled = true
+
+[cache]
+ttl = 300
+size = 1000

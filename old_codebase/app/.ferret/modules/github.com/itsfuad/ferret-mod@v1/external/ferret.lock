@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "generated_at": "2025-07-27T07:01:08Z",
+  "packages": {
+    "github.com/itsfuad/ferret-remote-mod@v0.0.1": {
+      "version": "v0.0.1",
+      "resolved_url": "https://github.com/itsfuad/ferret-remote-mod/archive/refs/tags/v0.0.1.zip",
+      "checksum": "660ac1cb9b9e3290e75917e746b464d181c6b4b7a04dd82ddf495ca5ae11182b",
+      "downloaded_at": "2025-07-27T07:01:08Z"
+    }
+  }
+}
