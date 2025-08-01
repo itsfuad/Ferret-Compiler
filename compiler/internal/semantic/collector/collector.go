@@ -126,7 +126,7 @@ func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return false
 	}
-	
+
 	if c.Debug {
 		colors.GREEN.Printf("Declared function symbol '%s' at %s\n", fn.Identifier.Name, fn.Loc().String())
 	}
@@ -150,14 +150,14 @@ func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, f
 		if param.Identifier == nil {
 			continue
 		}
-		
+
 		paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, nil, param.Identifier.Loc())
 		paramErr := functionScope.Declare(param.Identifier.Name, paramSymbol)
 		if paramErr != nil {
 			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+paramErr.Error(), report.COLLECTOR_PHASE)
 			continue
 		}
-		
+
 		if c.Debug {
 			colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc().String())
 		}

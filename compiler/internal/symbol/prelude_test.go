@@ -61,6 +61,7 @@ func TestAddPreludeSymbolsNoExtraSymbols(t *testing.T) {
 		"i8": {}, "i16": {}, "i32": {}, "i64": {},
 		"u8": {}, "u16": {}, "u32": {}, "u64": {},
 		"f32": {}, "f64": {}, "str": {}, "bool": {}, "byte": {},
+		"true": {}, "false": {},
 	}
 
 	for name := range table.Symbols {
