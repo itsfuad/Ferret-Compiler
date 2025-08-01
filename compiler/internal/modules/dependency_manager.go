@@ -11,6 +11,10 @@ import (
 	"compiler/colors"
 )
 
+const (
+	CONFIG_DIR = ".ferret"
+)
+
 // DependencyManager handles dependency management using the lockfile system
 type DependencyManager struct {
 	projectRoot string
@@ -53,7 +57,7 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	colors.GREEN.Printf("Found version: %s\n", actualVersion)
 
 	// Set up cache path
-	cachePath := filepath.Join(dm.projectRoot, ".ferret", "modules")
+	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules")
 	err = os.MkdirAll(cachePath, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
@@ -71,7 +75,7 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	}
 
 	// Add to fer.ret as direct dependency
-	fullRepoPath := "github.com/" + repoName
+	fullRepoPath := REMOTE_HOST + repoName
 	err = WriteFerRetDependency(dm.projectRoot, fullRepoPath, actualVersion, description)
 	if err != nil {
 		return fmt.Errorf("failed to update fer.ret: %w", err)
@@ -79,107 +83,6 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 
 	// After updating fer.ret, regenerate the lockfile
 	return dm.InstallAllDependencies()
-}
-
-// InstallAllDependencies installs all dependencies listed in fer.ret and generates the lockfile
-func (dm *DependencyManager) InstallAllDependencies() error {
-	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
-	if err != nil {
-		return fmt.Errorf("failed to read dependencies from fer.ret: %w", err)
-	}
-
-	if len(dependencies) == 0 {
-		colors.YELLOW.Println("No dependencies found in fer.ret")
-		dm.lockfile = NewLockfile()
-		dm.saveLockfile()
-		return nil
-	}
-
-	colors.BLUE.Printf("Installing %d dependencies from fer.ret...\n", len(dependencies))
-
-	lockfile := NewLockfile()
-	seen := make(map[string]struct{}) // repo@version keys
-
-	for moduleName, dep := range dependencies {
-		moduleSpec := moduleName
-		if dep.Version != "" {
-			moduleSpec = moduleName + "@" + dep.Version
-		}
-		_, requestedVersion, repoName, err := SplitRemotePath(moduleSpec)
-		if err != nil {
-			colors.RED.Printf("Invalid module specification: %s\n", moduleSpec)
-			continue
-		}
-		actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
-		if err != nil {
-			colors.RED.Printf("Module not found: %s\n", moduleSpec)
-			continue
-		}
-		cachePath := filepath.Join(dm.projectRoot, ".ferret", "modules")
-		if !IsModuleCached(cachePath, repoName, actualVersion) {
-			err = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
-			if err != nil {
-				colors.RED.Printf("Failed to download module: %s\n", moduleSpec)
-				continue
-			}
-		}
-		fullRepoPath := "github.com/" + repoName
-		key := fullRepoPath + "@" + actualVersion
-		// Recursively resolve transitive dependencies and collect their keys
-		transitiveKeys := dm.resolveTransitiveDependencies(fullRepoPath, actualVersion, repoName, cachePath, lockfile, seen, key)
-		lockfile.SetDependency(fullRepoPath, actualVersion, true, dep.Comment, transitiveKeys, []string{})
-		for _, depKey := range transitiveKeys {
-			lockfile.AddUsedBy(depKey, key)
-		}
-		seen[key] = struct{}{}
-	}
-
-	dm.lockfile = lockfile
-	return dm.saveLockfile()
-}
-
-// RemoveDependency removes a direct dependency and cleans up unused indirect dependencies
-func (dm *DependencyManager) RemoveDependency(moduleName string) error {
-	lockfile, err := LoadLockfile(dm.projectRoot)
-	if err != nil {
-		return fmt.Errorf("failed to load lockfile: %w", err)
-	}
-
-	// Only allow removal of direct dependencies
-	var foundAny bool
-	var errs []string
-	for key, entry := range lockfile.Dependencies {
-		if strings.HasPrefix(key, moduleName+"@") {
-			if !entry.Direct {
-				errs = append(errs, fmt.Sprintf("cannot remove indirect dependency: %s", key))
-				continue
-			}
-			foundAny = true
-			if len(entry.UsedBy) > 0 {
-				errs = append(errs, fmt.Sprintf("cannot delete %s. required by: %v", key, entry.UsedBy))
-				continue
-			}
-			// Recursively remove dependencies if not used by others
-			for _, depKey := range entry.Dependencies {
-				lockfile.RemoveUsedBy(depKey, key)
-				depEntry := lockfile.Dependencies[depKey]
-				if !depEntry.Direct && len(depEntry.UsedBy) == 0 {
-					lockfile.RemoveDependency(depEntryKeyParts(depKey))
-					dm.deleteCacheForKey(depKey)
-				}
-			}
-			lockfile.RemoveDependency(depEntryKeyParts(key))
-			dm.deleteCacheForKey(key)
-		}
-	}
-	if !foundAny {
-		return fmt.Errorf("module %s is not installed as a direct dependency", moduleName)
-	}
-	if len(errs) > 0 {
-		return errors.New(strings.Join(errs, "; "))
-	}
-	dm.lockfile = lockfile
-	return dm.saveLockfile()
 }
 
 // CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
@@ -258,15 +161,188 @@ func findFerretFiles(dir string) ([]string, error) {
 	return ferFiles, err
 }
 
+// InstallAllDependencies installs all dependencies listed in fer.ret and generates the lockfile
+func (dm *DependencyManager) InstallAllDependencies() error {
+	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to read dependencies from fer.ret: %w", err)
+	}
+
+	if len(dependencies) == 0 {
+		return dm.handleNoDependencies()
+	}
+
+	colors.BLUE.Printf("Installing %d dependencies from fer.ret...\n", len(dependencies))
+
+	lockfile := NewLockfile()
+	seen := make(map[string]struct{}) // repo@version keys
+
+	for moduleName, dep := range dependencies {
+		dm.installSingleDependency(moduleName, dep, lockfile, seen)
+	}
+
+	dm.lockfile = lockfile
+	return dm.saveLockfile()
+}
+
+// handleNoDependencies handles the case when no dependencies are found
+func (dm *DependencyManager) handleNoDependencies() error {
+	colors.YELLOW.Println("No dependencies found in fer.ret")
+	dm.lockfile = NewLockfile()
+	dm.saveLockfile()
+	return nil
+}
+
+// installSingleDependency installs a single dependency and its transitive dependencies
+func (dm *DependencyManager) installSingleDependency(moduleName string, dep FerRetDependency, lockfile *Lockfile, seen map[string]struct{}) {
+	moduleSpec := dm.buildModuleSpec(moduleName, dep.Version)
+
+	_, requestedVersion, repoName, err := SplitRemotePath(moduleSpec)
+	if err != nil {
+		colors.RED.Printf("Invalid module specification: %s\n", moduleSpec)
+		return
+	}
+
+	actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
+	if err != nil {
+		colors.RED.Printf("Module not found: %s\n", moduleSpec)
+		return
+	}
+
+	if !dm.ensureModuleCached(repoName, actualVersion, moduleSpec) {
+		return
+	}
+
+	dm.addDependencyToLockfile(repoName, actualVersion, dep, lockfile, seen)
+}
+
+// buildModuleSpec builds the module specification string
+func (dm *DependencyManager) buildModuleSpec(moduleName, version string) string {
+	if version != "" {
+		return moduleName + "@" + version
+	}
+	return moduleName
+}
+
+// ensureModuleCached ensures the module is cached, downloading if necessary
+func (dm *DependencyManager) ensureModuleCached(repoName, actualVersion, moduleSpec string) bool {
+	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules")
+	if !IsModuleCached(cachePath, repoName, actualVersion) {
+		err := DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
+		if err != nil {
+			colors.RED.Printf("Failed to download module: %s\n", moduleSpec)
+			return false
+		}
+	}
+	return true
+}
+
+// addDependencyToLockfile adds the dependency and its transitive dependencies to the lockfile
+func (dm *DependencyManager) addDependencyToLockfile(repoName, actualVersion string, dep FerRetDependency, lockfile *Lockfile, seen map[string]struct{}) {
+	fullRepoPath := REMOTE_HOST + repoName
+	key := fullRepoPath + "@" + actualVersion
+	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules")
+
+	// Recursively resolve transitive dependencies and collect their keys
+	transitiveKeys := dm.resolveTransitiveDependencies(fullRepoPath, actualVersion, repoName, cachePath, lockfile, seen, key)
+	lockfile.SetDependency(fullRepoPath, actualVersion, true, dep.Comment, transitiveKeys, []string{})
+
+	for _, depKey := range transitiveKeys {
+		lockfile.AddUsedBy(depKey, key)
+	}
+	seen[key] = struct{}{}
+}
+
+// RemoveDependency removes a direct dependency and cleans up unused indirect dependencies
+func (dm *DependencyManager) RemoveDependency(moduleName string) error {
+	lockfile, err := LoadLockfile(dm.projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load lockfile: %w", err)
+	}
+
+	foundAny, errs := dm.processDependencyRemoval(moduleName, lockfile)
+
+	if !foundAny {
+		return fmt.Errorf("module %s is not installed as a direct dependency", moduleName)
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+
+	dm.lockfile = lockfile
+	return dm.saveLockfile()
+}
+
+// processDependencyRemoval processes the removal of dependencies matching the module name
+func (dm *DependencyManager) processDependencyRemoval(moduleName string, lockfile *Lockfile) (bool, []string) {
+	var foundAny bool
+	var errs []string
+
+	for key, entry := range lockfile.Dependencies {
+		if strings.HasPrefix(key, moduleName+"@") {
+			found, err := dm.removeSingleDependency(key, entry, lockfile)
+			if found {
+				foundAny = true
+			}
+			if err != "" {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	return foundAny, errs
+}
+
+// removeSingleDependency removes a single dependency entry
+func (dm *DependencyManager) removeSingleDependency(key string, entry LockfileEntry, lockfile *Lockfile) (bool, string) {
+	if !entry.Direct {
+		return false, fmt.Sprintf("cannot remove indirect dependency: %s", key)
+	}
+
+	if len(entry.UsedBy) > 0 {
+		return true, fmt.Sprintf("cannot delete %s. required by: %v", key, entry.UsedBy)
+	}
+
+	dm.removeTransitiveDependencies(entry, key, lockfile)
+	lockfile.RemoveDependency(depEntryKeyParts(key))
+	dm.deleteCacheForKey(key)
+
+	return true, ""
+}
+
+// removeTransitiveDependencies recursively removes transitive dependencies if not used by others
+func (dm *DependencyManager) removeTransitiveDependencies(entry LockfileEntry, parentKey string, lockfile *Lockfile) {
+	for _, depKey := range entry.Dependencies {
+		lockfile.RemoveUsedBy(depKey, parentKey)
+		depEntry := lockfile.Dependencies[depKey]
+		if !depEntry.Direct && len(depEntry.UsedBy) == 0 {
+			lockfile.RemoveDependency(depEntryKeyParts(depKey))
+			dm.deleteCacheForKey(depKey)
+		}
+	}
+}
+
 // resolveTransitiveDependencies recursively resolves and adds transitive dependencies to the lockfile
 // Returns the list of repo@version keys that the parent depends on
 func (dm *DependencyManager) resolveTransitiveDependencies(parentRepo, parentVersion, parentRepoName, cachePath string, lockfile *Lockfile, seen map[string]struct{}, parentKey string) []string {
+	remoteImports := dm.extractRemoteImportsFromModule(parentRepo, parentVersion, parentRepoName, cachePath)
+	if remoteImports == nil {
+		return nil
+	}
+
+	return dm.processRemoteImports(remoteImports, cachePath, lockfile, seen, parentKey)
+}
+
+// extractRemoteImportsFromModule extracts all remote imports from a module
+func (dm *DependencyManager) extractRemoteImportsFromModule(parentRepo, parentVersion, parentRepoName, cachePath string) map[string]struct{} {
 	moduleDir := filepath.Join(cachePath, "github.com", parentRepoName+"@"+parentVersion)
 	ferFiles, err := findFerretFiles(moduleDir)
 	if err != nil {
 		colors.YELLOW.Printf("Warning: Failed to scan module files for %s@%s: %s\n", parentRepo, parentVersion, err)
 		return nil
 	}
+
 	remoteImports := make(map[string]struct{})
 	for _, ferFile := range ferFiles {
 		imports, err := extractRemoteImports(ferFile)
@@ -278,32 +354,58 @@ func (dm *DependencyManager) resolveTransitiveDependencies(parentRepo, parentVer
 			remoteImports[imp] = struct{}{}
 		}
 	}
+
+	return remoteImports
+}
+
+// processRemoteImports processes all remote imports and returns dependency keys
+func (dm *DependencyManager) processRemoteImports(remoteImports map[string]struct{}, cachePath string, lockfile *Lockfile, seen map[string]struct{}, parentKey string) []string {
 	var depKeys []string
+
 	for importPath := range remoteImports {
-		_, requestedVersion, repoName, err := SplitRemotePath(importPath)
-		if err != nil {
-			continue
+		depKey := dm.processSingleRemoteImport(importPath, cachePath, lockfile, seen, parentKey)
+		if depKey != "" {
+			depKeys = append(depKeys, depKey)
 		}
-		actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
-		if err != nil {
-			continue
-		}
-		if !IsModuleCached(cachePath, repoName, actualVersion) {
-			_ = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
-		}
-		fullRepoPath := "github.com/" + repoName
-		key := fullRepoPath + "@" + actualVersion
-		if _, already := seen[key]; !already {
-			// Recursively resolve further dependencies
-			transitiveKeys := dm.resolveTransitiveDependencies(fullRepoPath, actualVersion, repoName, cachePath, lockfile, seen, key)
-			lockfile.SetDependency(fullRepoPath, actualVersion, false, "", transitiveKeys, []string{parentKey})
-			seen[key] = struct{}{}
-		} else {
-			lockfile.AddUsedBy(key, parentKey)
-		}
-		depKeys = append(depKeys, key)
 	}
+
 	return depKeys
+}
+
+// processSingleRemoteImport processes a single remote import and returns its dependency key
+func (dm *DependencyManager) processSingleRemoteImport(importPath, cachePath string, lockfile *Lockfile, seen map[string]struct{}, parentKey string) string {
+	_, requestedVersion, repoName, err := SplitRemotePath(importPath)
+	if err != nil {
+		return ""
+	}
+
+	actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
+	if err != nil {
+		return ""
+	}
+
+	if !IsModuleCached(cachePath, repoName, actualVersion) {
+		_ = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
+	}
+
+	return dm.addOrUpdateTransitiveDependency(repoName, actualVersion, cachePath, lockfile, seen, parentKey)
+}
+
+// addOrUpdateTransitiveDependency adds or updates a transitive dependency in the lockfile
+func (dm *DependencyManager) addOrUpdateTransitiveDependency(repoName, actualVersion, cachePath string, lockfile *Lockfile, seen map[string]struct{}, parentKey string) string {
+	fullRepoPath := REMOTE_HOST + repoName
+	key := fullRepoPath + "@" + actualVersion
+
+	if _, already := seen[key]; !already {
+		// Recursively resolve further dependencies
+		transitiveKeys := dm.resolveTransitiveDependencies(fullRepoPath, actualVersion, repoName, cachePath, lockfile, seen, key)
+		lockfile.SetDependency(fullRepoPath, actualVersion, false, "", transitiveKeys, []string{parentKey})
+		seen[key] = struct{}{}
+	} else {
+		lockfile.AddUsedBy(key, parentKey)
+	}
+
+	return key
 }
 
 // extractRemoteImports parses a .fer file and extracts remote import statements
@@ -320,7 +422,7 @@ func extractRemoteImports(filePath string) ([]string, error) {
 		line = strings.TrimSpace(line)
 
 		// Look for import statements: import "github.com/..."
-		if strings.HasPrefix(line, "import") && strings.Contains(line, "github.com/") {
+		if strings.HasPrefix(line, "import") && strings.Contains(line, REMOTE_HOST) {
 			// Extract the import path from quotes
 			start := strings.Index(line, `"`)
 			if start == -1 {
@@ -334,49 +436,13 @@ func extractRemoteImports(filePath string) ([]string, error) {
 			importPath := line[start+1 : start+1+end]
 
 			// Check if it's a remote import
-			if strings.HasPrefix(importPath, "github.com/") {
+			if strings.HasPrefix(importPath, REMOTE_HOST) {
 				remoteImports = append(remoteImports, importPath)
 			}
 		}
 	}
 
 	return remoteImports, nil
-}
-
-// installTransitiveDependency installs a single transitive dependency
-func (dm *DependencyManager) installTransitiveDependency(importPath, parentModule, cachePath string) error {
-	// Parse the remote import to get repo information
-	_, requestedVersion, repoName, err := SplitRemotePath(importPath)
-	if err != nil {
-		return fmt.Errorf("invalid remote import path: %w", err)
-	}
-
-	// Check if the module exists on GitHub and get the actual version
-	actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
-	if err != nil {
-		return fmt.Errorf("module not found: %w", err)
-	}
-
-	// Check if already cached
-	if IsModuleCached(cachePath, repoName, actualVersion) {
-		colors.YELLOW.Printf("Transitive dependency %s@%s is already cached\n", repoName, actualVersion)
-	} else {
-		// Download and cache the module
-		err = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
-		if err != nil {
-			return fmt.Errorf("failed to download transitive dependency: %w", err)
-		}
-	}
-
-	// Add to lockfile as indirect dependency
-	fullRepoPath := "github.com/" + repoName
-	dm.lockfile.Dependencies[fullRepoPath+"@"+actualVersion] = LockfileEntry{
-		Version:     actualVersion,
-		Direct:      false,
-		Description: "",
-	}
-
-	return nil
 }
 
 // saveLockfile saves the lockfile with a timestamp
@@ -411,6 +477,6 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 		return
 	}
 	repoName := parts[1] + "/" + parts[2] // user/repo
-	cachePath := filepath.Join(dm.projectRoot, ".ferret", "modules", "github.com", repoName+"@"+version)
+	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", "github.com", repoName+"@"+version)
 	_ = os.RemoveAll(cachePath)
 }
