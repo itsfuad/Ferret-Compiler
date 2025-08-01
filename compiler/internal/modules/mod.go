@@ -37,11 +37,12 @@ func (p ModulePhase) String() string {
 }
 
 type Module struct {
-	AST         *ast.Program
-	SymbolTable *symbol.SymbolTable
-	Phase       ModulePhase // Current processing phase
-	IsBuiltin   bool        // Whether this is a builtin module
-	Type        ModuleType
+	AST            *ast.Program
+	SymbolTable    *symbol.SymbolTable
+	FunctionScopes map[string]*symbol.SymbolTable // Function name -> local symbol table
+	Phase          ModulePhase                    // Current processing phase
+	IsBuiltin      bool                           // Whether this is a builtin module
+	Type           ModuleType
 }
 
 // ModuleType represents the category of a module

@@ -345,3 +345,93 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 	)
 	return nil
 }
+
+func checkUnaryExprType(r *analyzer.AnalyzerNode, e *ast.UnaryExpr, cm *modules.Module) stype.Type {
+	operandType := evaluateExpressionType(r, *e.Operand, cm)
+	if operandType == nil {
+		return nil
+	}
+
+	// Handle specific unary operations
+	switch e.Operator.Value {
+	case "!":
+		if semantic.IsBoolType(operandType) {
+			return operandType // Boolean negation returns same type
+		}
+	case "-":
+		if semantic.IsNumericType(operandType) {
+			return operandType // Unary minus returns same numeric type
+		}
+	default:
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			e.Loc(),
+			fmt.Sprintf("unsupported unary operator '%s' for type '%s'", e.Operator.Value, operandType),
+			report.TYPECHECK_PHASE,
+		)
+	}
+
+	return nil
+}
+
+// checkPrefixExprType handles prefix increment/decrement operations (++x, --x)
+func checkPrefixExprType(r *analyzer.AnalyzerNode, e *ast.PrefixExpr, cm *modules.Module) stype.Type {
+	operandType := evaluateExpressionType(r, *e.Operand, cm)
+	if operandType == nil {
+		return nil
+	}
+
+	// Handle prefix operations
+	switch e.Operator.Value {
+	case "++", "--":
+		if semantic.IsNumericType(operandType) {
+			return operandType // Prefix increment/decrement returns same numeric type
+		}
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			e.Loc(),
+			fmt.Sprintf("operator '%s' cannot be applied to type '%s'", e.Operator.Value, operandType),
+			report.TYPECHECK_PHASE,
+		)
+	default:
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			e.Loc(),
+			fmt.Sprintf("unsupported prefix operator '%s'", e.Operator.Value),
+			report.TYPECHECK_PHASE,
+		)
+	}
+
+	return nil
+}
+
+// checkPostfixExprType handles postfix increment/decrement operations (x++, x--)
+func checkPostfixExprType(r *analyzer.AnalyzerNode, e *ast.PostfixExpr, cm *modules.Module) stype.Type {
+	operandType := evaluateExpressionType(r, *e.Operand, cm)
+	if operandType == nil {
+		return nil
+	}
+
+	// Handle postfix operations
+	switch e.Operator.Value {
+	case "++", "--":
+		if semantic.IsNumericType(operandType) {
+			return operandType // Postfix increment/decrement returns same numeric type
+		}
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			e.Loc(),
+			fmt.Sprintf("operator '%s' cannot be applied to type '%s'", e.Operator.Value, operandType),
+			report.TYPECHECK_PHASE,
+		)
+	default:
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			e.Loc(),
+			fmt.Sprintf("unsupported postfix operator '%s'", e.Operator.Value),
+			report.TYPECHECK_PHASE,
+		)
+	}
+
+	return nil
+}

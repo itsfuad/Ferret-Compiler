@@ -159,3 +159,69 @@ func checkExprListTypeWithContext(r *analyzer.AnalyzerNode, exprs *ast.Expressio
 	}
 	return types
 }
+
+// checkFunctionDecl validates function declarations and their return paths
+func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm *modules.Module) {
+	if funcDecl.Function == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			funcDecl.Loc(),
+			"Function declaration missing function body",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Get the expected return type
+	var expectedReturnType stype.Type = nil
+	if funcDecl.Function.ReturnType != nil {
+		resolvedType, err := semantic.DeriveSemanticType(funcDecl.Function.ReturnType, cm)
+		if err != nil {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				funcDecl.Function.ReturnType.Loc(),
+				fmt.Sprintf("Invalid return type: %s", err.Error()),
+				report.TYPECHECK_PHASE,
+			)
+			return
+		}
+		expectedReturnType = resolvedType
+	}
+
+	// Switch to function scope for type checking
+	functionScope, exists := cm.FunctionScopes[funcDecl.Identifier.Name]
+	if exists {
+		// Temporarily switch to function scope
+		originalTable := cm.SymbolTable
+		cm.SymbolTable = functionScope
+
+		// Analyze the function body for control flow and returns
+		result := analyzeControlFlow(r, funcDecl.Function.Body, cm, expectedReturnType)
+
+		// Restore module scope
+		cm.SymbolTable = originalTable
+
+		// Check if non-void function has all paths returning
+		if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				funcDecl.Loc(),
+				"Not all paths in function return a value",
+				report.TYPECHECK_PHASE,
+			)
+		}
+	} else {
+		// Fallback to module scope if function scope not found
+		result := analyzeControlFlow(r, funcDecl.Function.Body, cm, expectedReturnType)
+
+		// Check if non-void function has all paths returning
+		if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				funcDecl.Loc(),
+				"Not all paths in function return a value",
+				report.TYPECHECK_PHASE,
+			)
+		}
+	}
+}

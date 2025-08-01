@@ -1,0 +1,30 @@
+// Test return statement validation - all valid cases (no params)
+
+fn voidFunc() {
+    let a = 10;
+    // No return needed for void function
+}
+
+fn intFunc() -> i32 {
+    let b = 20;
+    return b + 5;
+}
+
+fn conditionalFunc() -> i32 {
+    let flag: bool = true;
+    if flag {
+        return 10;
+    } else {
+        if flag {
+            return 20;
+        } else {
+            //return 1;
+        }
+        return 20;
+    }
+    //return 0;
+}
+
+fn voidReturn() {
+    return; // Valid bare return for void function
+}

@@ -38,6 +38,12 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 		resultType = checkIdentifierType(e, cm)
 	case *ast.BinaryExpr:
 		resultType = checkBinaryExprType(r, e, cm)
+	case *ast.UnaryExpr:
+		resultType = checkUnaryExprType(r, e, cm)
+	case *ast.PrefixExpr:
+		resultType = checkPrefixExprType(r, e, cm)
+	case *ast.PostfixExpr:
+		resultType = checkPostfixExprType(r, e, cm)
 	case *ast.ArrayLiteralExpr:
 		resultType = checkArrayLiteralType(r, e, cm)
 	case *ast.IndexableExpr:

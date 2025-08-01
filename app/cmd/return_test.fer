@@ -1,0 +1,36 @@
+// Test return statement validation
+
+fn voidFunction() {
+    let x = 10;
+    // No return needed for void function
+}
+
+fn intFunction() -> i32 {
+    let y = 20;
+    return y + 5;
+}
+
+fn conditionalReturn(flag: bool) -> i32 {
+    if flag {
+        return 10;
+    } else {
+        return 20;
+    }
+}
+
+fn missingReturn() -> i32 {
+    let x = 10;
+    // Error: missing return statement
+}
+
+fn earlyReturn() -> i32 {
+    return 42;
+    let x = 10; // Error: unreachable code
+}
+
+fn partialReturn(flag: bool) -> i32 {
+    if flag {
+        return 10;
+    }
+    // Error: missing return in else path
+}

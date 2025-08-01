@@ -1,0 +1,17 @@
+fn function1() {
+    let x = 10;
+}
+
+fn function2() {
+    let x = "hello";
+}
+
+fn function3() {
+    let x = true;
+}
+
+fn main() {
+    function1();
+    function2(); 
+    function3();
+}

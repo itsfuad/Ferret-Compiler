@@ -22,6 +22,9 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 	//add the type information to the symbol
 	var paramTypes []stype.Type
 	if fn.Function.Params != nil {
+		// Get the function's local symbol table
+		functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
+
 		for _, param := range fn.Function.Params {
 			paramType, err := semantic.DeriveSemanticType(param.Type, cm)
 			if err != nil {
@@ -29,6 +32,13 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 				return
 			}
 			paramTypes = append(paramTypes, paramType)
+
+			// Update the parameter symbol in the function scope with the resolved type
+			if exists && param.Identifier != nil {
+				if paramSymbol, found := functionScope.Lookup(param.Identifier.Name); found {
+					paramSymbol.Type = paramType
+				}
+			}
 		}
 	}
 
@@ -44,9 +54,20 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 		returnType = &stype.PrimitiveType{Name: types.VOID}
 	}
 
-	// Resolve function body
+	// Resolve function body using function-local scope
 	if fn.Function.Body != nil {
-		resolveNode(r, fn.Function.Body, cm)
+		// Get the function's local symbol table
+		functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
+		if exists {
+			// Temporarily switch to function scope for body resolution
+			originalTable := cm.SymbolTable
+			cm.SymbolTable = functionScope
+			resolveNode(r, fn.Function.Body, cm)
+			cm.SymbolTable = originalTable // Restore module scope
+		} else {
+			// Fallback to module scope if function scope not found
+			resolveNode(r, fn.Function.Body, cm)
+		}
 	}
 
 	// Create function type and symbol
