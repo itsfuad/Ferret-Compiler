@@ -3,7 +3,7 @@ let x = y + 1;    // Used after declaration - should work
 let result = add(5, 10); // Function called before declaration - should work
 
 fn main() {
-    print("test");
+    //print("test");
 }
 
 fn add(a: i32, b: i32) -> i32 {  // Function declared after call - should work

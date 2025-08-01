@@ -49,7 +49,7 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 	// collect functions for forward declarations
 	switch n := node.(type) {
 	case *ast.ImportStmt:
-		collectSymbolsFromImport(c, n, cm)
+		collectSymbolsFromImport(c, n)
 	case *ast.FunctionDecl:
 		collectFunctionSymbol(c, n, cm)
 	case *ast.VarDeclStmt:
@@ -63,7 +63,7 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 	}
 }
 
-func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportStmt, parentModule *modules.Module) {
+func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportStmt) {
 	defer func() {
 		if r := recover(); r != nil {
 			collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("Panic while collecting symbols from import: %v", r), report.COLLECTOR_PHASE)
@@ -100,53 +100,81 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 }
 
 func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
-	if fn.Identifier.Name == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE)
+	if !declareFunctionSymbol(c, fn, cm) {
 		return
 	}
 
-	// declare the function symbol in the module's symbol table
-	sym := symbol.NewSymbolWithLocation(fn.Identifier.Name, symbol.SymbolFunc, nil, fn.Loc())
-	err := cm.SymbolTable.Declare(fn.Identifier.Name, sym)
-	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
+	functionScope := createFunctionScope(fn, cm)
+	if functionScope == nil {
 		return
 	}
+
+	collectFunctionParameters(c, fn, functionScope)
+	collectFunctionBody(c, fn, cm, functionScope)
+}
+
+// declareFunctionSymbol declares the function symbol in the module's symbol table
+func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) bool {
+	if fn.Identifier.Name == "" {
+		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE)
+		return false
+	}
+
+	functionSymbol := symbol.NewSymbolWithLocation(fn.Identifier.Name, symbol.SymbolFunc, nil, fn.Loc())
+	err := cm.SymbolTable.Declare(fn.Identifier.Name, functionSymbol)
+	if err != nil {
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		return false
+	}
+	
 	if c.Debug {
 		colors.GREEN.Printf("Declared function symbol '%s' at %s\n", fn.Identifier.Name, fn.Loc().String())
 	}
+	return true
+}
 
-	// Create a local symbol table for this function with the module as parent
+// createFunctionScope creates and stores a local symbol table for the function
+func createFunctionScope(fn *ast.FunctionDecl, cm *modules.Module) *symbol.SymbolTable {
 	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
-
-	// Store the function scope in the module
 	cm.FunctionScopes[fn.Identifier.Name] = functionScope
+	return functionScope
+}
 
-	// Collect symbols from function parameters in the function's local scope
-	if fn.Function != nil {
-		for _, param := range fn.Function.Params {
-			if param.Identifier != nil {
-				paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, nil, param.Identifier.Loc())
-				paramErr := functionScope.Declare(param.Identifier.Name, paramSymbol)
-				if paramErr != nil {
-					c.Ctx.Reports.AddCriticalError(c.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+paramErr.Error(), report.COLLECTOR_PHASE)
-					continue
-				}
-				if c.Debug {
-					colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc().String())
-				}
-			}
+// collectFunctionParameters collects symbols from function parameters in the function's local scope
+func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, functionScope *symbol.SymbolTable) {
+	if fn.Function == nil {
+		return
+	}
+
+	for _, param := range fn.Function.Params {
+		if param.Identifier == nil {
+			continue
 		}
-
-		// Collect symbols from function body in the function's local scope
-		if fn.Function.Body != nil {
-			// Temporarily switch to function scope for body collection
-			originalTable := cm.SymbolTable
-			cm.SymbolTable = functionScope
-			collectSymbolsFromBlock(c, fn.Function.Body, cm)
-			cm.SymbolTable = originalTable // Restore module scope
+		
+		paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, nil, param.Identifier.Loc())
+		paramErr := functionScope.Declare(param.Identifier.Name, paramSymbol)
+		if paramErr != nil {
+			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+paramErr.Error(), report.COLLECTOR_PHASE)
+			continue
+		}
+		
+		if c.Debug {
+			colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc().String())
 		}
 	}
+}
+
+// collectFunctionBody collects symbols from function body in the function's local scope
+func collectFunctionBody(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module, functionScope *symbol.SymbolTable) {
+	if fn.Function == nil || fn.Function.Body == nil {
+		return
+	}
+
+	// Temporarily switch to function scope for body collection
+	originalTable := cm.SymbolTable
+	cm.SymbolTable = functionScope
+	collectSymbolsFromBlock(c, fn.Function.Body, cm)
+	cm.SymbolTable = originalTable // Restore module scope
 }
 
 func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
@@ -157,8 +185,8 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 		}
 
 		// Declare the variable symbol with placeholder type
-		symbol := symbol.NewSymbolWithLocation(variable.Identifier.Name, symbol.SymbolVar, nil, variable.Identifier.Loc())
-		err := cm.SymbolTable.Declare(variable.Identifier.Name, symbol)
+		variableSymbol := symbol.NewSymbolWithLocation(variable.Identifier.Name, symbol.SymbolVar, nil, variable.Identifier.Loc())
+		err := cm.SymbolTable.Declare(variable.Identifier.Name, variableSymbol)
 		if err != nil {
 			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.COLLECTOR_PHASE)
 			continue
@@ -177,8 +205,8 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 	}
 
 	// Declare the type symbol with placeholder type
-	symbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, nil, decl.Alias.Loc())
-	err := cm.SymbolTable.Declare(aliasName, symbol)
+	typeSymbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, nil, decl.Alias.Loc())
+	err := cm.SymbolTable.Declare(aliasName, typeSymbol)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, decl.Alias.Loc(), "Failed to declare type symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return

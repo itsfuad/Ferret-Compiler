@@ -90,11 +90,3 @@ func LatestVersion(v1, v2 string) string {
 	}
 	return v2
 }
-
-func prefferedVersion(v1, v2 string) string {
-	if CompareSemver(v1, v2) {
-		return v1
-	} else {
-		return v2
-	}
-}
