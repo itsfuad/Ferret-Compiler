@@ -151,9 +151,8 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 			}
 			// Update the symbol's type
 			symbol.Type = got
-
 			if r.Debug {
-				colors.TEAL.Printf("Declared variable symbol '%s' with type '%v' at %s\n", variable.Identifier.Name, got, variable.Identifier.Loc().String())
+				colors.TEAL.Printf("Declared variable symbol '%s' with explicit type '%v' at %s\n", variable.Identifier.Name, symbol.Type, variable.Identifier.Loc().String())
 			}
 		}
 	}

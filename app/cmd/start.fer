@@ -28,10 +28,12 @@ nonVoidfn();
 io::print("Hello, Ferret!");
 geometry::area_circle(3);
 
-// fn doSomething() {
-//     // This function does something
-// }
+fn doSomething() {
+    // This function does something
+}
 
-// fn add(a: i32, b: i32) -> i32 {
-//     return a + b;
-// }
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+let value = 10;
