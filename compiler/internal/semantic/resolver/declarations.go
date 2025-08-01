@@ -8,7 +8,6 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
-	"compiler/internal/symbol"
 	"compiler/internal/types"
 )
 
@@ -62,30 +61,30 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
 	for i, variable := range decl.Variables {
 
-		var expType stype.Type
-
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
 			resolveExpr(r, decl.Initializers[i], cm)
+		}
+
+		// Look up the already-declared symbol from the collector phase
+		symbol, found := cm.SymbolTable.Lookup(variable.Identifier.Name)
+		if !found {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.Identifier.Loc(), "Variable '"+variable.Identifier.Name+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
+			continue
 		}
 
 		if variable.ExplicitType != nil {
 			got, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
-				return
+				continue
 			}
-			expType = got
-		}
+			// Update the symbol's type
+			symbol.Type = got
 
-		err := cm.SymbolTable.Declare(variable.Identifier.Name, symbol.NewSymbolWithLocation(variable.Identifier.Name, symbol.SymbolVar, expType, variable.Identifier.Loc()))
-		if err != nil {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.RESOLVER_PHASE)
-			return
-		}
-
-		if r.Debug {
-			colors.TEAL.Printf("Declared variable symbol '%s' with type '%v' at %s\n", variable.Identifier.Name, expType, variable.Identifier.Loc().String())
+			if r.Debug {
+				colors.TEAL.Printf("Declared variable symbol '%s' with type '%v' at %s\n", variable.Identifier.Name, got, variable.Identifier.Loc().String())
+			}
 		}
 	}
 }
@@ -94,6 +93,13 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 	aliasName := decl.Alias.Name
 	if aliasName == "" {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Look up the already-declared symbol from the collector phase
+	symbol, found := cm.SymbolTable.Lookup(aliasName)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "Type alias '"+aliasName+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
 		return
 	}
 
@@ -107,15 +113,12 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 		Name:       types.TYPE_NAME(aliasName),
 		Definition: typeToDeclare,
 	}
-	symbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, symbolType, decl.Alias.Loc())
 
-	err = cm.SymbolTable.Declare(aliasName, symbol)
-	if err != nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "Failed to declare type alias: "+err.Error(), report.RESOLVER_PHASE)
-		return
-	}
+	// Update the symbol's type
+	symbol.Type = symbolType
+
 	if r.Debug {
-		colors.ORANGE.Printf("Declared type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc().String())
+		colors.ORANGE.Printf("Resolved type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc().String())
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
+	symbolpkg "compiler/internal/symbol"
 	"fmt"
 )
 
@@ -61,9 +62,31 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 }
 
 func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *modules.Module) {
-	if _, found := cm.SymbolTable.Lookup(id.Name); !found {
+	symbol, found := cm.SymbolTable.Lookup(id.Name)
+	if !found {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE)
+		return
 	}
+
+	// For variables: check if they're used before declaration (forward reference)
+	// For functions: allow forward references
+	if symbol.Kind == symbolpkg.SymbolVar && symbol.Location != nil {
+		usagePos := id.Loc().Start
+		declarationPos := symbol.Location.Start
+
+		// If variable is used before it's declared, that's an error
+		if usagePos.Line < declarationPos.Line ||
+			(usagePos.Line == declarationPos.Line && usagePos.Column < declarationPos.Column) {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				id.Loc(),
+				fmt.Sprintf("Cannot use variable '%s' before it is declared",
+					id.Name),
+				report.RESOLVER_PHASE,
+			)
+		}
+	}
+	// Functions can be called before declaration - no check needed
 }
 
 func resolveExpressionList(r *analyzer.AnalyzerNode, exprList *ast.ExpressionList, cm *modules.Module) {

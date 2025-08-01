@@ -1,0 +1,19 @@
+// Test comprehensive forward reference handling
+
+// This should work - function can be called before declaration
+let result = multiply(5, 3);
+
+// This should fail - variable used before declaration
+let x = y + 10;
+
+// This should fail - type used before declaration
+type Early Late;
+
+// Declarations come later
+let y: i32 = 42;
+
+fn multiply(a: i32, b: i32) -> i32 {
+    return a * b;
+}
+
+type Late i32;

@@ -121,6 +121,18 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Modul
 		return nil, fmt.Errorf("type '%s' does not exist", userType.TypeName)
 	}
 	if symbol.Type == nil {
+		// Check if this is a forward reference (type declared later)
+		if symbol.Location != nil {
+			usagePos := userType.Loc().Start
+			declarationPos := symbol.Location.Start
+
+			// If type is used before it's declared, that's a forward reference error
+			if usagePos.Line < declarationPos.Line ||
+				(usagePos.Line == declarationPos.Line && usagePos.Column < declarationPos.Column) {
+				return nil, fmt.Errorf("Cannot use type '%s' before it is declared",
+					userType.TypeName)
+			}
+		}
 		return nil, fmt.Errorf("type '%s' has no associated type", userType.TypeName)
 	}
 	return symbol.Type, nil
