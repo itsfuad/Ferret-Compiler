@@ -52,6 +52,10 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		collectSymbolsFromImport(c, n, cm)
 	case *ast.FunctionDecl:
 		collectFunctionSymbol(c, n, cm)
+	case *ast.VarDeclStmt:
+		collectVariableSymbols(c, n, cm)
+	case *ast.TypeDeclStmt:
+		collectTypeSymbol(c, n, cm)
 	}
 }
 
@@ -106,5 +110,44 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 	}
 	if c.Debug {
 		colors.GREEN.Printf("Declared function symbol '%s' at %s\n", fn.Identifier.Name, fn.Loc().String())
+	}
+}
+
+func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
+	for _, variable := range decl.Variables {
+		if variable.Identifier.Name == "" {
+			c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, variable.Identifier.Loc(), "Variable identifier cannot be empty", report.COLLECTOR_PHASE)
+			continue
+		}
+
+		// Declare the variable symbol with placeholder type
+		symbol := symbol.NewSymbolWithLocation(variable.Identifier.Name, symbol.SymbolVar, nil, variable.Identifier.Loc())
+		err := cm.SymbolTable.Declare(variable.Identifier.Name, symbol)
+		if err != nil {
+			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.COLLECTOR_PHASE)
+			continue
+		}
+		if c.Debug {
+			colors.GREEN.Printf("Declared variable symbol '%s' (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
+		}
+	}
+}
+
+func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *modules.Module) {
+	aliasName := decl.Alias.Name
+	if aliasName == "" {
+		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.COLLECTOR_PHASE)
+		return
+	}
+
+	// Declare the type symbol with placeholder type
+	symbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, nil, decl.Alias.Loc())
+	err := cm.SymbolTable.Declare(aliasName, symbol)
+	if err != nil {
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, decl.Alias.Loc(), "Failed to declare type symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		return
+	}
+	if c.Debug {
+		colors.GREEN.Printf("Declared type symbol '%s' (incomplete) at %s\n", aliasName, decl.Alias.Loc().String())
 	}
 }
