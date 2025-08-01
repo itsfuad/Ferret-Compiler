@@ -1,0 +1,59 @@
+// Test if-else control flow with simple assignments
+
+let x: i32 = 10;
+let y: i32 = 20;
+let flag: bool = true;
+let result: i32 = 0;
+
+// Simple if statement
+if x > 5 {
+    result = x + 1;
+}
+
+// If-else statement
+if flag {
+    y = 25;
+} else {
+    y = 15;
+}
+
+// If-else-if chain
+if x < 5 {
+    y = 1;
+} else if x < 15 {
+    y = 2;
+} else {
+    y = 3;
+}
+
+// Nested if statements
+if x > 0 {
+    if y > 20 {
+        result = 100;
+    } else {
+        result = 50;
+    }
+}
+
+// Function with if-else (avoiding return statements for now)
+fn processValue(value: i32) {
+    if value > 10 {
+        let tempHigh: i32 = value * 2;
+    } else {
+        let tempLow: i32 = value * 3;
+    }
+}
+
+fn main() {
+    // Test if-else in function context
+    if x > 5 {
+        let localVar: i32 = 42;
+        if localVar > 40 {
+            let nestedVar: i32 = 100;
+        }
+    }
+    
+    // Call function with if-else
+    processValue(15);
+    processValue(5);
+}
