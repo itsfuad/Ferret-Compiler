@@ -173,9 +173,9 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Assignment operators
 - [x] Grouping
 - [x] Type aliases
-- [ ] Arrays
-    - [ ] Array indexing
-    - [ ] Array assignment
+- [x] Arrays
+    - [x] Array indexing
+    - [x] Array assignment
 - [ ] Structs
     - [ ] Anonymous structs
     - [ ] Struct literals
@@ -183,27 +183,31 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
     - [ ] Struct field assignment
 - [ ] Methods
 - [ ] Interfaces
-- [ ] Functions
-- [ ] Conditionals
+- [x] Functions
+      - [x] Dead code elimination
+      - [x] Function calls
+      - [x] Function parameters
+      - [x] Function return values
+      - [ ] Annonymous functions
+      - [ ] Closures
+- [x] Conditionals
+    - [x] Control flow analysis
 - [ ] Loops (for, while)
 - [ ] Switch statements
 - [x] Type casting
 - [ ] Maps
 - [ ] Range expressions
 - [ ] Error handling
-- [ ] Imports and modules
+- [x] Imports and modules
 - [ ] Nullable/optional types
 - [ ] Generics
 - [ ] Advanced code generation
 - [x] Rich error reporting
-- [ ] Branch analysis
 - [x] Collector (Symbol collection and scope building)
 - [x] Resolver (Symbol resolution and reference binding)
 - [x] Type checking (Type inference and validation)
-- [x] Code generation (x86-64 assembly - basic implementation)
+- [ ] Code generation (x86-64 assembly - basic implementation)
 
-## Future Plans
-[ ] Clean dependency with 'ferret clean'
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
