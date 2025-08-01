@@ -1,6 +1,0 @@
-// Simple math module for testing imports
-let pi: f64 = 3.14159;
-
-fn area(radius: i32) -> f64 {
-    return pi * radius * radius;
-}
