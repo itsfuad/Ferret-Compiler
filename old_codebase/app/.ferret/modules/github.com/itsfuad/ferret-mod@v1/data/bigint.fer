@@ -1,6 +1,0 @@
-import "data/mods/constants";
-import "data/types";
-
-const r: types::BigInt = 10;
-
-let radius = constants::PI * (r * r) as types::BigFloat;
