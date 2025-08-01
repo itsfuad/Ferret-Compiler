@@ -193,6 +193,8 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 	if exists {
 		// Temporarily switch to function scope
 		originalTable := cm.SymbolTable
+		// Ensure function scope has access to module imports
+		functionScope.Imports = originalTable.Imports
 		cm.SymbolTable = functionScope
 
 		// Analyze the function body for control flow and returns

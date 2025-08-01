@@ -49,7 +49,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 
 func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) []stype.Type {
 	paramTypes := make([]stype.Type, 0) // Initialize as empty slice, not nil slice
-	
+
 	// Check if function has no parameters
 	if fn.Function == nil || fn.Function.Params == nil || len(fn.Function.Params) == 0 {
 		return paramTypes // Return empty slice for functions with no parameters
@@ -101,14 +101,16 @@ func resolveFunctionBody(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 	if fn.Function == nil || fn.Function.Body == nil {
 		return
 	}
-	
+
 	colors.PINK.Printf("Resolving function body for '%s' at %s\n", fn.Identifier.Name, fn.Function.Body.Loc().String())
 
 	functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
 	if exists {
 		colors.LIGHT_GREEN.Printf("Resolving function body for '%s' at %s\n", fn.Identifier.Name, fn.Function.Body.Loc().String())
 		// Temporarily switch to function scope for body resolution
+		// but preserve imports from module scope
 		originalTable := cm.SymbolTable
+		functionScope.Imports = originalTable.Imports // Copy imports to function scope
 		cm.SymbolTable = functionScope
 		resolveNode(r, fn.Function.Body, cm)
 		cm.SymbolTable = originalTable // Restore module scope
@@ -120,9 +122,9 @@ func resolveFunctionBody(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
-	
+
 	colors.ORANGE.Printf("Resolving variable declaration\n")
-	
+
 	for i, variable := range decl.Variables {
 
 		colors.BLUE.Printf("Resolving variable declaration '%s' at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())

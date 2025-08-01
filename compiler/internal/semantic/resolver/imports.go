@@ -6,13 +6,26 @@ import (
 	"compiler/internal/modules"
 	"compiler/internal/report"
 	"compiler/internal/semantic/analyzer"
+	"compiler/internal/symbol"
 	"fmt"
 )
+
+func getImportKeys(imports map[string]*symbol.SymbolTable) []string {
+	keys := make([]string, 0, len(imports))
+	for k := range imports {
+		keys = append(keys, k)
+	}
+	return keys
+}
 
 func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.Module) {
 	if imp.ImportPath.Value == "" {
 		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.RESOLVER_PHASE)
 		return
+	}
+
+	if r.Debug {
+		colors.YELLOW.Printf("Resolving import '%s' as '%s' in module '%s'\n", imp.ImportPath.Value, imp.ModuleName, cm.AST.Modulename)
 	}
 
 	// Resolve the import path based on context
@@ -36,12 +49,23 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *module
 	anz := analyzer.NewAnalyzerNode(module.AST, r.Ctx, r.Debug)
 	ResolveProgram(anz)
 	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
+
+	if r.Debug {
+		colors.GREEN.Printf("Successfully stored import '%s' in module '%s'\n", imp.ModuleName, cm.AST.Modulename)
+	}
 }
 
 func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) {
 
+	if r.Debug {
+		colors.CYAN.Printf("Looking for module '%s' in imports of '%s'\n", res.Module.Name, cm.AST.Modulename)
+	}
+
 	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
 	if !ok {
+		if r.Debug {
+			colors.RED.Printf("Available imports in '%s': %v\n", cm.AST.Modulename, getImportKeys(cm.SymbolTable.Imports))
+		}
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Module '%s' is not imported", res.Module.Name), report.RESOLVER_PHASE)
 		return
 	}

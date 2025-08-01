@@ -1,0 +1,4 @@
+import "github.com/itsfuad/ferret-remote-mod/extern";
+
+let string = extern::repo;
+

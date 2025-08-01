@@ -1,0 +1,16 @@
+[default]
+name = "ext"
+version = "1.0.0"
+
+[compiler]
+version = "0.1.0"
+
+[cache]
+path = ".ferret/cache"
+
+[remote]
+enabled = true
+share = true
+
+[dependencies]
+github.com/itsfuad/ferret-remote-mod = "^v0.0.1"

@@ -1,0 +1,7 @@
+# This is a comment
+name = "test"
+
+# Another comment
+[section]
+# Comment in section
+value = 42 # This is a comment

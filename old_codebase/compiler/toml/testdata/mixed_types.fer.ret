@@ -1,0 +1,6 @@
+string_val = "hello world"
+int_val = 123
+float_val = 3.14159
+bool_true = true
+bool_false = false
+raw_val = some_unquoted_value
