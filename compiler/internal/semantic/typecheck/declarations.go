@@ -40,6 +40,9 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	// Case: no explicit type → just infer
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
+		if r.Debug {
+			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType.String(), variable.Identifier.Name, variable.Identifier.Loc().String())
+		}
 		return
 	}
 
