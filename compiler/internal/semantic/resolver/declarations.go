@@ -14,6 +14,7 @@ import (
 )
 
 func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
+
 	functionSymbol, found := cm.SymbolTable.Lookup(fn.Identifier.Name)
 	if !found {
 		colors.RED.Printf("Function '%s' not found in symbol table\n", fn.Identifier.Name)
@@ -21,15 +22,22 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 		return
 	}
 
+	// Get function scope from the function symbol itself
+	functionScope := functionSymbol.Scope
+	if functionScope == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function scope for '"+fn.Identifier.Name+"' not found", report.RESOLVER_PHASE)
+		return
+	}
+
 	// Resolve parameter types and update function scope symbols
-	paramTypes := resolveParameterTypes(r, fn, cm)
+	paramTypes := resolveParameterTypes(r, fn.Function, cm, functionScope)
 	if paramTypes == nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function '"+fn.Identifier.Name+"'", report.RESOLVER_PHASE)
 		return // Error occurred during parameter resolution
 	}
 
 	// Resolve return type
-	returnType := resolveReturnType(r, fn, cm)
+	returnType := resolveReturnType(r, fn.Function, cm)
 	if returnType == nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function '"+fn.Identifier.Name+"'", report.RESOLVER_PHASE)
 		return // Error occurred during return type resolution
@@ -37,8 +45,12 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 
 	fmt.Printf("Resolved function '%s' with parameters: %v and return type: %v\n", fn.Identifier.Name, paramTypes, returnType)
 	// Resolve function body
-	resolveFunctionBody(r, fn, cm)
-
+	//set scope
+	originalTable := cm.SymbolTable
+	cm.SymbolTable = functionScope
+	resolveBlock(r, fn.Function.Body, cm)
+	// Restore original module scope
+	cm.SymbolTable = originalTable
 	// Create and assign function type
 	functionType := stype.FunctionType{
 		Parameters: paramTypes,
@@ -47,21 +59,20 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 	functionSymbol.Type = &functionType
 }
 
-func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) []stype.Type {
+func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module, functionScope *symbol.SymbolTable) []stype.Type {
 	paramTypes := make([]stype.Type, 0) // Initialize as empty slice, not nil slice
 
 	// Check if function has no parameters
-	if fn.Function == nil || fn.Function.Params == nil || len(fn.Function.Params) == 0 {
+	if fn == nil || fn.Params == nil || len(fn.Params) == 0 {
 		return paramTypes // Return empty slice for functions with no parameters
 	}
 
-	functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
-	if !exists {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function scope for '"+fn.Identifier.Name+"' not found", report.RESOLVER_PHASE)
+	if functionScope == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function scope not found", report.RESOLVER_PHASE)
 		return nil // Return nil to indicate error
 	}
 
-	for _, param := range fn.Function.Params {
+	for _, param := range fn.Params {
 		paramType, err := semantic.DeriveSemanticType(param.Type, cm)
 		if err != nil {
 			colors.RED.Printf("Error deriving type for parameter '%s': %s\n", param.Identifier.Name, err.Error())
@@ -70,55 +81,45 @@ func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 		}
 		paramTypes = append(paramTypes, paramType)
 
-		// Update parameter symbol in function scope
-		updateParameterSymbol(&param, paramType, functionScope, exists)
+		// Try to update parameter symbol first (for function declarations)
+		// If it doesn't exist, create it (for function literals)
+		createOrUpdateParameterSymbol(&param, paramType, functionScope, r)
 	}
 	return paramTypes
 }
 
-func updateParameterSymbol(param *ast.Parameter, paramType stype.Type, functionScope *symbol.SymbolTable, exists bool) {
-	if exists && param.Identifier != nil {
+func createOrUpdateParameterSymbol(param *ast.Parameter, paramType stype.Type, functionScope *symbol.SymbolTable, r *analyzer.AnalyzerNode) {
+	if functionScope != nil && param.Identifier != nil {
+		// Try to find existing parameter symbol (from collector phase for function declarations)
 		if paramSymbol, found := functionScope.Lookup(param.Identifier.Name); found {
+			// Update existing symbol
 			paramSymbol.Type = paramType
+			if r.Debug {
+				colors.YELLOW.Printf("Updated parameter symbol '%s' with type '%s'\n", param.Identifier.Name, paramType.String())
+			}
+		} else {
+			// Create new symbol (for function literals)
+			paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, paramType, param.Identifier.Loc())
+			err := functionScope.Declare(param.Identifier.Name, paramSymbol)
+			if err != nil {
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+err.Error(), report.RESOLVER_PHASE)
+			} else if r.Debug {
+				colors.GREEN.Printf("Created parameter symbol '%s' with type '%s' for function literal\n", param.Identifier.Name, paramType.String())
+			}
 		}
 	}
 }
 
-func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) stype.Type {
-	if fn.Function != nil && fn.Function.ReturnType != nil {
-		retType, err := semantic.DeriveSemanticType(fn.Function.ReturnType, cm)
+func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
+	if fn != nil && fn.ReturnType != nil {
+		retType, err := semantic.DeriveSemanticType(fn.ReturnType, cm)
 		if err != nil {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Function.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
 			return nil
 		}
 		return retType
 	}
 	return &stype.PrimitiveType{Name: types.VOID}
-}
-
-func resolveFunctionBody(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
-	// Check if function has a body
-	if fn.Function == nil || fn.Function.Body == nil {
-		return
-	}
-
-	colors.PINK.Printf("Resolving function body for '%s' at %s\n", fn.Identifier.Name, fn.Function.Body.Loc().String())
-
-	functionScope, exists := cm.FunctionScopes[fn.Identifier.Name]
-	if exists {
-		colors.LIGHT_GREEN.Printf("Resolving function body for '%s' at %s\n", fn.Identifier.Name, fn.Function.Body.Loc().String())
-		// Temporarily switch to function scope for body resolution
-		// but preserve imports from module scope
-		originalTable := cm.SymbolTable
-		functionScope.Imports = originalTable.Imports // Copy imports to function scope
-		cm.SymbolTable = functionScope
-		resolveNode(r, fn.Function.Body, cm)
-		cm.SymbolTable = originalTable // Restore module scope
-	} else {
-		colors.RED.Printf("Function scope for '%s' not found, resolving in module scope\n", fn.Identifier.Name)
-		// Fallback to module scope if function scope not found
-		resolveNode(r, fn.Function.Body, cm)
-	}
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
@@ -203,5 +204,72 @@ func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt,
 
 	if r.Debug {
 		colors.TEAL.Printf("Resolved assignment statement at %s\n", assign.Loc().String())
+	}
+}
+
+// resolveFunctionLiteral resolves function literals when encountered in expressions
+func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
+	if fn == nil || fn.ID == "" {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Create a function symbol for this literal
+	functionSymbol := symbol.NewSymbolWithLocation(fn.ID, symbol.SymbolFunc, nil, fn.Loc())
+
+	// Create function scope with module scope as parent
+	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
+	functionSymbol.Scope = functionScope
+
+	// Add function literal symbol to module symbol table
+	if err := cm.SymbolTable.Declare(fn.ID, functionSymbol); err != nil {
+		// If it already exists, get the existing symbol
+		existingSymbol, found := cm.SymbolTable.Lookup(fn.ID)
+		if !found {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to declare function literal symbol: "+err.Error(), report.RESOLVER_PHASE)
+			return
+		}
+		functionSymbol = existingSymbol
+		functionScope = functionSymbol.Scope
+		if functionScope == nil {
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal scope not found", report.RESOLVER_PHASE)
+			return
+		}
+	}
+
+	if r.Debug {
+		colors.BLUE.Printf("Resolved function literal '%s' at %s\n", fn.ID, fn.Loc().String())
+	}
+
+	// Resolve parameter types and update function scope symbols
+	paramTypes := resolveParameterTypes(r, fn, cm, functionScope)
+	if paramTypes == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Resolve return type
+	returnType := resolveReturnType(r, fn, cm)
+	if returnType == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
+		return
+	}
+
+	originalTable := cm.SymbolTable
+	cm.SymbolTable = functionScope
+	// Resolve function body
+	resolveBlock(r, fn.Body, cm)
+	// Restore original module scope
+	cm.SymbolTable = originalTable
+
+	// Create and assign function type
+	functionType := stype.FunctionType{
+		Parameters: paramTypes,
+		ReturnType: returnType,
+	}
+	functionSymbol.Type = &functionType
+
+	if r.Debug {
+		colors.ORANGE.Printf("Resolved function literal '%s' with parameters: %v and return type: %v\n", fn.ID, paramTypes, returnType)
 	}
 }

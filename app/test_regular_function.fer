@@ -1,0 +1,14 @@
+// Simple function test
+
+fn add(x: i32, y: i32) -> i32 {
+    return x + y;
+}
+
+fn multiply(a: i32, b: i32) -> i32 {
+    return a * b;
+}
+
+fn main() {
+    let result1: i32 = add(5, 3);
+    let result2: i32 = multiply(4, 6);
+}

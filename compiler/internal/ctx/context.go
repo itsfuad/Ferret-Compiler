@@ -444,12 +444,11 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 	}
 
 	c.Modules[importPath] = &modules.Module{
-		AST:            module,
-		SymbolTable:    symbol.NewSymbolTable(c.Builtins),
-		FunctionScopes: make(map[string]*symbol.SymbolTable),
-		Phase:          modules.PHASE_PARSED, // Module is parsed when added
-		IsBuiltin:      isBuiltin,
-		Type:           modules.GetModuleType(importPath, c.ProjectConfig.Name),
+		AST:         module,
+		SymbolTable: symbol.NewSymbolTable(c.Builtins),
+		Phase:       modules.PHASE_PARSED, // Module is parsed when added
+		IsBuiltin:   isBuiltin,
+		Type:        modules.GetModuleType(importPath, c.ProjectConfig.Name),
 	}
 }
 

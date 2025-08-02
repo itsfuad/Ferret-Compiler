@@ -82,6 +82,7 @@ func (s *StructLiteralExpr) Expr()                 {} // Expr is a marker interf
 func (s *StructLiteralExpr) Loc() *source.Location { return &s.Location }
 
 type FunctionLiteral struct {
+	ID         string // Unique identifier for this literal
 	Params     []Parameter
 	ReturnType DataType
 	Body       *Block
