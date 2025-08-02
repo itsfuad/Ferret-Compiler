@@ -1,0 +1,30 @@
+// Test struct casting functionality
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+type Point3D struct {
+    x: i32,
+    y: i32, 
+    z: i32
+};
+
+fn main() {
+    // Named to Anonymous casting - should work if all fields match
+    let namedPoint: Point = @Point{x: 10, y: 20};
+    let anonFromNamed = namedPoint as struct{x: i32, y: i32};
+    
+    // Anonymous to Named casting - should work if all fields match  
+    let anonPoint = @struct{x: 30, y: 40};
+    let namedFromAnon: Point = anonPoint as Point;
+    
+    // Named to Named casting (structural subtyping)
+    let point3d: Point3D = @Point3D{x: 1, y: 2, z: 3};
+    let point2d: Point = point3d as Point; // Point3D has all Point fields + more
+    
+    // Test field access after casting
+    let x1: i32 = anonFromNamed.x;
+    let y1: i32 = namedFromAnon.y;
+    let x2: i32 = point2d.x;
+}
