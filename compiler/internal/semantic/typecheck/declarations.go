@@ -83,7 +83,7 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 			report.TYPECHECK_PHASE,
 		)
 
-		if isCastValid(inferredType, explicitType) {
+		if ok, _ := isCastable(inferredType, explicitType, cm); ok {
 			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
 		}
 	}
@@ -127,7 +127,7 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 		if !IsAssignableFrom(lhsType, rhsType) {
 			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
 
-			if isCastValid(rhsType, lhsType) {
+			if ok, _ := isCastable(rhsType, lhsType, cm); ok {
 				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType.String()))
 			}
 
@@ -182,7 +182,7 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			funcDecl.Loc(),
-			"Function '"+funcDecl.Identifier.Name+"' not found in symbol table",
+			fmt.Sprintf("Function '%s' not found in symbol table", funcDecl.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -192,7 +192,7 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			funcDecl.Loc(),
-			"Function scope for '"+funcDecl.Identifier.Name+"' not found",
+			fmt.Sprintf("Function scope for '%s' not found", funcDecl.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return

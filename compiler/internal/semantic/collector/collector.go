@@ -352,8 +352,7 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 	// Declare the type symbol with placeholder type
 	typeSymbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, nil, decl.Alias.Loc())
 
-	// TODO: Check why we need it later
-	// Check if this is a struct type that needs its own scope for methods
+	// create a scope for the type to hold its methods
 	if decl.BaseType != nil {
 		// Create a scope for struct types to hold their methods
 		structScope := symbol.NewSymbolTable(cm.SymbolTable)

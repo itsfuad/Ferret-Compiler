@@ -299,7 +299,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 				report.TYPECHECK_PHASE,
 			)
 
-			if isCastValid(elemType, elementType) {
+			if ok, _ := isCastable(elemType, elementType, cm); !ok {
 				err.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", elementType))
 			}
 
