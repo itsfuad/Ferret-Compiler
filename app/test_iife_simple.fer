@@ -1,0 +1,7 @@
+fn main() -> i32 {
+    return 42;
+}
+
+fn()-> i32 {
+    return 24;
+}();

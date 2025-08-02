@@ -153,6 +153,16 @@ func parseNode(p *Parser) ast.Node {
 		node = parseReturnStmt(p)
 	case lexer.FUNCTION_TOKEN:
 		node = parseFunctionLike(p)
+		// Check if this is a function literal that should be treated as an expression (IIFE)
+		if funcLit, ok := node.(*ast.FunctionLiteral); ok {
+			// If followed by '(', treat as an expression statement for IIFE
+			if p.peek().Kind == lexer.OPEN_PAREN {
+				// Create a function call expression with the literal as the callee
+				callExpr, _ := parseFunctionCall(p, funcLit)
+				node = parseExpressionStatement(p, callExpr)
+			}
+			// Otherwise, it's a standalone function literal at top level (unusual but valid)
+		}
 	case lexer.IF_TOKEN:
 		node = parseIfStatement(p)
 	case lexer.AT_TOKEN:
