@@ -275,7 +275,7 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 	}
 
 	fmt.Printf("Resolved method '%s.%s' with receiver: %v, parameters: %v and return type: %v\n", receiverTypeName, methodName, receiverType, paramTypes, returnType)
-	
+
 	// Resolve method body
 	//set scope
 	originalTable := cm.SymbolTable
@@ -283,7 +283,7 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 	resolveBlock(r, method.Function.Body, cm)
 	// Restore original module scope
 	cm.SymbolTable = originalTable
-	
+
 	// Create and assign method type (same as function type but includes receiver information)
 	methodType := stype.FunctionType{
 		Parameters: paramTypes,

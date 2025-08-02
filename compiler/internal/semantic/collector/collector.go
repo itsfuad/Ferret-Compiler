@@ -179,10 +179,10 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 
 	// Collect receiver parameter first (always the first parameter in method scope)
 	collectMethodReceiver(c, method, functionScope)
-	
+
 	// Collect method parameters
 	collectFunctionParameters(c, method.Function, functionScope)
-	
+
 	// Collect method body
 	collectFunctionBody(c, method.Function, cm, functionScope)
 }
@@ -197,8 +197,8 @@ func declareMethodSymbolInStructScope(c *analyzer.AnalyzerNode, method *ast.Meth
 	}
 
 	functionScope := symbol.NewSymbolTable(structScope)
-	functionSymbol.Scope = functionScope           // Store scope in the method symbol itself
-	functionScope.Imports = structScope.Imports    // Ensure method scope has access to imports
+	functionSymbol.Scope = functionScope        // Store scope in the method symbol itself
+	functionScope.Imports = structScope.Imports // Ensure method scope has access to imports
 
 	if c.Debug {
 		colors.BRIGHT_BROWN.Printf("Declared method symbol '%s' in struct scope at %s\n", methodName, method.Loc().String())
@@ -351,7 +351,7 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 
 	// Declare the type symbol with placeholder type
 	typeSymbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, nil, decl.Alias.Loc())
-	
+
 	// TODO: Check why we need it later
 	// Check if this is a struct type that needs its own scope for methods
 	if decl.BaseType != nil {
@@ -363,7 +363,7 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 			colors.CYAN.Printf("Created scope for struct type '%s'\n", aliasName)
 		}
 	}
-	
+
 	err := cm.SymbolTable.Declare(aliasName, typeSymbol)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, decl.Alias.Loc(), "Failed to declare type symbol: "+err.Error(), report.COLLECTOR_PHASE)
