@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+git.sh
 
 # Build output directory
 bin/
