@@ -46,6 +46,10 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 }
 
 func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
+	if node == nil {
+		return
+	}
+
 	colors.BROWN.Printf("Collecting symbols from node <%T> at %s\n", node, node.Loc().String())
 	// collect functions for forward declarations
 	switch n := node.(type) {
@@ -63,6 +67,35 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		collectSymbolsFromIfStmt(c, n, cm)
 	case *ast.Block:
 		collectSymbolsFromBlock(c, n, cm)
+	case *ast.FunctionCallExpr:
+		// Recursively collect from the caller (might be a function literal)
+		if n.Caller != nil {
+			collectSymbols(c, *n.Caller, cm)
+		}
+		// Recursively collect from arguments (might contain function literals)
+		for _, arg := range n.Arguments {
+			collectSymbols(c, arg, cm)
+		}
+	case *ast.BinaryExpr:
+		// Recursively collect from both operands
+		if n.Left != nil {
+			collectSymbols(c, *n.Left, cm)
+		}
+		if n.Right != nil {
+			collectSymbols(c, *n.Right, cm)
+		}
+	case *ast.PrefixExpr:
+		// Recursively collect from the operand
+		if n.Operand != nil {
+			collectSymbols(c, *n.Operand, cm)
+		}
+	case *ast.PostfixExpr:
+		// Recursively collect from the operand
+		if n.Operand != nil {
+			collectSymbols(c, *n.Operand, cm)
+		}
+		// For other expressions and nodes, we don't need to collect symbols
+		// (literals, identifiers, etc. don't contain nested function literals)
 	}
 }
 
