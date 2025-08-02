@@ -1,0 +1,31 @@
+// Complex IIFE test 
+fn main() -> i32 {
+    // Test IIFE with complex expressions and control flow
+    let result = fn(a: i32, b: i32) -> i32 {
+        let temp = a + b;
+        if temp > 10 {
+            let bonus = 5;
+            return temp * 2 + bonus;
+        } else {
+            return temp;
+        }
+    }(5, 8);
+    
+    // Test nested IIFE
+    let doubled = fn(x: i32) -> i32 {
+        return fn(y: i32) -> i32 {
+            return y * 2;
+        }(x);
+    }(result);
+
+    //normal literal fn
+    const myfunc = fn() -> i32 {
+        return 100;
+    };
+
+    myfunc(); // Call the normal function literal
+    
+    return doubled;
+}
+
+main();

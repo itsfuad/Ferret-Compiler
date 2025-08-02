@@ -62,6 +62,8 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		checkIfStmt(r, n, cm)
 	case *ast.Block:
 		checkBlock(r, n, cm)
+	case *ast.FunctionLiteral:
+		checkFunctionLiteralType(r, n, cm)
 	case *ast.ReturnStmt:
 		// Return statements are checked in the context of function declarations
 		// Standalone return statements are an error

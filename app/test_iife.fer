@@ -1,0 +1,19 @@
+// Test IIFE (Immediately Invoked Function Expression)
+let result = fn(x: i32, y: i32) -> i32 {
+    let sum = x + y;
+    return sum * 2;
+}(10, 20);
+
+fn main() -> i32 {
+    // Test IIFE at top level
+    fn() -> i32 {
+        return 42;
+    }();
+    
+    // Test IIFE with parameters  
+    let value = fn(a: i32) -> i32 {
+        return a + result;
+    }(5);
+    
+    return value;
+}

@@ -69,6 +69,8 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		resolveExpressionList(r, n, cm)
 	case *ast.ExpressionStmt:
 		resolveExpressionStmt(r, n, cm)
+	case *ast.FunctionLiteral:
+		resolveFunctionLiteral(r, n, cm)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for resolution", n), report.RESOLVER_PHASE)
 	}
