@@ -57,6 +57,8 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		collectSymbolsFromImport(c, n)
 	case *ast.FunctionDecl:
 		collectFunctionSymbol(c, n, cm)
+	case *ast.MethodDecl:
+		collectMethodSymbol(c, n, cm)
 	case *ast.FunctionLiteral:
 		collectFunctionLiteral(c, n, cm)
 	case *ast.VarDeclStmt:
@@ -135,6 +137,91 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 		Ctx:     collector.Ctx,
 		Program: module.AST,
 	})
+}
+
+func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) {
+	// Methods are similar to functions but have a receiver parameter
+	// Method should be stored in the struct's scope, not module scope
+	if method.Method == nil || method.Method.Name == "" {
+		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, method.Loc(), "Method identifier cannot be empty", report.COLLECTOR_PHASE)
+		return
+	}
+
+	if method.Receiver == nil || method.Receiver.Identifier == nil {
+		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, method.Loc(), "Method must have a receiver", report.COLLECTOR_PHASE)
+		return
+	}
+
+	// Get the receiver type name to find the struct's scope
+	receiverTypeName := ""
+	if method.Receiver.Type != nil {
+		receiverTypeName = string(method.Receiver.Type.Type())
+	}
+
+	// Find the struct type symbol to get its scope
+	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
+	if !found {
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, method.Loc(), "Receiver type '"+receiverTypeName+"' not found", report.COLLECTOR_PHASE)
+		return
+	}
+
+	if structSymbol.Scope == nil {
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, method.Loc(), "Receiver type '"+receiverTypeName+"' does not have a scope for methods", report.COLLECTOR_PHASE)
+		return
+	}
+
+	// Store method in the struct's scope with just the method name (not qualified)
+	methodName := method.Method.Name
+	functionScope := declareMethodSymbolInStructScope(c, method, methodName, structSymbol.Scope)
+	if functionScope == nil {
+		return
+	}
+
+	// Collect receiver parameter first (always the first parameter in method scope)
+	collectMethodReceiver(c, method, functionScope)
+
+	// Collect method parameters
+	collectFunctionParameters(c, method.Function, functionScope)
+
+	// Collect method body
+	collectFunctionBody(c, method.Function, cm, functionScope)
+}
+
+// declareMethodSymbolInStructScope declares the method symbol in the struct's scope
+func declareMethodSymbolInStructScope(c *analyzer.AnalyzerNode, method *ast.MethodDecl, methodName string, structScope *symbol.SymbolTable) *symbol.SymbolTable {
+	functionSymbol := symbol.NewSymbolWithLocation(methodName, symbol.SymbolFunc, nil, method.Loc())
+	err := structScope.Declare(methodName, functionSymbol)
+	if err != nil {
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Loc(), "Failed to declare method symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		return nil
+	}
+
+	functionScope := symbol.NewSymbolTable(structScope)
+	functionSymbol.Scope = functionScope        // Store scope in the method symbol itself
+	functionScope.Imports = structScope.Imports // Ensure method scope has access to imports
+
+	if c.Debug {
+		colors.BRIGHT_BROWN.Printf("Declared method symbol '%s' in struct scope at %s\n", methodName, method.Loc().String())
+	}
+	return functionScope
+}
+
+// collectMethodReceiver collects the receiver parameter in the method's local scope
+func collectMethodReceiver(c *analyzer.AnalyzerNode, method *ast.MethodDecl, methodScope *symbol.SymbolTable) {
+	if method.Receiver == nil || method.Receiver.Identifier == nil {
+		return
+	}
+
+	receiverSymbol := symbol.NewSymbolWithLocation(method.Receiver.Identifier.Name, symbol.SymbolVar, nil, method.Receiver.Identifier.Loc())
+	receiverErr := methodScope.Declare(method.Receiver.Identifier.Name, receiverSymbol)
+	if receiverErr != nil {
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "Failed to declare receiver symbol: "+receiverErr.Error(), report.COLLECTOR_PHASE)
+		return
+	}
+
+	if c.Debug {
+		colors.GREEN.Printf("Declared receiver symbol '%s' (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc().String())
+	}
 }
 
 func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
@@ -264,6 +351,18 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 
 	// Declare the type symbol with placeholder type
 	typeSymbol := symbol.NewSymbolWithLocation(aliasName, symbol.SymbolType, nil, decl.Alias.Loc())
+
+	// create a scope for the type to hold its methods
+	if decl.BaseType != nil {
+		// Create a scope for struct types to hold their methods
+		structScope := symbol.NewSymbolTable(cm.SymbolTable)
+		structScope.Imports = cm.SymbolTable.Imports // Ensure struct scope has access to module imports
+		typeSymbol.Scope = structScope
+		if c.Debug {
+			colors.CYAN.Printf("Created scope for struct type '%s'\n", aliasName)
+		}
+	}
+
 	err := cm.SymbolTable.Declare(aliasName, typeSymbol)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, decl.Alias.Loc(), "Failed to declare type symbol: "+err.Error(), report.COLLECTOR_PHASE)

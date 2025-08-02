@@ -1,0 +1,16 @@
+// Test simple field access first
+type Person struct {
+    name: str,
+    age: i32
+};
+
+fn main() {
+    let p: Person = @Person{
+        name: "Alice",
+        age: 30
+    };
+    
+    // Test field access only first
+    let name: str = p.name;
+    let age: i32 = p.age;
+}

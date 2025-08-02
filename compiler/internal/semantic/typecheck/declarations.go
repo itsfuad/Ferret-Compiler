@@ -83,7 +83,7 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 			report.TYPECHECK_PHASE,
 		)
 
-		if isCastValid(inferredType, explicitType) {
+		if ok, _ := isCastable(inferredType, explicitType, cm); ok {
 			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
 		}
 	}
@@ -127,7 +127,7 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 		if !IsAssignableFrom(lhsType, rhsType) {
 			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
 
-			if isCastValid(rhsType, lhsType) {
+			if ok, _ := isCastable(rhsType, lhsType, cm); ok {
 				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType.String()))
 			}
 
@@ -182,7 +182,7 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			funcDecl.Loc(),
-			"Function '"+funcDecl.Identifier.Name+"' not found in symbol table",
+			fmt.Sprintf("Function '%s' not found in symbol table", funcDecl.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -192,7 +192,7 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			funcDecl.Loc(),
-			"Function scope for '"+funcDecl.Identifier.Name+"' not found",
+			fmt.Sprintf("Function scope for '%s' not found", funcDecl.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -234,14 +234,102 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 	cm.SymbolTable = originalTable
 
 	// Check if non-void function has all paths returning
-	if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
+	if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.AllPathsReturn {
+		if len(result.CriticalMissingReturns) > 0 {
+			// Report main error
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				fn.Loc(),
+				"Not all paths in function return a value",
+				report.TYPECHECK_PHASE,
+			)
+
+			// Add specific errors for each critical missing return location
+			for i, loc := range result.CriticalMissingReturns {
+				if i < 3 { // Limit to first 3 locations to avoid spam
+					r.Ctx.Reports.AddSemanticError(
+						r.Program.FullPath,
+						&loc,
+						"Missing return statement in this path",
+						report.TYPECHECK_PHASE,
+					)
+				}
+			}
+		} else {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				fn.Loc(),
+				"Not all paths in function return a value",
+				report.TYPECHECK_PHASE,
+			)
+		}
+	}
+}
+
+func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *modules.Module) {
+	if methodDecl.Function == nil {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			fn.Loc(),
-			"Not all paths in function return a value",
+			methodDecl.Loc(),
+			"Method declaration missing function body",
 			report.TYPECHECK_PHASE,
 		)
+		return
 	}
+
+	// Get the receiver type name to find the struct's scope
+	receiverTypeName := ""
+	if methodDecl.Receiver.Type != nil {
+		receiverTypeName = string(methodDecl.Receiver.Type.Type())
+	}
+	methodName := methodDecl.Method.Name
+
+	// Find the struct type symbol to get its scope
+	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Struct type '"+receiverTypeName+"' not found in symbol table",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	if structSymbol.Scope == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Struct type '"+receiverTypeName+"' does not have a scope for methods",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Look for the method in the struct's scope
+	methodSymbol, found := structSymbol.Scope.Lookup(methodName)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Method '"+methodName+"' not found in struct '"+receiverTypeName+"' scope",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	if methodSymbol.Scope == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Method scope for '"+methodName+"' not found",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Check the method function using the helper function
+	checkFunctionLiteral(r, methodDecl.Function, cm, methodSymbol.Scope)
 }
 
 // checkFunctionLiteralType checks function literals and returns their type

@@ -7,14 +7,15 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
+	"compiler/internal/source"
 	"fmt"
 )
 
 // ControlFlowResult represents the result of control flow analysis
 type ControlFlowResult struct {
-	HasReturn   bool       // Whether this path has a return statement
-	IsReachable bool       // Whether code after this construct is reachable
-	ReturnType  stype.Type // Type of return value (if any)
+	AllPathsReturn         bool
+	HasFallbackReturn      bool              // Function body has a return after conditionals
+	CriticalMissingReturns []source.Location // Only critical missing returns
 }
 
 // checkIfStmt validates an if statement and its branches
@@ -148,45 +149,119 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 // analyzeControlFlow performs comprehensive control flow analysis for a block
 func analyzeControlFlow(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module, expectedReturnType stype.Type) ControlFlowResult {
 	if block == nil {
-		return ControlFlowResult{HasReturn: false, IsReachable: true}
+		return createEmptyControlFlowResult()
 	}
 
-	result := ControlFlowResult{HasReturn: false, IsReachable: true}
+	result := createEmptyControlFlowResult()
+	conditionalResults := []ControlFlowResult{}
+	hasConditionals := false
+
+	// Process all nodes in the block
+	earlyReturn, hasConditionals := processBlockNodes(r, block, cm, expectedReturnType, &result, &conditionalResults, hasConditionals)
+	if earlyReturn {
+		return result
+	}
+
+	// Handle fallback return detection and missing returns
+	return handleFallbackAndMissingReturns(block, result, conditionalResults, hasConditionals)
+}
+
+// createEmptyControlFlowResult creates a new empty ControlFlowResult
+func createEmptyControlFlowResult() ControlFlowResult {
+	return ControlFlowResult{
+		AllPathsReturn:         false,
+		HasFallbackReturn:      false,
+		CriticalMissingReturns: []source.Location{},
+	}
+}
+
+// processBlockNodes processes all nodes in a block and returns early if return found
+func processBlockNodes(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module, expectedReturnType stype.Type,
+	result *ControlFlowResult, conditionalResults *[]ControlFlowResult, hasConditionals bool) (bool, bool) {
+
 	reachable := true
 
 	for _, node := range block.Nodes {
 		if !reachable {
-			// Dead code detected
-			r.Ctx.Reports.AddSemanticError(
-				r.Program.FullPath,
-				node.Loc(),
-				"Unreachable code after return statement",
-				report.TYPECHECK_PHASE,
-			)
+			reportUnreachableCode(r, node)
 			continue
 		}
 
 		switch n := node.(type) {
 		case *ast.ReturnStmt:
 			checkReturnStmt(r, n, cm, expectedReturnType)
-			result.HasReturn = true
-			reachable = false // Code after return is unreachable
-		case *ast.IfStmt:
-			ifResult := analyzeIfStatement(r, n, cm, expectedReturnType)
-			if ifResult.HasReturn {
-				result.HasReturn = true
+			result.AllPathsReturn = true
+			if !hasConditionals {
+				result.HasFallbackReturn = true
 			}
-			if !ifResult.IsReachable {
-				reachable = false
+			return true, hasConditionals // Early return found
+		case *ast.IfStmt:
+			hasConditionals = true
+			ifResult := analyzeIfStatement(r, n, cm, expectedReturnType)
+			*conditionalResults = append(*conditionalResults, ifResult)
+			if ifResult.AllPathsReturn {
+				result.AllPathsReturn = true
+				return true, hasConditionals // All paths in if statement return
 			}
 		default:
-			// Check other nodes normally
 			checkNode(r, node, cm)
 		}
 	}
 
-	result.IsReachable = reachable
+	return false, hasConditionals
+}
+
+// reportUnreachableCode reports unreachable code after return
+func reportUnreachableCode(r *analyzer.AnalyzerNode, node ast.Node) {
+	r.Ctx.Reports.AddSemanticError(
+		r.Program.FullPath,
+		node.Loc(),
+		"Unreachable code after return statement",
+		report.TYPECHECK_PHASE,
+	)
+}
+
+// handleFallbackAndMissingReturns handles fallback return detection and collects missing returns
+func handleFallbackAndMissingReturns(block *ast.Block, result ControlFlowResult, conditionalResults []ControlFlowResult, hasConditionals bool) ControlFlowResult {
+	// Check for fallback return after conditionals
+	if hasConditionals && hasFallbackReturn(block) {
+		result.HasFallbackReturn = true
+		result.AllPathsReturn = true
+		return result
+	}
+
+	// Collect critical missing returns if no fallback
+	if !result.HasFallbackReturn {
+		collectMissingReturns(&result, conditionalResults, hasConditionals, block)
+	}
+
 	return result
+}
+
+// hasFallbackReturn checks if block has a return statement at the end
+func hasFallbackReturn(block *ast.Block) bool {
+	for i := len(block.Nodes) - 1; i >= 0; i-- {
+		if _, ok := block.Nodes[i].(*ast.ReturnStmt); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// collectMissingReturns collects all critical missing return locations
+func collectMissingReturns(result *ControlFlowResult, conditionalResults []ControlFlowResult, hasConditionals bool, block *ast.Block) {
+	for _, condResult := range conditionalResults {
+		if !condResult.AllPathsReturn {
+			result.CriticalMissingReturns = append(result.CriticalMissingReturns, condResult.CriticalMissingReturns...)
+		}
+	}
+
+	// If no conditionals and no return, add end of block
+	if !hasConditionals {
+		if endLoc := getBlockEndLocation(block); endLoc != nil {
+			result.CriticalMissingReturns = append(result.CriticalMissingReturns, *endLoc)
+		}
+	}
 }
 
 // analyzeIfStatement analyzes if statement for return paths
@@ -197,30 +272,76 @@ func analyzeIfStatement(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *module
 	// Analyze main body
 	mainResult := analyzeControlFlow(r, ifStmt.Body, cm, expectedReturnType)
 
-	// Analyze alternative (else/else-if)
-	var altResult ControlFlowResult
+	// Handle if-else vs if-only cases
 	if ifStmt.Alternative != nil {
-		switch alt := ifStmt.Alternative.(type) {
-		case *ast.IfStmt:
-			altResult = analyzeIfStatement(r, alt, cm, expectedReturnType)
-		case *ast.Block:
-			altResult = analyzeControlFlow(r, alt, cm, expectedReturnType)
-		}
+		return analyzeIfElseBranches(r, ifStmt, cm, expectedReturnType, mainResult)
 	} else {
-		// No else branch - code is reachable
-		altResult = ControlFlowResult{HasReturn: false, IsReachable: true}
+		return analyzeIfOnlyBranch(mainResult)
 	}
+}
 
-	// Combine results
+// analyzeIfElseBranches handles if-else and if-else-if cases
+func analyzeIfElseBranches(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Module, expectedReturnType stype.Type, mainResult ControlFlowResult) ControlFlowResult {
+	result := createEmptyControlFlowResult()
+
+	// Analyze alternative branch
+	altResult := analyzeAlternativeBranch(r, ifStmt.Alternative, cm, expectedReturnType)
+
 	// Both paths have returns only if BOTH main and alternative have returns
-	hasReturn := mainResult.HasReturn && altResult.HasReturn
-	// Code is reachable if either path is reachable
-	isReachable := mainResult.IsReachable || altResult.IsReachable
-
-	return ControlFlowResult{
-		HasReturn:   hasReturn,
-		IsReachable: isReachable,
+	if mainResult.AllPathsReturn && altResult.AllPathsReturn {
+		result.AllPathsReturn = true
+	} else {
+		// Collect missing returns from problematic branches
+		collectBranchMissingReturns(&result, mainResult, altResult)
 	}
+
+	return result
+}
+
+// analyzeIfOnlyBranch handles if statement without else
+func analyzeIfOnlyBranch(mainResult ControlFlowResult) ControlFlowResult {
+	result := createEmptyControlFlowResult()
+
+	// If statement without else - execution can fall through
+	result.AllPathsReturn = false
+	if !mainResult.AllPathsReturn {
+		result.CriticalMissingReturns = append(result.CriticalMissingReturns, mainResult.CriticalMissingReturns...)
+	}
+
+	return result
+}
+
+// analyzeAlternativeBranch analyzes else or else-if branch
+func analyzeAlternativeBranch(r *analyzer.AnalyzerNode, alternative ast.Node, cm *modules.Module, expectedReturnType stype.Type) ControlFlowResult {
+	switch alt := alternative.(type) {
+	case *ast.IfStmt:
+		return analyzeIfStatement(r, alt, cm, expectedReturnType)
+	case *ast.Block:
+		return analyzeControlFlow(r, alt, cm, expectedReturnType)
+	default:
+		return createEmptyControlFlowResult()
+	}
+}
+
+// collectBranchMissingReturns collects missing returns from if-else branches
+func collectBranchMissingReturns(result *ControlFlowResult, mainResult, altResult ControlFlowResult) {
+	// Only report specific branches that are problematic
+	if !mainResult.AllPathsReturn {
+		result.CriticalMissingReturns = append(result.CriticalMissingReturns, mainResult.CriticalMissingReturns...)
+	}
+	if !altResult.AllPathsReturn {
+		result.CriticalMissingReturns = append(result.CriticalMissingReturns, altResult.CriticalMissingReturns...)
+	}
+}
+
+// getBlockEndLocation returns the location at the end of a block
+func getBlockEndLocation(block *ast.Block) *source.Location {
+	if block == nil || len(block.Nodes) == 0 {
+		return nil
+	}
+	// Return the location of the last node in the block
+	lastNode := block.Nodes[len(block.Nodes)-1]
+	return lastNode.Loc()
 }
 
 // isVoidType checks if a type represents void (no return type)

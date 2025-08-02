@@ -1,0 +1,50 @@
+// Test enhanced control flow error reporting
+fn testSimpleIf(x: i32) -> i32 {
+    if x > 0 {
+        return x;
+    }
+    // Missing return in the case where x <= 0
+}
+
+fn testIfElse(x: i32) -> i32 {
+    if x > 10 {
+        return x * 2;
+    } else if x > 5 {
+        // Missing return in this branch
+        let y: i32 = x + 1;
+    } else {
+        return x;
+    }
+}
+
+fn testNestedIf(x: i32, y: i32) -> i32 {
+    if x > 0 {
+        if y > 0 {
+            return x + y;
+        }
+        // Missing return when x > 0 but y <= 0
+    } else {
+        return x - y;
+    }
+}
+
+fn testComplexPaths(a: i32, b: i32, c: i32) -> i32 {
+    if a > 0 {
+        if b > 0 {
+            if c > 0 {
+                return a + b + c;
+            }
+            // Missing return when a > 0, b > 0, c <= 0
+        } else {
+            return a + b;
+        }
+    }
+    // Missing return when a <= 0
+}
+
+fn main() {
+    let result1: i32 = testSimpleIf(5);
+    let result2: i32 = testIfElse(3);
+    let result3: i32 = testNestedIf(1, -1);
+    let result4: i32 = testComplexPaths(1, 1, -1);
+}

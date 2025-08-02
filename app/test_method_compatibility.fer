@@ -1,0 +1,52 @@
+// Test method compatibility in struct casting
+type Shape struct {
+    area: f64
+};
+
+fn (self: Shape) getArea() -> f64 {
+    return self.area;
+}
+
+fn (self: Shape) setArea(newArea: f64) {
+    // Note: In real implementation this would need mutable reference
+}
+
+type Rectangle struct {
+    width: f64,
+    height: f64,
+    area: f64
+};
+
+fn (self: Rectangle) getArea() -> f64 {
+    return self.width * self.height;
+}
+
+// Rectangle is missing setArea method
+
+type Circle struct {
+    radius: f64,
+    area: f64
+};
+
+fn (self: Circle) getArea() -> f64 {
+    return 3.14159 * self.radius * self.radius;
+}
+
+fn (self: Circle) setArea(newArea: f64) {
+    // Implementation
+}
+
+fn (self: Circle) getRadius() -> f64 {
+    return self.radius;
+}
+
+fn main() {
+    let rect: Rectangle = @Rectangle{width: 10.0, height: 5.0, area: 50.0};
+    let circle: Circle = @Circle{radius: 5.0, area: 78.54};
+    
+    // This should fail - Rectangle is missing setArea method
+    let shape1: Shape = rect as Shape;
+    
+    // This should succeed - Circle has all Shape methods (and more)
+    let shape2: Shape = circle as Shape;
+}

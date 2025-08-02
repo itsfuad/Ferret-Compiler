@@ -1,0 +1,21 @@
+// Test unnamed (anonymous) struct literals
+fn main() {
+    // Test anonymous struct literal
+    let point = @struct{
+        x: 10,
+        y: 20
+    };
+    
+    // Test field access on anonymous struct
+    let x: i32 = point.x;
+    let y: i32 = point.y;
+    
+    // Test another anonymous struct with different fields
+    let person = @struct{
+        name: "Alice",
+        age: 30
+    };
+    
+    let name: str = person.name;
+    let age: i32 = person.age;
+}

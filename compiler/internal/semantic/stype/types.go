@@ -51,7 +51,8 @@ func (u *UserType) String() string {
 
 func (u *UserType) Equals(other Type) bool {
 	if otherUser, ok := other.(*UserType); ok {
-		return u.Name == otherUser.Name
+		//source and target user types must have the same name and same fields with same types
+		return u.Name == otherUser.Name && u.Definition.Equals(otherUser.Definition)
 	}
 	return false
 }

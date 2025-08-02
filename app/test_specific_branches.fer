@@ -1,0 +1,32 @@
+// Test specific branch highlighting
+
+// Simple case - should highlight the else-if branch specifically
+fn testElseIfMissing(x: i32) -> i32 {
+    if x > 0 {
+        return x * 2;
+    } else if x > -10 {
+        // This branch should be highlighted - missing return
+        let y: i32 = x + 1;
+    } else {
+        return x;
+    }
+}
+
+// Should highlight the nested if branch
+fn testNestedIfMissing(x: i32) -> i32 {
+    if x > 0 {
+        if x > 10 {
+            // This nested branch should be highlighted
+            let z: i32 = x * 2;
+        } else {
+            return x;
+        }
+    } else {
+        return x - 1;
+    }
+}
+
+fn main() {
+    let result1: i32 = testElseIfMissing(5);
+    let result2: i32 = testNestedIfMissing(15);
+}

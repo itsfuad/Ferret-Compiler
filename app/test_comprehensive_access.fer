@@ -1,0 +1,61 @@
+// Comprehensive test of struct property access
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+type Rectangle struct {
+    topLeft: Point,
+    width: i32,
+    height: i32
+};
+
+fn (p: Point) getX() -> i32 {
+    return p.x;
+}
+
+fn (p: Point) getY() -> i32 {
+    return p.y;
+}
+
+fn (p: Point) distanceFromOrigin() -> i32 {
+    return p.x + p.y; // Simple distance calculation
+}
+
+fn (r: Rectangle) getArea() -> i32 {
+    return r.width * r.height;
+}
+
+fn (r: Rectangle) getTopLeftX() -> i32 {
+    return r.topLeft.x; // Nested field access
+}
+
+fn main() {
+    let point: Point = @Point{
+        x: 10,
+        y: 20
+    };
+    
+    let rect: Rectangle = @Rectangle{
+        topLeft: @Point{x: 5, y: 15},
+        width: 30,
+        height: 40
+    };
+    
+    // Test field access
+    let px: i32 = point.x;
+    let py: i32 = point.y;
+    let rw: i32 = rect.width;
+    let rh: i32 = rect.height;
+    
+    // Test method access
+    let pointX: i32 = point.getX();
+    let pointY: i32 = point.getY();
+    let distance: i32 = point.distanceFromOrigin();
+    let area: i32 = rect.getArea();
+    let topX: i32 = rect.getTopLeftX();
+    
+    // Test nested field access
+    let nestedX: i32 = rect.topLeft.x;
+    let nestedY: i32 = rect.topLeft.y;
+}
