@@ -28,4 +28,18 @@ fn main() -> i32 {
     return doubled;
 }
 
+fn()-> i32 {
+    // This is a normal function literal
+    return 42;
+}();
+
 main();
+
+type Node struct {
+    value: i32
+};
+
+fn (n: Node) getVal() -> i32 {
+    return n.value;
+}
+
