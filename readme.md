@@ -176,20 +176,20 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Arrays
     - [x] Array indexing
     - [x] Array assignment
-- [ ] Structs
-    - [ ] Anonymous structs
-    - [ ] Struct literals
-    - [ ] Struct field access
-    - [ ] Struct field assignment
-- [ ] Methods
+- [x] Structs
+    - [x] Anonymous structs
+    - [x] Struct literals
+    - [x] Struct field access
+    - [x] Struct field assignment
+    - [x] Methods
 - [ ] Interfaces
 - [x] Functions
-      - [x] Dead code elimination
-      - [x] Function calls
-      - [x] Function parameters
-      - [x] Function return values
-      - [ ] Annonymous functions
-      - [ ] Closures
+    - [x] Dead code elimination
+    - [x] Function calls
+    - [x] Function parameters
+    - [x] Function return values
+    - [x] Annonymous functions
+    - [x] Closures
 - [x] Conditionals
     - [x] Control flow analysis
 - [ ] Loops (for, while)
