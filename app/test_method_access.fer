@@ -1,0 +1,19 @@
+// Test method access only
+type Person struct {
+    name: str,
+    age: i32
+};
+
+fn (self: Person) getName() -> str {
+    return self.name;
+}
+
+fn main() {
+    let p: Person = @Person{
+        name: "Alice",
+        age: 30
+    };
+    
+    // Test method access
+    let nameMethod: str = p.getName();
+}
