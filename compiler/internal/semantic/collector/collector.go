@@ -106,9 +106,11 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 		}
 	}()
 
+	colors.BLUE.Printf("Collecting symbols from import '%s' at %s\n", imp.ImportPath.Value, imp.Loc().String())
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
 	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, collector.Program.FullPath, collector.Ctx.RemoteCachePath)
+	colors.BLUE.Sprintf("moduleKey: %s", moduleKey)
 
 	// ✅ SECURITY CHECK: Validate remote import permissions
 	if err := modules.CheckCanImportRemoteModules(collector.Ctx.ProjectRoot, moduleKey); err != nil {
@@ -224,7 +226,7 @@ func collectFunctionBody(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *
 }
 
 func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
-	for i, variable := range decl.Variables {
+	for _, variable := range decl.Variables {
 		if variable.Identifier.Name == "" {
 			c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, variable.Identifier.Loc(), "Variable identifier cannot be empty", report.COLLECTOR_PHASE)
 			continue
@@ -240,8 +242,16 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 		if c.Debug {
 			colors.GREEN.Printf("Declared variable symbol '%s' (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
 		}
-
-		collectSymbols(c, decl.Initializers[i], cm)
+	}
+	// Collect initializers if any
+	for _, initializer := range decl.Initializers {
+		if initializer == nil {
+			continue
+		}
+		collectSymbols(c, initializer, cm) // Collect symbols from the initializer expression
+		if c.Debug {
+			colors.GREEN.Printf("Collected symbols from initializer at %s\n", initializer.Loc().String())
+		}
 	}
 }
 
