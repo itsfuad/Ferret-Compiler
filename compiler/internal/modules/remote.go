@@ -36,12 +36,10 @@ type GitHubRelease struct {
 // CheckRemoteModuleExists checks if a remote module exists and returns available versions
 func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) {
 	// Parse user/repo from repoName
-	parts := strings.Split(repoName, "/")
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid repository name: %s", repoName)
+	user, repo, err := parseRepoName(repoName)
+	if err != nil {
+		return "", err
 	}
-
-	user, repo := parts[0], parts[1]
 
 	// Get releases from GitHub API
 	releases, err := getGitHubReleases(user, repo)
@@ -53,34 +51,42 @@ func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) 
 		return "", fmt.Errorf("no releases found for repository: %s", repoName)
 	}
 
-	// If specific version requested, check if it exists
+	// Handle specific version request
 	if requestedVersion != "latest" {
-		for _, release := range releases {
-			if release.TagName == requestedVersion || release.TagName == "v"+requestedVersion {
-				return release.TagName, nil
-			}
-		}
-		return "", fmt.Errorf("version %s not found for repository %s", requestedVersion, repoName)
+		return findSpecificVersion(releases, requestedVersion, repoName)
 	}
 
-	// Find latest stable release (not pre-release or draft)
-	var latestVersion string
+	// Find latest version
+	return findLatestVersion(releases, repoName)
+}
+
+// parseRepoName parses repository name into user and repo components
+func parseRepoName(repoName string) (string, string, error) {
+	parts := strings.Split(repoName, "/")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid repository name: %s", repoName)
+	}
+	return parts[0], parts[1], nil
+}
+
+// findSpecificVersion finds a specific version in the releases
+func findSpecificVersion(releases []GitHubRelease, requestedVersion, repoName string) (string, error) {
 	for _, release := range releases {
-		if !release.Draft && !release.Prerelease {
-			if latestVersion == "" || CompareSemver(release.TagName, latestVersion) {
-				latestVersion = release.TagName
-			}
+		if release.TagName == requestedVersion || release.TagName == "v"+requestedVersion {
+			return release.TagName, nil
 		}
 	}
+	return "", fmt.Errorf("version %s not found for repository %s", requestedVersion, repoName)
+}
 
+// findLatestVersion finds the latest stable version from releases
+func findLatestVersion(releases []GitHubRelease, repoName string) (string, error) {
+	// First, try to find latest stable release
+	latestVersion := findLatestStableRelease(releases)
+
+	// If no stable release, try any non-draft release
 	if latestVersion == "" {
-		// If no stable release, take the first non-draft release
-		for _, release := range releases {
-			if !release.Draft {
-				latestVersion = release.TagName
-				break
-			}
-		}
+		latestVersion = findLatestNonDraftRelease(releases)
 	}
 
 	if latestVersion == "" {
@@ -90,55 +96,87 @@ func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) 
 	return latestVersion, nil
 }
 
+// findLatestStableRelease finds the latest stable (non-prerelease, non-draft) release
+func findLatestStableRelease(releases []GitHubRelease) string {
+	var latestVersion string
+	for _, release := range releases {
+		if !release.Draft && !release.Prerelease {
+			if latestVersion == "" || CompareSemver(release.TagName, latestVersion) {
+				latestVersion = release.TagName
+			}
+		}
+	}
+	return latestVersion
+}
+
+// findLatestNonDraftRelease finds the latest non-draft release (including prereleases)
+func findLatestNonDraftRelease(releases []GitHubRelease) string {
+	for _, release := range releases {
+		if !release.Draft {
+			return release.TagName
+		}
+	}
+	return ""
+}
+
 // DownloadRemoteModule downloads a remote module to the cache
 func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) error {
 	// Parse user/repo from repoName
-	parts := strings.Split(repoName, "/")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid repository name: %s", repoName)
-	}
-
-	user, repo := parts[0], parts[1]
-
-	// Create download URL
-	downloadURL := fmt.Sprintf(GitHubTagArchiveURL, user, repo, version)
-
-	colors.BLUE.Printf("Downloading %s@%s from %s\n", repoName, version, downloadURL)
-
-	// Download the archive
-	resp, err := http.Get(downloadURL)
+	user, repo, err := parseRepoName(repoName)
 	if err != nil {
-		return fmt.Errorf("failed to download module: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download module: HTTP %d", resp.StatusCode)
+		return err
 	}
 
-	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s-%s-*.zip", user, repo))
+	// Download the module archive
+	downloadPath, err := downloadModuleArchive(user, repo, version, repoName)
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
+		return err
 	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
+	defer os.Remove(downloadPath)
 
-	// Copy response to temporary file
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to write downloaded content: %w", err)
-	}
-
-	// Extract to cache with full github.com path and version
+	// Extract to cache
 	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+version)
-	err = extractZipToCache(tmpFile.Name(), moduleDir, repo+"-"+strings.TrimPrefix(version, "v"))
+	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(version, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
 	}
 
 	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoName, version)
 	return nil
+}
+
+// downloadModuleArchive downloads the module archive and returns the temporary file path
+func downloadModuleArchive(user, repo, version, repoName string) (string, error) {
+	// Create download URL
+	downloadURL := fmt.Sprintf(GitHubTagArchiveURL, user, repo, version)
+	colors.BLUE.Printf("Downloading %s@%s from %s\n", repoName, version, downloadURL)
+
+	// Download the archive
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download module: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download module: HTTP %d", resp.StatusCode)
+	}
+
+	// Create temporary file for download
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s-%s-*.zip", user, repo))
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer tmpFile.Close()
+
+	// Copy response to temporary file
+	_, err = io.Copy(tmpFile, resp.Body)
+	if err != nil {
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to write downloaded content: %w", err)
+	}
+
+	return tmpFile.Name(), nil
 }
 
 // getGitHubReleases fetches releases from GitHub API
@@ -184,41 +222,54 @@ func extractZipToCache(zipPath, targetDir, expectedPrefix string) error {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	// Extract files
-	for _, file := range reader.File {
-		// Skip directories and remove the prefix (usually repo-version/)
-		if file.FileInfo().IsDir() {
-			continue
-		}
+	// Extract all files
+	return extractAllFiles(reader.File, targetDir, expectedPrefix)
+}
 
-		// Remove the expected prefix from the path
-		relativePath := file.Name
-		if strings.HasPrefix(relativePath, expectedPrefix+"/") {
-			relativePath = strings.TrimPrefix(relativePath, expectedPrefix+"/")
-		}
-
-		// Skip if path is empty after prefix removal
-		if relativePath == "" {
-			continue
-		}
-
-		// Create full target path
-		targetPath := filepath.Join(targetDir, relativePath)
-
-		// Create directory for the file if needed
-		err = os.MkdirAll(filepath.Dir(targetPath), 0755)
+// extractAllFiles extracts all files from the zip archive
+func extractAllFiles(files []*zip.File, targetDir, expectedPrefix string) error {
+	for _, file := range files {
+		err := extractSingleZipFile(file, targetDir, expectedPrefix)
 		if err != nil {
-			return fmt.Errorf("failed to create directory for %s: %w", targetPath, err)
-		}
-
-		// Extract file
-		err = extractFile(file, targetPath)
-		if err != nil {
-			return fmt.Errorf("failed to extract file %s: %w", relativePath, err)
+			return err
 		}
 	}
-
 	return nil
+}
+
+// extractSingleZipFile extracts a single file from the zip archive
+func extractSingleZipFile(file *zip.File, targetDir, expectedPrefix string) error {
+	// Skip directories
+	if file.FileInfo().IsDir() {
+		return nil
+	}
+
+	// Process file path
+	relativePath := processFilePath(file.Name, expectedPrefix)
+	if relativePath == "" {
+		return nil // Skip files with empty paths after processing
+	}
+
+	// Create full target path
+	targetPath := filepath.Join(targetDir, relativePath)
+
+	// Create directory for the file if needed
+	err := os.MkdirAll(filepath.Dir(targetPath), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", targetPath, err)
+	}
+
+	// Extract file
+	return extractFile(file, targetPath)
+}
+
+// processFilePath removes expected prefix from file path
+func processFilePath(fileName, expectedPrefix string) string {
+	relativePath := fileName
+	if strings.HasPrefix(relativePath, expectedPrefix+"/") {
+		relativePath = strings.TrimPrefix(relativePath, expectedPrefix+"/")
+	}
+	return relativePath
 }
 
 // extractFile extracts a single file from zip archive

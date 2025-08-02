@@ -234,13 +234,35 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 	cm.SymbolTable = originalTable
 
 	// Check if non-void function has all paths returning
-	if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			fn.Loc(),
-			"Not all paths in function return a value",
-			report.TYPECHECK_PHASE,
-		)
+	if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.AllPathsReturn {
+		if len(result.CriticalMissingReturns) > 0 {
+			// Report main error
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				fn.Loc(),
+				"Not all paths in function return a value",
+				report.TYPECHECK_PHASE,
+			)
+
+			// Add specific errors for each critical missing return location
+			for i, loc := range result.CriticalMissingReturns {
+				if i < 3 { // Limit to first 3 locations to avoid spam
+					r.Ctx.Reports.AddSemanticError(
+						r.Program.FullPath,
+						&loc,
+						"Missing return statement in this path",
+						report.TYPECHECK_PHASE,
+					)
+				}
+			}
+		} else {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				fn.Loc(),
+				"Not all paths in function return a value",
+				report.TYPECHECK_PHASE,
+			)
+		}
 	}
 }
 
