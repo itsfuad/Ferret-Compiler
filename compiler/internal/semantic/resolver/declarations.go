@@ -207,7 +207,91 @@ func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt,
 	}
 }
 
-// resolveFunctionLiteral resolves function literals when encountered in expressions
+// resolveMethodDecl resolves method declarations stored in struct scopes
+func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) {
+	// Get the receiver type name to find the struct's scope
+	receiverTypeName := ""
+	if method.Receiver.Type != nil {
+		receiverTypeName = string(method.Receiver.Type.Type())
+	}
+	methodName := method.Method.Name
+
+	// Find the struct type symbol to get its scope
+	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
+	if !found {
+		colors.RED.Printf("Struct type '%s' not found in symbol table\n", receiverTypeName)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Struct type '"+receiverTypeName+"' is not declared", report.RESOLVER_PHASE)
+		return
+	}
+
+	if structSymbol.Scope == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Struct type '"+receiverTypeName+"' does not have a scope for methods", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Look for the method in the struct's scope
+	methodSymbol, found := structSymbol.Scope.Lookup(methodName)
+	if !found {
+		colors.RED.Printf("Method '%s' not found in struct '%s' scope\n", methodName, receiverTypeName)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Method '"+methodName+"' is not declared for struct '"+receiverTypeName+"'", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Get method scope from the method symbol itself
+	methodScope := methodSymbol.Scope
+	if methodScope == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Method scope for '"+methodName+"' not found", report.RESOLVER_PHASE)
+		return
+	}
+
+	// Resolve receiver type
+	receiverType, err := semantic.DeriveSemanticType(method.Receiver.Type, cm)
+	if err != nil {
+		colors.RED.Printf("Error deriving type for receiver '%s': %s\n", method.Receiver.Identifier.Name, err.Error())
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type: "+err.Error(), report.RESOLVER_PHASE)
+		return
+	}
+
+	// Update receiver symbol with resolved type
+	if receiverSymbol, found := methodScope.Lookup(method.Receiver.Identifier.Name); found {
+		receiverSymbol.Type = receiverType
+		if r.Debug {
+			colors.GREEN.Printf("Updated receiver symbol '%s' with type '%v\n", method.Receiver.Identifier.Name, receiverType)
+		}
+	}
+
+	// Resolve parameter types and update method scope symbols
+	paramTypes := resolveParameterTypes(r, method.Function, cm, methodScope)
+	if paramTypes == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Failed to resolve parameter types for method '"+methodName+"'", report.RESOLVER_PHASE)
+		return // Error occurred during parameter resolution
+	}
+
+	// Resolve return type
+	returnType := resolveReturnType(r, method.Function, cm)
+	if returnType == nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Failed to resolve return type for method '"+methodName+"'", report.RESOLVER_PHASE)
+		return // Error occurred during return type resolution
+	}
+
+	fmt.Printf("Resolved method '%s.%s' with receiver: %v, parameters: %v and return type: %v\n", receiverTypeName, methodName, receiverType, paramTypes, returnType)
+
+	// Resolve method body
+	//set scope
+	originalTable := cm.SymbolTable
+	cm.SymbolTable = methodScope
+	resolveBlock(r, method.Function.Body, cm)
+	// Restore original module scope
+	cm.SymbolTable = originalTable
+
+	// Create and assign method type (same as function type but includes receiver information)
+	methodType := stype.FunctionType{
+		Parameters: paramTypes,
+		ReturnType: returnType,
+	}
+	methodSymbol.Type = &methodType
+}
+
 func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 	if fn == nil || fn.ID == "" {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.RESOLVER_PHASE)

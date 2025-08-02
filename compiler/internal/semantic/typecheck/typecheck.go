@@ -50,6 +50,8 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		checkImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
 		checkFunctionDecl(r, n, cm)
+	case *ast.MethodDecl:
+		checkMethodDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		checkVariableDeclaration(r, n, cm)
 	case *ast.TypeDeclStmt:

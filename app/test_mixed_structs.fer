@@ -1,0 +1,30 @@
+// Comprehensive test of both named and anonymous structs
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+fn (p: Point) getX() -> i32 {
+    return p.x;
+}
+
+fn main() {
+    // Named struct with methods
+    let namedPoint: Point = @Point{x: 10, y: 20};
+    let namedX: i32 = namedPoint.x;        // Field access works
+    let namedMethodX: i32 = namedPoint.getX(); // Method access works
+    
+    // Anonymous struct - only fields
+    let anonPoint = @struct{x: 30, y: 40};
+    let anonX: i32 = anonPoint.x;          // Field access works
+    // anonPoint.getX() would fail - no methods on anonymous structs
+    
+    // Different anonymous structs have different types
+    let anonPerson = @struct{name: "Bob", age: 25};
+    let personName: str = anonPerson.name;
+    let personAge: i32 = anonPerson.age;
+    
+    // Even with same field names, different anonymous structs are distinct types
+    let anotherPoint = @struct{x: 50, y: 60};
+    let anotherX: i32 = anotherPoint.x;
+}
