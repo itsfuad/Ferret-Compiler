@@ -144,7 +144,7 @@ func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm
 	}
 
 	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
-	functionSymbol.Scope = functionScope // Store scope in the function symbol itself
+	functionSymbol.Scope = functionScope           // Store scope in the function symbol itself
 	functionScope.Imports = cm.SymbolTable.Imports // Ensure function scope has access to module imports
 
 	if c.Debug {
