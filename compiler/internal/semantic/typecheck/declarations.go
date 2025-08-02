@@ -244,6 +244,72 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 	}
 }
 
+func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *modules.Module) {
+	if methodDecl.Function == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Method declaration missing function body",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Get the receiver type name to find the struct's scope
+	receiverTypeName := ""
+	if methodDecl.Receiver.Type != nil {
+		receiverTypeName = string(methodDecl.Receiver.Type.Type())
+	}
+	methodName := methodDecl.Method.Name
+
+	// Find the struct type symbol to get its scope
+	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Struct type '"+receiverTypeName+"' not found in symbol table",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	if structSymbol.Scope == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Struct type '"+receiverTypeName+"' does not have a scope for methods",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Look for the method in the struct's scope
+	methodSymbol, found := structSymbol.Scope.Lookup(methodName)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Method '"+methodName+"' not found in struct '"+receiverTypeName+"' scope",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	if methodSymbol.Scope == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			"Method scope for '"+methodName+"' not found",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Check the method function using the helper function
+	checkFunctionLiteral(r, methodDecl.Function, cm, methodSymbol.Scope)
+}
+
 // checkFunctionLiteralType checks function literals and returns their type
 func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
 	if fn == nil || fn.ID == "" {
