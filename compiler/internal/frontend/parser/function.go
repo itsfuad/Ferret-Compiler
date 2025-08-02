@@ -188,7 +188,7 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	name := declareFunction(p)
 
 	function := parseFunctionLiteral(p, &start.Start, true)
-	
+
 	function.ID = name.Name // Set the function ID to the declared name
 
 	return &ast.FunctionDecl{
