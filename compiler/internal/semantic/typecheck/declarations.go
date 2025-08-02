@@ -8,6 +8,7 @@ import (
 	"compiler/internal/semantic"
 	"compiler/internal/semantic/analyzer"
 	"compiler/internal/semantic/stype"
+	"compiler/internal/symbol"
 	"fmt"
 )
 
@@ -41,7 +42,7 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
 		if r.Debug {
-			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType.String(), variable.Identifier.Name, variable.Identifier.Loc().String())
+			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc().String())
 		}
 		return
 	}
@@ -175,14 +176,42 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		return
 	}
 
+	// Get function symbol and its scope
+	functionSymbol, found := cm.SymbolTable.Lookup(funcDecl.Identifier.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			funcDecl.Loc(),
+			"Function '"+funcDecl.Identifier.Name+"' not found in symbol table",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	if functionSymbol.Scope == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			funcDecl.Loc(),
+			"Function scope for '"+funcDecl.Identifier.Name+"' not found",
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Check the function literal using the helper function
+	checkFunctionLiteral(r, funcDecl.Function, cm, functionSymbol.Scope)
+}
+
+// checkFunctionLiteral validates function literals and their return paths
+func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module, functionScope *symbol.SymbolTable) {
 	// Get the expected return type
 	var expectedReturnType stype.Type = nil
-	if funcDecl.Function.ReturnType != nil {
-		resolvedType, err := semantic.DeriveSemanticType(funcDecl.Function.ReturnType, cm)
+	if fn.ReturnType != nil {
+		resolvedType, err := semantic.DeriveSemanticType(fn.ReturnType, cm)
 		if err != nil {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
-				funcDecl.Function.ReturnType.Loc(),
+				fn.ReturnType.Loc(),
 				fmt.Sprintf("Invalid return type: %s", err.Error()),
 				report.TYPECHECK_PHASE,
 			)
@@ -191,42 +220,64 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		expectedReturnType = resolvedType
 	}
 
-	// Switch to function scope for type checking
-	functionScope, exists := cm.FunctionScopes[funcDecl.Identifier.Name]
-	if exists {
-		// Temporarily switch to function scope
-		originalTable := cm.SymbolTable
-		// Ensure function scope has access to module imports
-		functionScope.Imports = originalTable.Imports
-		cm.SymbolTable = functionScope
+	// Switch to function scope for type checking if we have one
+	// Temporarily switch to function scope
+	originalTable := cm.SymbolTable
+	// Ensure function scope has access to module imports
+	functionScope.Imports = originalTable.Imports
+	cm.SymbolTable = functionScope
 
-		// Analyze the function body for control flow and returns
-		result := analyzeControlFlow(r, funcDecl.Function.Body, cm, expectedReturnType)
+	// Analyze the function body for control flow and returns
+	result := analyzeControlFlow(r, fn.Body, cm, expectedReturnType)
 
-		// Restore module scope
-		cm.SymbolTable = originalTable
+	// Restore module scope
+	cm.SymbolTable = originalTable
 
-		// Check if non-void function has all paths returning
-		if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
-			r.Ctx.Reports.AddSemanticError(
-				r.Program.FullPath,
-				funcDecl.Loc(),
-				"Not all paths in function return a value",
-				report.TYPECHECK_PHASE,
-			)
-		}
-	} else {
-		// Fallback to module scope if function scope not found
-		result := analyzeControlFlow(r, funcDecl.Function.Body, cm, expectedReturnType)
-
-		// Check if non-void function has all paths returning
-		if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
-			r.Ctx.Reports.AddSemanticError(
-				r.Program.FullPath,
-				funcDecl.Loc(),
-				"Not all paths in function return a value",
-				report.TYPECHECK_PHASE,
-			)
-		}
+	// Check if non-void function has all paths returning
+	if expectedReturnType != nil && !isVoidType(expectedReturnType) && !result.HasReturn {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			fn.Loc(),
+			"Not all paths in function return a value",
+			report.TYPECHECK_PHASE,
+		)
 	}
+}
+
+// checkFunctionLiteralType checks function literals and returns their type
+func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
+	if fn == nil || fn.ID == "" {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.TYPECHECK_PHASE)
+		return nil
+	}
+
+	// Get function symbol and its scope
+	functionSymbol, found := cm.SymbolTable.Lookup(fn.ID)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			fn.Loc(),
+			"Function literal '"+fn.ID+"' not found in symbol table",
+			report.TYPECHECK_PHASE,
+		)
+		return nil
+	}
+
+	// Get function scope from the function symbol itself
+	functionScope := functionSymbol.Scope
+	if functionScope == nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			fn.Loc(),
+			"Function literal scope for '"+fn.ID+"' not found",
+			report.TYPECHECK_PHASE,
+		)
+		return nil
+	}
+
+	// Check the function literal using the helper function
+	checkFunctionLiteral(r, fn, cm, functionScope)
+
+	// Return the function's type
+	return functionSymbol.Type
 }

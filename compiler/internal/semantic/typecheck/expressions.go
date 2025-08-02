@@ -52,6 +52,8 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 		resultType = checkImportedSymbolType(r, e, cm)
 	case *ast.FunctionCallExpr:
 		resultType = checkFunctionCallType(r, e, cm)
+	case *ast.FunctionLiteral:
+		resultType = checkFunctionLiteralType(r, e, cm)
 	case *ast.CastExpr:
 		resultType = checkCastExprType(r, e, cm)
 	default:

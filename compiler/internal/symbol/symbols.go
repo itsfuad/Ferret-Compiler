@@ -23,6 +23,7 @@ type Symbol struct {
 	Kind     SymbolKind
 	Type     stype.Type
 	Location *source.Location
+	Scope    *SymbolTable
 }
 
 // NewSymbol creates a new symbol with the given properties

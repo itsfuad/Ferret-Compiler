@@ -5,6 +5,7 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils"
 	"compiler/internal/utils/lists"
 )
 
@@ -155,6 +156,7 @@ func parseFunctionLiteral(p *Parser, start *source.Position, parseNewParams bool
 	location := *source.NewLocation(start, block.Loc().End)
 
 	return &ast.FunctionLiteral{
+		ID:         utils.GenerateFunctionLiteralID(),
 		Params:     params,
 		ReturnType: returnType,
 		Body:       block,
@@ -186,6 +188,8 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	name := declareFunction(p)
 
 	function := parseFunctionLiteral(p, &start.Start, true)
+	
+	function.ID = name.Name // Set the function ID to the declared name
 
 	return &ast.FunctionDecl{
 		Identifier: name,

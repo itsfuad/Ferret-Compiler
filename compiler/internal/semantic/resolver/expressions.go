@@ -26,7 +26,12 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 	case *ast.PostfixExpr:
 		resolveExpr(r, *e.Operand, cm)
 	case *ast.FunctionCallExpr:
-		//add later
+		// Resolve the caller expression
+		resolveExpr(r, *e.Caller, cm)
+		// Resolve arguments
+		for _, arg := range e.Arguments {
+			resolveExpr(r, arg, cm)
+		}
 	case *ast.FieldAccessExpr:
 		resolveExpr(r, *e.Object, cm)
 	case *ast.VarScopeResolution:
@@ -47,11 +52,11 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 		//add later
 	case *ast.StructLiteralExpr:
 		//add later
+	case *ast.FunctionLiteral:
+		resolveFunctionLiteral(r, e, cm)
 	case *ast.IndexableExpr:
 		resolveExpr(r, *e.Indexable, cm)
 		resolveExpr(r, *e.Index, cm)
-	case *ast.FunctionLiteral:
-		//add later
 	case *ast.CastExpr:
 		// Resolve the value being cast
 		resolveExpr(r, *e.Value, cm)

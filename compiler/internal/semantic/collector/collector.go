@@ -46,12 +46,15 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 }
 
 func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
+	colors.BROWN.Printf("Collecting symbols from node <%T> at %s\n", node, node.Loc().String())
 	// collect functions for forward declarations
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		collectSymbolsFromImport(c, n)
 	case *ast.FunctionDecl:
 		collectFunctionSymbol(c, n, cm)
+	case *ast.FunctionLiteral:
+		collectFunctionLiteral(c, n, cm)
 	case *ast.VarDeclStmt:
 		collectVariableSymbols(c, n, cm)
 	case *ast.TypeDeclStmt:
@@ -100,53 +103,63 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 }
 
 func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) {
-	if !declareFunctionSymbol(c, fn, cm) {
-		return
-	}
 
-	functionScope := createFunctionScope(fn, cm)
+	functionScope := declareFunctionSymbol(c, fn.Function, cm)
 	if functionScope == nil {
 		return
 	}
 
+	collectFunctionParameters(c, fn.Function, functionScope)
+	collectFunctionBody(c, fn.Function, cm, functionScope)
+}
+
+func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
+
+	colors.AQUA.Printf("Collecting function literal '%s' at %s\n", fn.ID, fn.Loc().String())
+
+	functionScope := declareFunctionSymbol(c, fn, cm)
+	if functionScope == nil {
+		return
+	}
+
+	colors.AQUA.Printf("Declared function symbol '%s' at %s\n", fn.ID, fn.Loc().String())
+
+	// Collect parameters and body in the function's local scope
 	collectFunctionParameters(c, fn, functionScope)
 	collectFunctionBody(c, fn, cm, functionScope)
 }
 
 // declareFunctionSymbol declares the function symbol in the module's symbol table
-func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module) bool {
-	if fn.Identifier.Name == "" {
+func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) *symbol.SymbolTable {
+	if fn.ID == "" {
 		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE)
-		return false
+		return nil
 	}
 
-	functionSymbol := symbol.NewSymbolWithLocation(fn.Identifier.Name, symbol.SymbolFunc, nil, fn.Loc())
-	err := cm.SymbolTable.Declare(fn.Identifier.Name, functionSymbol)
+	functionSymbol := symbol.NewSymbolWithLocation(fn.ID, symbol.SymbolFunc, nil, fn.Loc())
+	err := cm.SymbolTable.Declare(fn.ID, functionSymbol)
 	if err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
-		return false
+		return nil
 	}
+
+	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
+	functionSymbol.Scope = functionScope // Store scope in the function symbol itself
+	functionScope.Imports = cm.SymbolTable.Imports // Ensure function scope has access to module imports
 
 	if c.Debug {
-		colors.GREEN.Printf("Declared function symbol '%s' at %s\n", fn.Identifier.Name, fn.Loc().String())
+		colors.BRIGHT_BROWN.Printf("Declared function symbol '%s' at %s\n", fn.ID, fn.Loc().String())
 	}
-	return true
-}
-
-// createFunctionScope creates and stores a local symbol table for the function
-func createFunctionScope(fn *ast.FunctionDecl, cm *modules.Module) *symbol.SymbolTable {
-	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
-	cm.FunctionScopes[fn.Identifier.Name] = functionScope
 	return functionScope
 }
 
 // collectFunctionParameters collects symbols from function parameters in the function's local scope
-func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, functionScope *symbol.SymbolTable) {
-	if fn.Function == nil {
+func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, functionScope *symbol.SymbolTable) {
+	if fn == nil {
 		return
 	}
 
-	for _, param := range fn.Function.Params {
+	for _, param := range fn.Params {
 		if param.Identifier == nil {
 			continue
 		}
@@ -165,20 +178,20 @@ func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, f
 }
 
 // collectFunctionBody collects symbols from function body in the function's local scope
-func collectFunctionBody(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *modules.Module, functionScope *symbol.SymbolTable) {
-	if fn.Function == nil || fn.Function.Body == nil {
+func collectFunctionBody(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module, functionScope *symbol.SymbolTable) {
+	if fn == nil || fn.Body == nil {
 		return
 	}
 
 	// Temporarily switch to function scope for body collection
 	originalTable := cm.SymbolTable
 	cm.SymbolTable = functionScope
-	collectSymbolsFromBlock(c, fn.Function.Body, cm)
+	collectSymbolsFromBlock(c, fn.Body, cm)
 	cm.SymbolTable = originalTable // Restore module scope
 }
 
 func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
-	for _, variable := range decl.Variables {
+	for i, variable := range decl.Variables {
 		if variable.Identifier.Name == "" {
 			c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, variable.Identifier.Loc(), "Variable identifier cannot be empty", report.COLLECTOR_PHASE)
 			continue
@@ -194,6 +207,8 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 		if c.Debug {
 			colors.GREEN.Printf("Declared variable symbol '%s' (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
 		}
+
+		collectSymbols(c, decl.Initializers[i], cm)
 	}
 }
 
