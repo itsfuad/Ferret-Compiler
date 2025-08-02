@@ -175,10 +175,15 @@ func isCastValid(sourceType, targetType stype.Type) bool {
 		return true
 	}
 
+	// Check for struct casting
+	if isStructCastValid(sourceType, targetType) {
+		return true
+	}
+
 	sourcePrim, sourceOk := sourceType.(*stype.PrimitiveType)
 	targetPrim, targetOk := targetType.(*stype.PrimitiveType)
 
-	// Both types must be primitive types for casting
+	// Both types must be primitive types for primitive casting
 	if !sourceOk || !targetOk {
 		return false
 	}
@@ -198,6 +203,64 @@ func isCastValid(sourceType, targetType stype.Type) bool {
 	}
 
 	// No valid cast found
+	return false
+}
+
+// isStructCastValid checks if a struct can be cast to another struct type
+func isStructCastValid(sourceType, targetType stype.Type) bool {
+	// Get the underlying struct types
+	sourceStruct := resolveStructType(sourceType)
+	targetStruct := resolveStructType(targetType)
+
+	// At least one must be a struct for struct casting
+	if sourceStruct == nil && targetStruct == nil {
+		return false
+	}
+
+	// If source is not a struct but target is, cannot cast
+	if sourceStruct == nil {
+		return false
+	}
+
+	// If target is not a struct but source is, cannot cast
+	if targetStruct == nil {
+		return false
+	}
+
+	// Check field compatibility: source must have all fields that target has
+	for targetFieldName, targetFieldType := range targetStruct.Fields {
+		sourceFieldType, exists := sourceStruct.Fields[targetFieldName]
+		if !exists {
+			return false // Target field not found in source
+		}
+
+		// Field types must be compatible (exact match for now)
+		if !sourceFieldType.Equals(targetFieldType) {
+			return false
+		}
+	}
+
+	// For named target types, check method compatibility if source is also named
+	targetIsNamed := isNamedStructType(targetType)
+	sourceIsNamed := isNamedStructType(sourceType)
+
+	// If target is named and source is named, source must have all methods that target has
+	if targetIsNamed && sourceIsNamed {
+		// This would require access to the module's symbol table to check methods
+		// For now, we'll allow it if field compatibility passes
+		// TODO: Add method compatibility checking if needed
+	}
+
+	// Source can have more fields/methods than target (structural subtyping)
+	return true
+}
+
+// isNamedStructType checks if a type is a named struct (UserType wrapping StructType)
+func isNamedStructType(t stype.Type) bool {
+	if userType, ok := t.(*stype.UserType); ok {
+		_, isStruct := userType.Definition.(*stype.StructType)
+		return isStruct
+	}
 	return false
 }
 
