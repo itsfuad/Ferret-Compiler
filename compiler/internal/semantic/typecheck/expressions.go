@@ -1,6 +1,7 @@
 package typecheck
 
 import (
+	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/report"
@@ -9,7 +10,9 @@ import (
 	"compiler/internal/semantic/stype"
 	"compiler/internal/source"
 	"compiler/internal/types"
+	"errors"
 	"fmt"
+	"strings"
 )
 
 // evaluateExpressionType infers the semantic type from an AST expression
@@ -151,117 +154,99 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 	}
 
 	// Check if the cast is valid
-	if !isCastValid(sourceType, targetType) {
+	isValid, err := isCastable(sourceType, targetType, cm)
+	if err != nil || !isValid {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			cast.Loc(),
-			fmt.Sprintf("cannot cast from '%s' to '%s'", sourceType.String(), targetType.String()),
+			fmt.Sprintf("cannot cast from '%s' to '%s': %v", sourceType.String(), targetType.String(), err),
 			report.TYPECHECK_PHASE,
 		)
-		return targetType // Still return target type for further analysis
+		return nil // Return nil if cast is invalid
 	}
 
 	return targetType
 }
 
-// isCastValid determines if a cast from sourceType to targetType is valid
-func isCastValid(sourceType, targetType stype.Type) bool {
-
-	sourceType = semantic.UnwrapType(sourceType) // Unwrap any type aliases
-	targetType = semantic.UnwrapType(targetType) // Unwrap any type aliases
-
-	// Allow casting between same types (no-op cast)
-	if sourceType.String() == targetType.String() {
-		return true
+func isCastable(sourceType, targetType stype.Type, cm *modules.Module) (bool, error) {
+	// primitive types can be casted to each other
+	if sourceType == nil || targetType == nil {
+		return false, errors.New("source or target type is nil")
 	}
 
-	// Check for struct casting
-	if isStructCastValid(sourceType, targetType) {
-		return true
+	sourceUnwrapped := semantic.UnwrapType(sourceType) // Unwrap any type aliases
+	targetUnwrapped := semantic.UnwrapType(targetType) // Unwrap any type aliases
+
+	if _, ok := sourceUnwrapped.(*stype.PrimitiveType); ok {
+		if _, ok := targetUnwrapped.(*stype.PrimitiveType); ok {
+			// Allow casting between primitive types
+			return isPrimitiveCastable(sourceUnwrapped, targetUnwrapped)
+		}
+		return false, errors.New("cannot cast primitive to non-primitive")
 	}
 
-	sourcePrim, sourceOk := sourceType.(*stype.PrimitiveType)
-	targetPrim, targetOk := targetType.(*stype.PrimitiveType)
-
-	// Both types must be primitive types for primitive casting
-	if !sourceOk || !targetOk {
-		return false
+	//structs can be casted to other struct and interfaces and interfaces can be casted to structs
+	if ss, ok := sourceUnwrapped.(*stype.StructType); ok {
+		//target must be a struct or interface. for now skip interface
+		if ts, ok := targetUnwrapped.(*stype.StructType); ok {
+			//both are struct
+			return castableStructToStruct(ss, ts, cm)
+		}
 	}
 
+	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
+}
+
+func castableStructToStruct(sourceType, targetType *stype.StructType, cm *modules.Module) (bool, error) {
+	//targets all properties must present
+
+	fieldErrors := make([]string, 0, len(targetType.Fields))
+
+	for fieldName, fieldType := range targetType.Fields {
+		if sourceFieldType, exists := sourceType.Fields[fieldName]; !exists {
+			fieldErrors = append(fieldErrors, colors.RED.Sprintf(" - missing field '%s'", fieldName))
+		} else if ok, _ := isCastable(sourceFieldType, fieldType, cm); !ok {
+			fieldErrors = append(fieldErrors, colors.PURPLE.Sprintf(" - field '%s' type required '%s', but got '%s'", fieldName, fieldType.String(), sourceFieldType.String()))
+		}
+	}
+
+	if len(fieldErrors) > 0 {
+		errMsg := colors.WHITE.Sprintf("\n%s and %s has field missmatch\n", sourceType.String(), targetType.String())
+		return false, fmt.Errorf("%s%s", errMsg, strings.Join(fieldErrors, "\n"))
+	}
+
+	fmt.Printf("Successfully casted struct '%s' to '%s'\n", sourceType.String(), targetType.String())
+
+	return true, nil
+}
+
+func isPrimitiveCastable(sourceType, targetType stype.Type) (bool, error) {
+	sourcePrim, _ := sourceType.(*stype.PrimitiveType)
+	targetPrim, _ := targetType.(*stype.PrimitiveType)
 	// Allow ALL numeric to numeric casting with explicit "as" keyword
 	// The developer explicitly requests the conversion, so allow both widening and narrowing
 	if types.IsNumericTypeName(sourcePrim.Name) && types.IsNumericTypeName(targetPrim.Name) {
-		return true
+		return true, nil
 	}
 
 	// Special case: byte can be cast to/from u8 and i8
 	if sourcePrim.Name == types.BYTE {
-		return targetPrim.Name == types.UINT8 || targetPrim.Name == types.INT8
+		res := targetPrim.Name == types.UINT8 || targetPrim.Name == types.INT8
+		if res {
+			return res, nil
+		}
+		return false, fmt.Errorf("byte and %s are incompatible types", targetPrim.Name)
 	}
 	if targetPrim.Name == types.BYTE {
-		return sourcePrim.Name == types.UINT8 || sourcePrim.Name == types.INT8
+		res := sourcePrim.Name == types.UINT8 || sourcePrim.Name == types.INT8
+		if res {
+			return res, nil
+		}
+		return false, fmt.Errorf("byte and %s are incompatible types", sourcePrim.Name)
 	}
 
 	// No valid cast found
-	return false
-}
-
-// isStructCastValid checks if a struct can be cast to another struct type
-func isStructCastValid(sourceType, targetType stype.Type) bool {
-	// Get the underlying struct types
-	sourceStruct := resolveStructType(sourceType)
-	targetStruct := resolveStructType(targetType)
-
-	// At least one must be a struct for struct casting
-	if sourceStruct == nil && targetStruct == nil {
-		return false
-	}
-
-	// If source is not a struct but target is, cannot cast
-	if sourceStruct == nil {
-		return false
-	}
-
-	// If target is not a struct but source is, cannot cast
-	if targetStruct == nil {
-		return false
-	}
-
-	// Check field compatibility: source must have all fields that target has
-	for targetFieldName, targetFieldType := range targetStruct.Fields {
-		sourceFieldType, exists := sourceStruct.Fields[targetFieldName]
-		if !exists {
-			return false // Target field not found in source
-		}
-
-		// Field types must be compatible (exact match for now)
-		if !sourceFieldType.Equals(targetFieldType) {
-			return false
-		}
-	}
-
-	// For named target types, check method compatibility if source is also named
-	targetIsNamed := isNamedStructType(targetType)
-	sourceIsNamed := isNamedStructType(sourceType)
-
-	// If target is named and source is named, source must have all methods that target has
-	if targetIsNamed && sourceIsNamed {
-		// This would require access to the module's symbol table to check methods
-		// For now, we'll allow it if field compatibility passes
-		// TODO: Add method compatibility checking if needed
-	}
-
-	// Source can have more fields/methods than target (structural subtyping)
-	return true
-}
-
-// isNamedStructType checks if a type is a named struct (UserType wrapping StructType)
-func isNamedStructType(t stype.Type) bool {
-	if userType, ok := t.(*stype.UserType); ok {
-		_, isStruct := userType.Definition.(*stype.StructType)
-		return isStruct
-	}
-	return false
+	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
 }
 
 // checkFieldAccessType handles struct field access and method access
@@ -291,15 +276,15 @@ func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccess
 // checkStructFieldOrMethodAccess checks field or method access on struct types
 func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.Type, fieldName string, location *source.Location, cm *modules.Module) stype.Type {
 	// First, try to resolve the underlying struct type
-	structType := resolveStructType(objectType)
-	if structType == nil {
+	unwrapped := semantic.UnwrapType(objectType)
+	structType, ok := unwrapped.(*stype.StructType)
+	if !ok {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
 			fmt.Sprintf("Cannot access field '%s' on non-struct type '%s'", fieldName, objectType.String()),
 			report.TYPECHECK_PHASE,
 		)
-		return nil
 	}
 
 	// Try to find the field in the struct definition first
@@ -334,19 +319,6 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 		)
 	}
 	return nil
-}
-
-// resolveStructType extracts the underlying struct type from user-defined types
-func resolveStructType(t stype.Type) *stype.StructType {
-	switch typ := t.(type) {
-	case *stype.StructType:
-		return typ
-	case *stype.UserType:
-		// Recursively resolve user-defined types
-		return resolveStructType(typ.Definition)
-	default:
-		return nil
-	}
 }
 
 // findStructField looks for a field in the struct type definition
@@ -449,8 +421,9 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 	}
 
 	// Get the struct type from the symbol, handling UserType wrappers
-	structType := resolveStructType(symbol.Type)
-	if structType == nil {
+	unwrapped := semantic.UnwrapType(symbol.Type)
+	structType, ok := unwrapped.(*stype.StructType)
+	if !ok {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			structLiteral.Loc(),
