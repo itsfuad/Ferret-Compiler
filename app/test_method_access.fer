@@ -8,12 +8,23 @@ fn (self: Person) getName() -> str {
     return self.name;
 }
 
+type Person2 Person;
+
 fn main() {
     let p: Person = @Person{
         name: "Alice",
         age: 30
     };
+
+    let p2: Person2 = @Person2{
+        name: "Bob",
+        age: 25
+    };
     
     // Test method access
     let nameMethod: str = p.getName();
+    let myage = p.age;
+
+    p2.age;
+    p2.getName(); // error, because alias only contains struct fields, not methods
 }

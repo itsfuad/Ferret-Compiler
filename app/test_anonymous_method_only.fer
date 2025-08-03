@@ -1,0 +1,7 @@
+fn (ann: struct{x: i32}) getX() -> i32 {
+    return ann.x;
+}
+
+fn main() -> i32 {
+    return 42;
+}

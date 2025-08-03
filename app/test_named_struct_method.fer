@@ -1,0 +1,24 @@
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+fn (p: Point) getX() -> i32 {
+    return p.x;
+}
+
+type Point2 Point;
+fn (p: Point2) getPX() -> i32 {
+    // This method is valid because Point2 is an alias of Point
+    return p.x;
+}
+
+fn main() -> i32 {
+
+    let p = @Point { x: 10, y: 20 };
+    let p2 = @Point2 { x: 30, y: 40 };
+    let x1 = p.getX();  // Should return 10
+    let x2 = p2.getPX(); // Should return 30
+
+    return 42;
+}

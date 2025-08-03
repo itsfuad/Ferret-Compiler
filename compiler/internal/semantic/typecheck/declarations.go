@@ -277,6 +277,14 @@ func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *m
 		return
 	}
 
+	// Validate that methods can only be defined on struct types
+	if methodDecl.Receiver != nil && methodDecl.Receiver.Type != nil {
+		if !isValidMethodReceiverType(methodDecl.Receiver.Type) {
+			// Skip processing - error already reported in collector phase
+			return
+		}
+	}
+
 	// Get the receiver type name to find the struct's scope
 	receiverTypeName := ""
 	if methodDecl.Receiver.Type != nil {
@@ -368,4 +376,32 @@ func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral,
 
 	// Return the function's type
 	return functionSymbol.Type
+}
+
+// isValidMethodReceiverType checks if a DataType is valid for method receiver
+// Only named struct types (UserDefinedType) are allowed
+func isValidMethodReceiverType(dataType ast.DataType) bool {
+	switch dataType.(type) {
+	case *ast.UserDefinedType:
+		// This is a named type, which is valid (it should resolve to a struct)
+		return true
+	case *ast.StructType:
+		// Anonymous struct types are not allowed for methods
+		return false
+	case *ast.IntType, *ast.FloatType, *ast.StringType, *ast.ByteType, *ast.BoolType:
+		// Primitive types are not allowed for methods
+		return false
+	case *ast.ArrayType:
+		// Array types are not allowed for methods
+		return false
+	case *ast.InterfaceType:
+		// Interface types are not allowed for method definitions
+		return false
+	case *ast.FunctionType:
+		// Function types are not allowed for methods
+		return false
+	default:
+		// Unknown type, not allowed
+		return false
+	}
 }

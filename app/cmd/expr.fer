@@ -44,4 +44,4 @@ fn multiply(a: i32, b: i32) -> i32 {
 
 let result = 0;
 
-sum, result = add(5, 10), multiply(2, 3); // calling functions and assigning results
+sum, result = add(5, 10) as f64, multiply(2, 3); // calling functions and assigning results

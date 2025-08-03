@@ -152,6 +152,19 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 		return
 	}
 
+	// Validate that methods can only be defined on struct types
+	if method.Receiver.Type != nil {
+		if !isValidMethodReceiverType(method.Receiver.Type) {
+			c.Ctx.Reports.AddSemanticError(
+				c.Program.FullPath,
+				method.Receiver.Type.Loc(),
+				getInvalidReceiverTypeMessage(method.Receiver.Type),
+				report.COLLECTOR_PHASE,
+			).AddHint("Methods can only be defined on named struct types. Define a struct type first: 'type MyStruct struct { ... }'")
+			return
+		}
+	}
+
 	// Get the receiver type name to find the struct's scope
 	receiverTypeName := ""
 	if method.Receiver.Type != nil {
@@ -394,5 +407,57 @@ func collectSymbolsFromBlock(c *analyzer.AnalyzerNode, block *ast.Block, cm *mod
 
 	for _, node := range block.Nodes {
 		collectSymbols(c, node, cm)
+	}
+}
+
+// isValidMethodReceiverType checks if a DataType is valid for method receiver
+// Only named struct types (UserDefinedType) are allowed
+func isValidMethodReceiverType(dataType ast.DataType) bool {
+	switch dataType.(type) {
+	case *ast.UserDefinedType:
+		// This is a named type, which is valid (it should resolve to a struct)
+		return true
+	case *ast.StructType:
+		// Anonymous struct types are not allowed for methods
+		return false
+	case *ast.IntType, *ast.FloatType, *ast.StringType, *ast.ByteType, *ast.BoolType:
+		// Primitive types are not allowed for methods
+		return false
+	case *ast.ArrayType:
+		// Array types are not allowed for methods
+		return false
+	case *ast.InterfaceType:
+		// Interface types are not allowed for method definitions
+		return false
+	case *ast.FunctionType:
+		// Function types are not allowed for methods
+		return false
+	default:
+		// Unknown type, not allowed
+		return false
+	}
+}
+
+// getInvalidReceiverTypeMessage returns an appropriate error message for invalid receiver types
+func getInvalidReceiverTypeMessage(dataType ast.DataType) string {
+	switch dataType.(type) {
+	case *ast.StructType:
+		return "cannot define methods on anonymous struct types"
+	case *ast.IntType, *ast.FloatType:
+		return "cannot define methods on numeric types"
+	case *ast.StringType:
+		return "cannot define methods on string type"
+	case *ast.ByteType:
+		return "cannot define methods on byte type"
+	case *ast.BoolType:
+		return "cannot define methods on boolean type"
+	case *ast.ArrayType:
+		return "cannot define methods on array types"
+	case *ast.InterfaceType:
+		return "cannot define methods on interface types"
+	case *ast.FunctionType:
+		return "cannot define methods on function types"
+	default:
+		return "cannot define methods on this type"
 	}
 }
