@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"compiler/cmd/flags"
+	"ferret/compiler/cmd/flags"
 )
 
 // Integration test for the init functionality

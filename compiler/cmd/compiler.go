@@ -5,15 +5,15 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
-	"compiler/colors"
-	"compiler/internal/ctx"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/ctx"
 
-	"compiler/internal/frontend/parser"
+	"ferret/compiler/internal/frontend/parser"
 
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/collector"
-	"compiler/internal/semantic/resolver"
-	"compiler/internal/semantic/typecheck"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/collector"
+	"ferret/compiler/internal/semantic/resolver"
+	"ferret/compiler/internal/semantic/typecheck"
 )
 
 func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.CompilerContext {

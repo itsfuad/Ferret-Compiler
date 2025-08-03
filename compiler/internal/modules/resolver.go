@@ -1,10 +1,10 @@
 package modules
 
 import (
-	"compiler/colors"
-	"compiler/internal/config"
-	"compiler/internal/utils/fs"
-	"compiler/toml"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/config"
+	"ferret/compiler/internal/utils/fs"
+	"ferret/compiler/toml"
 	"os"
 
 	"fmt"

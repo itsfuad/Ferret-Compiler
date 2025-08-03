@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"compiler/colors"
+	"ferret/compiler/colors"
 )
 
 const (

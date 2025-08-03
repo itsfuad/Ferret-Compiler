@@ -1,6 +1,6 @@
 package ast
 
-import "compiler/internal/source"
+import "ferret/compiler/internal/source"
 
 type IntLiteral struct {
 	Value int64  // Actual numeric value

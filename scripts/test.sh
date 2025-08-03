@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd ../compiler
+cd ..
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,7 +16,7 @@ skipped=0
 echo "Running tests..."
 
 # Run tests and capture output
-test_output=$(go test ./... -v 2>&1)
+test_output=$(go test ./compiler/... -v 2>&1)
 exit_code=$?
 
 # Parse the output

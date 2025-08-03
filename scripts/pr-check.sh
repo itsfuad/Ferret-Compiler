@@ -29,18 +29,18 @@ echo "✅ Go is available: $(go version)"
 
 echo ""
 echo "📦 Step 2: Downloading dependencies..."
-cd "$COMPILER_DIR"
+cd "$ROOT_DIR"
 go mod download
 echo "✅ Dependencies downloaded"
 
 echo ""
 echo "🎨 Step 3: Checking code formatting..."
-if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+if [ "$(gofmt -s -l ./compiler | wc -l)" -gt 0 ]; then
     echo "❌ The following files are not formatted correctly:"
-    gofmt -s -l .
+    gofmt -s -l ./compiler
     echo ""
     echo "Please run the following command to fix formatting issues:"
-    echo "cd compiler && gofmt -s -w ."
+    echo "gofmt -s -w ./compiler"
     exit 1
 else
     echo "✅ All Go files are properly formatted"
@@ -48,19 +48,19 @@ fi
 
 echo ""
 echo "🔍 Step 4: Running go vet..."
-go vet ./...
+go vet ./compiler/...
 echo "✅ go vet passed"
 
 echo ""
 echo "🧪 Step 5: Running tests..."
-go test -v ./...
+go test -v ./compiler/...
 echo "✅ All tests passed"
 
 echo ""
 echo "🔨 Step 6: Building compiler..."
 mkdir -p "$BIN_DIR"
-cd "$COMPILER_DIR"
-go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v
+cd "$ROOT_DIR"
+go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v ./compiler
 chmod +x "$BIN_DIR/ferret"
 echo "✅ Compiler built successfully"
 
@@ -106,9 +106,9 @@ if ! command -v gosec &> /dev/null; then
     fi
 fi
 
-cd "$COMPILER_DIR"
+cd "$ROOT_DIR"
 # Run gosec and always create a SARIF file
-gosec -fmt sarif -out "$ROOT_DIR/gosec.sarif" -stderr ./... || true
+gosec -fmt sarif -out "$ROOT_DIR/gosec.sarif" -stderr ./compiler/... || true
 
 # Check if SARIF file was created
 if [ ! -f "$ROOT_DIR/gosec.sarif" ] || [ ! -s "$ROOT_DIR/gosec.sarif" ]; then

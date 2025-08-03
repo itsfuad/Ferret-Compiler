@@ -3,10 +3,10 @@ package parser
 import (
 	"testing"
 
-	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
-	"compiler/internal/testutil"
-	"compiler/internal/types"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
+	"ferret/compiler/internal/testutil"
+	"ferret/compiler/internal/types"
 )
 
 func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, bitSize uint8, unsigned bool) {
