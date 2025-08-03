@@ -1,0 +1,6 @@
+import "std/io";
+
+fn main() -> i32 {
+    io::print("Simple test");
+    return 0;
+}
