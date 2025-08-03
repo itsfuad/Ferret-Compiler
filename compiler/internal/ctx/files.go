@@ -1,7 +1,7 @@
 package ctx
 
 import (
-	"compiler/internal/modules"
+	"ferret/compiler/internal/modules"
 	"fmt"
 )
 

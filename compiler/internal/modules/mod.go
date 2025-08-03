@@ -1,9 +1,9 @@
 package modules
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/symbol"
-	"compiler/internal/utils/fs"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/symbol"
+	"ferret/compiler/internal/utils/fs"
 	"path/filepath"
 	"strings"
 )

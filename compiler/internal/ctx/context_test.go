@@ -1,7 +1,7 @@
 package ctx
 
 import (
-	"compiler/internal/config"
+	"ferret/compiler/internal/config"
 	"testing"
 )
 

@@ -1,8 +1,8 @@
 package typecheck
 
 import (
-	"compiler/internal/semantic/stype"
-	"compiler/internal/types"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/types"
 	"testing"
 )
 
@@ -46,25 +46,25 @@ func TestCommonNumericType(t *testing.T) {
 
 	// Test same types
 	result := getCommonNumericType(int32Type, int32Type)
-	if !result.Equals(int32Type) {
+	if result.TypeName() != types.INT32 {
 		t.Error("common type of same types should be that type")
 	}
 
 	// Test int32 + int64 -> int64
 	result = getCommonNumericType(int32Type, int64Type)
-	if !result.Equals(int64Type) {
+	if result.TypeName() != types.INT64 {
 		t.Error("common type of int32 and int64 should be int64")
 	}
 
 	// Test int32 + float32 -> float32
 	result = getCommonNumericType(int32Type, float32Type)
-	if !result.Equals(float32Type) {
+	if result.TypeName() != types.FLOAT32 {
 		t.Error("common type of int32 and float32 should be float32")
 	}
 
 	// Test float32 + float64 -> float64
 	result = getCommonNumericType(float32Type, float64Type)
-	if !result.Equals(float64Type) {
+	if result.TypeName() != types.FLOAT64 {
 		t.Error("common type of float32 and float64 should be float64")
 	}
 }

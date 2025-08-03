@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"compiler/internal/source"
+	"ferret/compiler/internal/source"
 )
 
 type Program struct {

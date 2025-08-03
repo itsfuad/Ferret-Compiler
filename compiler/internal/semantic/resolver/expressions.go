@@ -1,11 +1,11 @@
 package resolver
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/semantic/analyzer"
-	symbolpkg "compiler/internal/symbol"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic/analyzer"
+	symbolpkg "ferret/compiler/internal/symbol"
 	"fmt"
 )
 
