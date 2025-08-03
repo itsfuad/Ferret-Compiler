@@ -109,6 +109,14 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	}()
 
 	colors.BLUE.Printf("Collecting symbols from import '%s' at %s\n", imp.ImportPath.Value, imp.Loc().String())
+
+	// Get the current module
+	currentModule, err := collector.Ctx.GetModule(collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
+	if err != nil {
+		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), "Failed to get current module for import validation", report.COLLECTOR_PHASE)
+		return
+	}
+
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
 	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, collector.Program.FullPath, collector.Ctx.RemoteCachePath)
@@ -125,6 +133,22 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	if err != nil {
 		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("Failed to get imported module: %s", err.Error()), report.COLLECTOR_PHASE)
 		return
+	}
+
+	// Add import to current module's symbol table with validation
+	alias := imp.ModuleName
+	if err := currentModule.SymbolTable.AddImport(alias, moduleKey, module.SymbolTable); err != nil {
+		collector.Ctx.Reports.AddSemanticError(
+			collector.Program.FullPath,
+			imp.Loc(),
+			err.Error(),
+			report.COLLECTOR_PHASE,
+		).AddHint("Use 'as <alias>' to specify a unique alias for this import")
+		return
+	}
+
+	if collector.Debug {
+		colors.GREEN.Printf("Added import '%s' with alias '%s' to module '%s'\n", moduleKey, alias, collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
 	}
 
 	//if already analyzed don't analyze again

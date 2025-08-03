@@ -1,0 +1,10 @@
+// Test successful alias usage
+
+import "std/io";
+import "math/constants" as cc;
+
+fn main() -> i32 {
+    io::print("Hello");
+    let pi = cc::PI;
+    return 42;
+}
