@@ -1,0 +1,9 @@
+// Test duplicate import detection
+
+import "std/io";
+import "std/io"; // This should show error: already imported
+
+fn main() -> i32 {
+    io::print("Hello");
+    return 42;
+}

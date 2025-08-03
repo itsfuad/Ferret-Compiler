@@ -1,0 +1,8 @@
+// Test alias conflict detection
+
+import "std/io";
+import "math/geometry" as io; // This should show error: alias 'io' already used
+
+fn main() -> i32 {
+    return 42;
+}
