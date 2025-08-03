@@ -1,0 +1,20 @@
+// Test invalid method declarations on non-struct types
+
+// Method on primitive type
+fn (x: i32) getValue() -> i32 {
+    return x;
+}
+
+// Method on array type  
+fn (arr: []i32) getLength() -> i32 {
+    return 0;
+}
+
+// Method on string type
+fn (s: str) getLength() -> i32 {
+    return 0;
+}
+
+fn main() -> i32 {
+    return 42;
+}

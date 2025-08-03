@@ -26,7 +26,7 @@ fn nonVoidfn() -> i32 {
 
 nonVoidfn();
 io::print("Hello, Ferret!");
-geometry::area_circle(3);
+geometry::area_circle(3.0);
 
 fn doSomething() {
     // This function does something

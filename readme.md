@@ -176,6 +176,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Arrays
     - [x] Array indexing
     - [x] Array assignment
+    - [ ] String indexing
 - [x] Structs
     - [x] Anonymous structs
     - [x] Struct literals

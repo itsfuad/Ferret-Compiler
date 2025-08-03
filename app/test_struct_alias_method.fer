@@ -1,0 +1,15 @@
+// Test method on type alias to struct (should pass)
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+type MyPoint Point;
+
+fn (p: MyPoint) getX() -> i32 {
+    return 0;  // For now, just return 0
+}
+
+fn main() -> i32 {
+    return 42;
+}

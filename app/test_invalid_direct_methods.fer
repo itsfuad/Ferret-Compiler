@@ -1,0 +1,20 @@
+// Test file for direct invalid method receivers
+
+// This should be INVALID - anonymous struct
+fn (p: struct{x: i32, y: i32}) invalidMethod() {
+    // empty
+}
+
+// This should be INVALID - primitive type
+fn (i: i32) invalidMethod() {
+    // empty  
+}
+
+// This should be INVALID - array type
+fn (a: []i32) invalidMethod() {
+    // empty
+}
+
+fn main() -> i32 {
+    return 42;
+}
