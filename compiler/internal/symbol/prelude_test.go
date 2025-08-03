@@ -3,8 +3,8 @@ package symbol
 import (
 	"testing"
 
-	"compiler/internal/semantic/stype"
-	"compiler/internal/types"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/types"
 )
 
 func TestAddPreludeSymbols(t *testing.T) {

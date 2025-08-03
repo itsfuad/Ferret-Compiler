@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"compiler/colors"
-	"compiler/internal/modules"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/modules"
 	"os"
 	"path/filepath"
 
-	//"compiler/internal/backend"
-	"compiler/internal/config"
+	//"ferret/compiler/internal/backend"
+	"ferret/compiler/internal/config"
 )
 
 const (

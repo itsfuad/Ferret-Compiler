@@ -1,14 +1,14 @@
 package typecheck
 
 import (
-	"compiler/colors"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/stype"
-	"compiler/internal/symbol"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/symbol"
 	"fmt"
 )
 

@@ -26,7 +26,7 @@ if errorlevel 1 (
 echo %GREEN%✅ Go is available%NC%
 
 echo %YELLOW%📦 Step 2: Downloading dependencies...%NC%
-cd /d %COMPILER_DIR%
+cd /d %ROOT_DIR%
 go mod download
 if errorlevel 1 (
     echo %RED%❌ Failed to download dependencies%NC%
@@ -35,11 +35,12 @@ if errorlevel 1 (
 echo %GREEN%✅ Dependencies downloaded%NC%
 
 echo %YELLOW%🎨 Step 3: Checking code formatting...%NC%
-gofmt -s -l . > temp_fmt.txt
+cd /d %ROOT_DIR%
+gofmt -s -l ./compiler > temp_fmt.txt
 for /f %%i in (temp_fmt.txt) do (
     echo %RED%❌ The following files are not formatted correctly:%NC%
     type temp_fmt.txt
-    echo %YELLOW%Please run: cd compiler && gofmt -s -w .%NC%
+    echo %YELLOW%Please run: gofmt -s -w ./compiler%NC%
     del temp_fmt.txt
     exit /b 1
 )
@@ -47,7 +48,7 @@ del temp_fmt.txt
 echo %GREEN%✅ All Go files are properly formatted%NC%
 
 echo %YELLOW%🔍 Step 4: Running go vet...%NC%
-go vet ./...
+go vet ./compiler/...
 if errorlevel 1 (
     echo %RED%❌ go vet failed%NC%
     exit /b 1
@@ -55,7 +56,7 @@ if errorlevel 1 (
 echo %GREEN%✅ go vet passed%NC%
 
 echo %YELLOW%🧪 Step 5: Running tests...%NC%
-go test -v ./...
+go test -v ./compiler/...
 if errorlevel 1 (
     echo %RED%❌ Tests failed%NC%
     exit /b 1
@@ -64,7 +65,7 @@ echo %GREEN%✅ All tests passed%NC%
 
 echo %YELLOW%🔨 Step 6: Building compiler...%NC%
 mkdir "%BIN_DIR%" 2>nul
-go build -o "%BIN_DIR%\ferret.exe" -ldflags "-s -w" -trimpath -v
+go build -o "%BIN_DIR%\ferret.exe" -ldflags "-s -w" -trimpath -v ./compiler
 if errorlevel 1 (
     echo %RED%❌ Build failed%NC%
     exit /b 1

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"compiler/internal/ctx"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/source"
+	"ferret/compiler/internal/ctx"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/source"
 )
 
 // parseImport parses an import statement

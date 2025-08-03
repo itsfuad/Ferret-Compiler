@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"compiler/cmd"
-	"compiler/cmd/cli"
-	"compiler/cmd/flags"
-	"compiler/colors"
+	"ferret/compiler/cmd"
+	"ferret/compiler/cmd/cli"
+	"ferret/compiler/cmd/flags"
+	"ferret/compiler/colors"
 )
 
 func main() {

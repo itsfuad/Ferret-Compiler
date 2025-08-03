@@ -1,14 +1,14 @@
 package typecheck
 
 import (
-	"compiler/colors"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/stype"
-	"compiler/internal/types"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/types"
 	"fmt"
 )
 
@@ -18,10 +18,6 @@ import (
 // Note: This function has limited type resolution capability. For full alias resolution,
 // the type checker should use resolveTypeAlias with analyzer context.
 func IsAssignableFrom(target, source stype.Type) bool {
-	// Exact type match
-	if target.Equals(source) {
-		return true
-	}
 
 	// Handle user types (aliases) - limited resolution without symbol table access
 	resolvedTarget := semantic.UnwrapType(target)
@@ -29,7 +25,7 @@ func IsAssignableFrom(target, source stype.Type) bool {
 
 	colors.PURPLE.Printf("Checking assignability: %v → %v ", resolvedSource, resolvedTarget)
 
-	if resolvedTarget.Equals(resolvedSource) || isNumericPromotion(resolvedTarget, resolvedSource) || isArrayCompatible(resolvedTarget, resolvedSource) || isFunctionCompatible(resolvedTarget, resolvedSource) || isStructCompatible(resolvedTarget, resolvedSource) {
+	if isNumericPromotion(resolvedTarget, resolvedSource) || isArrayCompatible(resolvedTarget, resolvedSource) || isFunctionCompatible(resolvedTarget, resolvedSource) || isStructCompatible(resolvedTarget, resolvedSource) {
 		colors.GREEN.Println(" ✔ ")
 		return true
 	}
@@ -48,6 +44,10 @@ func isNumericPromotion(target, source stype.Type) bool {
 
 	if !targetOk || !sourceOk {
 		return false
+	}
+
+	if targetPrim.TypeName() == sourcePrim.TypeName() {
+		return true // Same type is always assignable
 	}
 
 	// Define promotion rules
@@ -232,9 +232,6 @@ func getBitwiseResultType(left, right stype.Type) stype.Type {
 
 // getCommonNumericType finds the common type for numeric operations
 func getCommonNumericType(left, right stype.Type) stype.Type {
-	if left.Equals(right) {
-		return left
-	}
 
 	leftPrim, leftOk := left.(*stype.PrimitiveType)
 	rightPrim, rightOk := right.(*stype.PrimitiveType)

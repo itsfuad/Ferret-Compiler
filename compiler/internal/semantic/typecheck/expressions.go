@@ -1,16 +1,16 @@
 package typecheck
 
 import (
-	"compiler/colors"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/stype"
-	"compiler/internal/source"
-	"compiler/internal/types"
 	"errors"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/source"
+	"ferret/compiler/internal/types"
 	"fmt"
 	"strings"
 )
@@ -469,7 +469,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		// Check the type of the field value
 		if field.FieldValue != nil {
 			actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
-			if actualFieldType != nil && !expectedFieldType.Equals(actualFieldType) {
+			if actualFieldType != nil && !IsAssignableFrom(expectedFieldType, actualFieldType) {
 				r.Ctx.Reports.AddSemanticError(
 					r.Program.FullPath,
 					&field.Location,
