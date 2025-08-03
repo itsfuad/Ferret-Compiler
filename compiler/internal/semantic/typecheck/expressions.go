@@ -130,7 +130,6 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 	return funcType.ReturnType
 }
 
-
 // checkFieldAccessType handles struct field access and method access
 func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccessExpr, cm *modules.Module) stype.Type {
 	if fieldAccess.Object == nil || fieldAccess.Field == nil {
