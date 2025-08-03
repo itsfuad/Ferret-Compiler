@@ -5,14 +5,13 @@ import (
 	"sort"
 	"strings"
 
-	"compiler/internal/types"
+	"ferret/compiler/internal/types"
 )
 
 // Type represents a semantic type in the type system (without location information)
 type Type interface {
 	TypeName() types.TYPE_NAME
 	String() string
-	Equals(other Type) bool
 }
 
 // PrimitiveType represents built-in primitive types (int, string, bool, etc.)
@@ -28,13 +27,6 @@ func (p *PrimitiveType) String() string {
 	return string(p.Name)
 }
 
-func (p *PrimitiveType) Equals(other Type) bool {
-	if otherPrim, ok := other.(*PrimitiveType); ok {
-		return p.Name == otherPrim.Name
-	}
-	return false
-}
-
 // UserType represents user-defined types and type aliases
 type UserType struct {
 	Name       types.TYPE_NAME
@@ -47,14 +39,6 @@ func (u *UserType) TypeName() types.TYPE_NAME {
 
 func (u *UserType) String() string {
 	return string(u.Name)
-}
-
-func (u *UserType) Equals(other Type) bool {
-	if otherUser, ok := other.(*UserType); ok {
-		//source and target user types must have the same name and same fields with same types
-		return u.Name == otherUser.Name && u.Definition.Equals(otherUser.Definition)
-	}
-	return false
 }
 
 // StructType represents struct types with named fields
@@ -88,13 +72,6 @@ func (s *StructType) String() string {
 	return fmt.Sprintf("%s { %s }", s.Name, strings.Join(fieldStrs, ", "))
 }
 
-func (s *StructType) Equals(other Type) bool {
-	if otherStruct, ok := other.(*StructType); ok {
-		return s.Name == otherStruct.Name
-	}
-	return false
-}
-
 // GetFieldType returns the type of a field in the struct, or nil if not found
 func (s *StructType) GetFieldType(fieldName string) Type {
 	return s.Fields[fieldName]
@@ -112,13 +89,6 @@ func (a *ArrayType) TypeName() types.TYPE_NAME {
 
 func (a *ArrayType) String() string {
 	return fmt.Sprintf("[]%s", a.ElementType.String())
-}
-
-func (a *ArrayType) Equals(other Type) bool {
-	if otherArray, ok := other.(*ArrayType); ok {
-		return a.ElementType.Equals(otherArray.ElementType)
-	}
-	return false
 }
 
 // FunctionType represents function types with parameters and return type
@@ -139,26 +109,6 @@ func (f *FunctionType) String() string {
 	}
 
 	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType.String())
-}
-
-func (f *FunctionType) Equals(other Type) bool {
-	if otherFunc, ok := other.(*FunctionType); ok {
-		// Check parameter count
-		if len(f.Parameters) != len(otherFunc.Parameters) {
-			return false
-		}
-
-		// Check each parameter type
-		for i, param := range f.Parameters {
-			if !param.Equals(otherFunc.Parameters[i]) {
-				return false
-			}
-		}
-
-		// Check return type
-		return f.ReturnType.Equals(otherFunc.ReturnType)
-	}
-	return false
 }
 
 // InterfaceType represents interface types with method signatures
@@ -191,16 +141,4 @@ func (i *InterfaceType) String() string {
 	}
 
 	return fmt.Sprintf("interface %s { %s }", i.Name, strings.Join(methodStrs, "; "))
-}
-
-func (i *InterfaceType) Equals(other Type) bool {
-	if otherInterface, ok := other.(*InterfaceType); ok {
-		return i.Name == otherInterface.Name
-	}
-	return false
-}
-
-// GetMethod returns the method signature for a given method name, or nil if not found
-func (i *InterfaceType) GetMethod(methodName string) *FunctionType {
-	return i.Methods[methodName]
 }

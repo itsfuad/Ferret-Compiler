@@ -37,4 +37,16 @@ fn main() {
     let y1: i32 = basicPoint.y;
     let x2: i32 = anonPoint.x;
     let y2: i32 = namedDest.y;
+
+    let char = 'a';
+    let strValue: str = "Hello, Ferret!";
+    //let charToStr: str = char as str; // Implicit cast from char to str
+    let i32Value: i32 = 42;
+    let uintValue: u32 = i32Value as u32; // Implicit cast from i32 to u32
+    let floatValue: f64 = 3.14;
+    let floatToInt: i32 = floatValue as i32; // Implicit cast from f64 to i32
+    let intToFloat: f64 = i32Value as f64; // Implicit cast from i32 to f64
+    //let strToChar: byte = strValue[0] as byte; // Implicit cast from str to byte
+    let byteToUint: u8 = char as u8; // Implicit cast from byte to u8
+    let byteToFloat: f32 = char as f32; // Implicit cast from byte to f32
 }

@@ -7,12 +7,12 @@ import (
 	"sort"
 	"strings"
 
-	"compiler/colors"
-	"compiler/internal/config"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/symbol"
+	"ferret/compiler/colors"
+	"ferret/compiler/internal/config"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/symbol"
 )
 
 var contextCreated = false

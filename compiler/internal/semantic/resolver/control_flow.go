@@ -1,9 +1,9 @@
 package resolver
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/semantic/analyzer"
 )
 
 // resolveIfStmt resolves an if statement and its branches

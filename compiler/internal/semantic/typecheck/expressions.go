@@ -1,18 +1,15 @@
 package typecheck
 
 import (
-	"compiler/colors"
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/stype"
-	"compiler/internal/source"
-	"compiler/internal/types"
-	"errors"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/source"
+	"ferret/compiler/internal/types"
 	"fmt"
-	"strings"
 )
 
 // evaluateExpressionType infers the semantic type from an AST expression
@@ -119,7 +116,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 		}
 
 		expectedType := funcType.Parameters[i]
-		if !IsAssignableFrom(expectedType, argType) {
+		if !isImplicitCastable(expectedType, argType) {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				call.Loc(),
@@ -131,122 +128,6 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 
 	// Return the function's return type (single return type now)
 	return funcType.ReturnType
-}
-
-// checkCastExprType validates type cast expressions and returns the target type
-func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules.Module) stype.Type {
-	// Evaluate the source expression type
-	sourceType := evaluateExpressionType(r, *cast.Value, cm)
-	if sourceType == nil {
-		return nil
-	}
-
-	// Convert AST target type to semantic type
-	targetType, err := semantic.DeriveSemanticType(cast.TargetType, cm)
-	if err != nil || targetType == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			cast.Loc(),
-			fmt.Sprintf("invalid target type in cast expression: %v", err),
-			report.TYPECHECK_PHASE,
-		)
-		return nil
-	}
-
-	// Check if the cast is valid
-	isValid, err := isCastable(sourceType, targetType, cm)
-	if err != nil || !isValid {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			cast.Loc(),
-			fmt.Sprintf("cannot cast from '%s' to '%s': %v", sourceType.String(), targetType.String(), err),
-			report.TYPECHECK_PHASE,
-		)
-		return nil // Return nil if cast is invalid
-	}
-
-	return targetType
-}
-
-func isCastable(sourceType, targetType stype.Type, cm *modules.Module) (bool, error) {
-	// primitive types can be casted to each other
-	if sourceType == nil || targetType == nil {
-		return false, errors.New("source or target type is nil")
-	}
-
-	sourceUnwrapped := semantic.UnwrapType(sourceType) // Unwrap any type aliases
-	targetUnwrapped := semantic.UnwrapType(targetType) // Unwrap any type aliases
-
-	if _, ok := sourceUnwrapped.(*stype.PrimitiveType); ok {
-		if _, ok := targetUnwrapped.(*stype.PrimitiveType); ok {
-			// Allow casting between primitive types
-			return isPrimitiveCastable(sourceUnwrapped, targetUnwrapped)
-		}
-		return false, errors.New("cannot cast primitive to non-primitive")
-	}
-
-	//structs can be casted to other struct and interfaces and interfaces can be casted to structs
-	if ss, ok := sourceUnwrapped.(*stype.StructType); ok {
-		//target must be a struct or interface. for now skip interface
-		if ts, ok := targetUnwrapped.(*stype.StructType); ok {
-			//both are struct
-			return castableStructToStruct(ss, ts, cm)
-		}
-	}
-
-	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
-}
-
-func castableStructToStruct(sourceType, targetType *stype.StructType, cm *modules.Module) (bool, error) {
-	//targets all properties must present
-
-	fieldErrors := make([]string, 0, len(targetType.Fields))
-
-	for fieldName, fieldType := range targetType.Fields {
-		if sourceFieldType, exists := sourceType.Fields[fieldName]; !exists {
-			fieldErrors = append(fieldErrors, colors.RED.Sprintf(" - missing field '%s'", fieldName))
-		} else if ok, _ := isCastable(sourceFieldType, fieldType, cm); !ok {
-			fieldErrors = append(fieldErrors, colors.PURPLE.Sprintf(" - field '%s' type required '%s', but got '%s'", fieldName, fieldType.String(), sourceFieldType.String()))
-		}
-	}
-
-	if len(fieldErrors) > 0 {
-		errMsg := colors.WHITE.Sprintf("\n%s and %s has field missmatch\n", sourceType.String(), targetType.String())
-		return false, fmt.Errorf("%s%s", errMsg, strings.Join(fieldErrors, "\n"))
-	}
-
-	fmt.Printf("Successfully casted struct '%s' to '%s'\n", sourceType.String(), targetType.String())
-
-	return true, nil
-}
-
-func isPrimitiveCastable(sourceType, targetType stype.Type) (bool, error) {
-	sourcePrim, _ := sourceType.(*stype.PrimitiveType)
-	targetPrim, _ := targetType.(*stype.PrimitiveType)
-	// Allow ALL numeric to numeric casting with explicit "as" keyword
-	// The developer explicitly requests the conversion, so allow both widening and narrowing
-	if types.IsNumericTypeName(sourcePrim.Name) && types.IsNumericTypeName(targetPrim.Name) {
-		return true, nil
-	}
-
-	// Special case: byte can be cast to/from u8 and i8
-	if sourcePrim.Name == types.BYTE {
-		res := targetPrim.Name == types.UINT8 || targetPrim.Name == types.INT8
-		if res {
-			return res, nil
-		}
-		return false, fmt.Errorf("byte and %s are incompatible types", targetPrim.Name)
-	}
-	if targetPrim.Name == types.BYTE {
-		res := sourcePrim.Name == types.UINT8 || sourcePrim.Name == types.INT8
-		if res {
-			return res, nil
-		}
-		return false, fmt.Errorf("byte and %s are incompatible types", sourcePrim.Name)
-	}
-
-	// No valid cast found
-	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
 }
 
 // checkFieldAccessType handles struct field access and method access
@@ -469,7 +350,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		// Check the type of the field value
 		if field.FieldValue != nil {
 			actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
-			if actualFieldType != nil && !expectedFieldType.Equals(actualFieldType) {
+			if actualFieldType != nil && !isImplicitCastable(expectedFieldType, actualFieldType) {
 				r.Ctx.Reports.AddSemanticError(
 					r.Program.FullPath,
 					&field.Location,

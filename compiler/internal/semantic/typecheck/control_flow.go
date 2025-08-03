@@ -1,13 +1,13 @@
 package typecheck
 
 import (
-	"compiler/internal/frontend/ast"
-	"compiler/internal/modules"
-	"compiler/internal/report"
-	"compiler/internal/semantic"
-	"compiler/internal/semantic/analyzer"
-	"compiler/internal/semantic/stype"
-	"compiler/internal/source"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/modules"
+	"ferret/compiler/internal/report"
+	"ferret/compiler/internal/semantic"
+	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/compiler/internal/semantic/stype"
+	"ferret/compiler/internal/source"
 	"fmt"
 )
 
@@ -135,7 +135,7 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 	}
 
 	// Check return type compatibility
-	if !IsAssignableFrom(expectedReturnType, returnValueType) {
+	if !isImplicitCastable(expectedReturnType, returnValueType) {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			returnStmt.Loc(),
