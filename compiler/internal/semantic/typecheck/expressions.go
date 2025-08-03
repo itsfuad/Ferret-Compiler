@@ -119,7 +119,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 		}
 
 		expectedType := funcType.Parameters[i]
-		if !IsAssignableFrom(expectedType, argType) {
+		if !isImplicitCastable(expectedType, argType) {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				call.Loc(),
@@ -154,7 +154,7 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 	}
 
 	// Check if the cast is valid
-	isValid, err := isCastable(sourceType, targetType, cm)
+	isValid, err := isExplicitCastable(sourceType, targetType)
 	if err != nil || !isValid {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -168,21 +168,25 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 	return targetType
 }
 
-func isCastable(sourceType, targetType stype.Type, cm *modules.Module) (bool, error) {
+func isExplicitCastable(sourceType, targetType stype.Type) (bool, error) {
 	// primitive types can be casted to each other
 	if sourceType == nil || targetType == nil {
 		return false, errors.New("source or target type is nil")
+	}
+	
+	if isImplicitCastable(sourceType, targetType) {
+		return true, nil // Implicit cast is also valid for explicit cast
 	}
 
 	sourceUnwrapped := semantic.UnwrapType(sourceType) // Unwrap any type aliases
 	targetUnwrapped := semantic.UnwrapType(targetType) // Unwrap any type aliases
 
+	// Check if both are primitive types
 	if _, ok := sourceUnwrapped.(*stype.PrimitiveType); ok {
 		if _, ok := targetUnwrapped.(*stype.PrimitiveType); ok {
-			// Allow casting between primitive types
-			return isPrimitiveCastable(sourceUnwrapped, targetUnwrapped)
+			// Both are primitive types, check if they are castable
+			return isPrimitiveExplicitCastable(sourceUnwrapped, targetUnwrapped)
 		}
-		return false, errors.New("cannot cast primitive to non-primitive")
 	}
 
 	//structs can be casted to other struct and interfaces and interfaces can be casted to structs
@@ -190,14 +194,14 @@ func isCastable(sourceType, targetType stype.Type, cm *modules.Module) (bool, er
 		//target must be a struct or interface. for now skip interface
 		if ts, ok := targetUnwrapped.(*stype.StructType); ok {
 			//both are struct
-			return castableStructToStruct(ss, ts, cm)
+			return isStructExplicitCastable(ss, ts)
 		}
 	}
 
 	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
 }
 
-func castableStructToStruct(sourceType, targetType *stype.StructType, cm *modules.Module) (bool, error) {
+func isStructExplicitCastable(sourceType, targetType *stype.StructType) (bool, error) {
 	//targets all properties must present
 
 	fieldErrors := make([]string, 0, len(targetType.Fields))
@@ -205,7 +209,7 @@ func castableStructToStruct(sourceType, targetType *stype.StructType, cm *module
 	for fieldName, fieldType := range targetType.Fields {
 		if sourceFieldType, exists := sourceType.Fields[fieldName]; !exists {
 			fieldErrors = append(fieldErrors, colors.RED.Sprintf(" - missing field '%s'", fieldName))
-		} else if ok, _ := isCastable(sourceFieldType, fieldType, cm); !ok {
+		} else if !isImplicitCastable(sourceFieldType, fieldType) {
 			fieldErrors = append(fieldErrors, colors.PURPLE.Sprintf(" - field '%s' type required '%s', but got '%s'", fieldName, fieldType.String(), sourceFieldType.String()))
 		}
 	}
@@ -220,9 +224,14 @@ func castableStructToStruct(sourceType, targetType *stype.StructType, cm *module
 	return true, nil
 }
 
-func isPrimitiveCastable(sourceType, targetType stype.Type) (bool, error) {
-	sourcePrim, _ := sourceType.(*stype.PrimitiveType)
-	targetPrim, _ := targetType.(*stype.PrimitiveType)
+func isPrimitiveExplicitCastable(sourceType, targetType stype.Type) (bool, error) {
+	sourcePrim, sOk := sourceType.(*stype.PrimitiveType)
+	targetPrim, tOk := targetType.(*stype.PrimitiveType)
+
+	if !sOk || !tOk {
+		return false, errors.New("both source and target must be primitive types")
+	}
+
 	// Allow ALL numeric to numeric casting with explicit "as" keyword
 	// The developer explicitly requests the conversion, so allow both widening and narrowing
 	if types.IsNumericTypeName(sourcePrim.Name) && types.IsNumericTypeName(targetPrim.Name) {
@@ -469,7 +478,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		// Check the type of the field value
 		if field.FieldValue != nil {
 			actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
-			if actualFieldType != nil && !IsAssignableFrom(expectedFieldType, actualFieldType) {
+			if actualFieldType != nil && !isImplicitCastable(expectedFieldType, actualFieldType) {
 				r.Ctx.Reports.AddSemanticError(
 					r.Program.FullPath,
 					&field.Location,

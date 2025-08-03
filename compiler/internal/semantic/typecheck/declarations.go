@@ -74,7 +74,7 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 		return
 	}
 
-	if !IsAssignableFrom(explicitType, inferredType) {
+	if !isImplicitCastable(explicitType, inferredType) {
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			initializer.Loc(),
@@ -83,7 +83,7 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 			report.TYPECHECK_PHASE,
 		)
 
-		if ok, _ := isCastable(inferredType, explicitType, cm); ok {
+		if ok, _ := isExplicitCastable(inferredType, explicitType); ok {
 			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
 		}
 	}
@@ -124,10 +124,10 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), "Failed to determine type for assignment", report.TYPECHECK_PHASE)
 			continue
 		}
-		if !IsAssignableFrom(lhsType, rhsType) {
+		if !isImplicitCastable(lhsType, rhsType) {
 			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
 
-			if ok, _ := isCastable(rhsType, lhsType, cm); ok {
+			if ok, _ := isExplicitCastable(rhsType, lhsType); ok {
 				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType.String()))
 			}
 
