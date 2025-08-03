@@ -1,0 +1,6 @@
+import "math/constants"; // This will be unused
+
+fn main() -> i32 {
+    // No usage of constants
+    return 0;
+}

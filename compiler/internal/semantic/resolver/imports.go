@@ -75,6 +75,11 @@ func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution
 		return
 	}
 
+	// Mark the import as used when successfully resolving a symbol from it
+	if r.UsedImports != nil {
+		r.UsedImports[res.Module.Name] = true
+	}
+
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
 		colors.TEAL.Printf("Resolved imported symbol '%s' from module '%s' imported from '%s'\n", res.Identifier.Name, res.Module.Name, cm.AST.Modulename)
