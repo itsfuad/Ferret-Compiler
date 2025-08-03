@@ -143,7 +143,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 			imp.Loc(),
 			err.Error(),
 			report.COLLECTOR_PHASE,
-		).AddHint("Use 'as <alias>' to specify a unique alias for this import")
+		)
 		return
 	}
 

@@ -33,9 +33,6 @@ type CompilerContext struct {
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
 
-	// Track unused imports per module: key is module import path, value is usage count
-	ImportUsage map[string]int
-
 	// Track modules that are currently being parsed to prevent infinite recursion
 	_parsingModules map[string]bool
 	// Keep track of the parsing stack to show cycle paths
