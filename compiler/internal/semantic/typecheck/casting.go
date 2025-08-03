@@ -49,7 +49,6 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 	return targetType
 }
 
-
 // --- EXPLICIT CASTING CHECKS ---
 
 func isExplicitCastable(sourceType, targetType stype.Type) (bool, error) {
@@ -57,7 +56,7 @@ func isExplicitCastable(sourceType, targetType stype.Type) (bool, error) {
 	if sourceType == nil || targetType == nil {
 		return false, errors.New("source or target type is nil")
 	}
-	
+
 	if isImplicitCastable(sourceType, targetType) {
 		return true, nil // Implicit cast is also valid for explicit cast
 	}
@@ -126,14 +125,7 @@ func isPrimitiveExplicitCastable(sourceType, targetType stype.Type) (bool, error
 	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
 }
 
-
-
-
-
-
-
 // -- IMPLICIT CASTING CHECKS ---
-
 
 // isImplicitCastable checks if a value of type 'source' can be assigned to 'target'
 // Note: This function has limited type resolution capability. For full alias resolution,
