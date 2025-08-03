@@ -14,18 +14,17 @@ import (
 
 // ===== CORE ASSIGNABILITY CHECK =====
 
-// IsAssignableFrom checks if a value of type 'source' can be assigned to 'target'
+// isImplicitCastable checks if a value of type 'source' can be assigned to 'target'
 // Note: This function has limited type resolution capability. For full alias resolution,
 // the type checker should use resolveTypeAlias with analyzer context.
-func IsAssignableFrom(target, source stype.Type) bool {
-
+func isImplicitCastable(target, source stype.Type) bool {
 	// Handle user types (aliases) - limited resolution without symbol table access
 	resolvedTarget := semantic.UnwrapType(target)
 	resolvedSource := semantic.UnwrapType(source)
 
 	colors.PURPLE.Printf("Checking assignability: %v → %v ", resolvedSource, resolvedTarget)
 
-	if isNumericPromotion(resolvedTarget, resolvedSource) || isArrayCompatible(resolvedTarget, resolvedSource) || isFunctionCompatible(resolvedTarget, resolvedSource) || isStructCompatible(resolvedTarget, resolvedSource) {
+	if isPrimitiveImplicitCastable(resolvedTarget, resolvedSource) || isArrayImplicitCastable(resolvedTarget, resolvedSource) || isFunctionImplicitCastable(resolvedTarget, resolvedSource) || isStructImpliticCastable(resolvedTarget, resolvedSource) {
 		colors.GREEN.Println(" ✔ ")
 		return true
 	}
@@ -37,8 +36,8 @@ func IsAssignableFrom(target, source stype.Type) bool {
 
 // ===== HELPER FUNCTIONS =====
 
-// isNumericPromotion checks if source can be promoted to target (implicit conversion)
-func isNumericPromotion(target, source stype.Type) bool {
+// isPrimitiveImplicitCastable checks if source can be promoted to target (implicit conversion)
+func isPrimitiveImplicitCastable(target, source stype.Type) bool {
 	targetPrim, targetOk := target.(*stype.PrimitiveType)
 	sourcePrim, sourceOk := source.(*stype.PrimitiveType)
 
@@ -76,8 +75,8 @@ func isNumericPromotion(target, source stype.Type) bool {
 	return false
 }
 
-// isArrayCompatible checks array type compatibility
-func isArrayCompatible(target, source stype.Type) bool {
+// isArrayImplicitCastable checks array type compatibility
+func isArrayImplicitCastable(target, source stype.Type) bool {
 	targetArray, targetOk := target.(*stype.ArrayType)
 	sourceArray, sourceOk := source.(*stype.ArrayType)
 
@@ -85,11 +84,11 @@ func isArrayCompatible(target, source stype.Type) bool {
 		return false
 	}
 
-	return IsAssignableFrom(targetArray.ElementType, sourceArray.ElementType)
+	return isImplicitCastable(targetArray.ElementType, sourceArray.ElementType)
 }
 
-// isFunctionCompatible checks function type compatibility
-func isFunctionCompatible(target, source stype.Type) bool {
+// isFunctionImplicitCastable checks function type compatibility
+func isFunctionImplicitCastable(target, source stype.Type) bool {
 	targetFunc, targetOk := target.(*stype.FunctionType)
 	sourceFunc, sourceOk := source.(*stype.FunctionType)
 
@@ -104,7 +103,7 @@ func isFunctionCompatible(target, source stype.Type) bool {
 
 	// Parameters are contravariant, returns are covariant
 	for i := range targetFunc.Parameters {
-		if !IsAssignableFrom(sourceFunc.Parameters[i], targetFunc.Parameters[i]) {
+		if !isImplicitCastable(sourceFunc.Parameters[i], targetFunc.Parameters[i]) {
 			return false
 		}
 	}
@@ -117,11 +116,11 @@ func isFunctionCompatible(target, source stype.Type) bool {
 		return false
 	}
 
-	return IsAssignableFrom(targetFunc.ReturnType, sourceFunc.ReturnType)
+	return isImplicitCastable(targetFunc.ReturnType, sourceFunc.ReturnType)
 }
 
-// isStructCompatible checks structural compatibility of structs
-func isStructCompatible(target, source stype.Type) bool {
+// isStructImpliticCastable checks structural compatibility of structs
+func isStructImpliticCastable(target, source stype.Type) bool {
 	targetStruct, targetOk := target.(*stype.StructType)
 	sourceStruct, sourceOk := source.(*stype.StructType)
 
@@ -132,7 +131,7 @@ func isStructCompatible(target, source stype.Type) bool {
 	// Source must have all fields that target requires, with compatible types
 	for fieldName, targetFieldType := range targetStruct.Fields {
 		sourceFieldType, exists := sourceStruct.Fields[fieldName]
-		if !exists || !IsAssignableFrom(targetFieldType, sourceFieldType) {
+		if !exists || !isImplicitCastable(targetFieldType, sourceFieldType) {
 			return false
 		}
 	}
@@ -208,7 +207,7 @@ func getArithmeticResultType(operator string, left, right stype.Type) stype.Type
 
 // getComparisonResultType handles comparison operations
 func getComparisonResultType(left, right stype.Type) stype.Type {
-	if IsAssignableFrom(left, right) || IsAssignableFrom(right, left) {
+	if isImplicitCastable(left, right) || isImplicitCastable(right, left) {
 		return &stype.PrimitiveType{Name: types.BOOL}
 	}
 	return nil
@@ -287,7 +286,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 			continue
 		}
 
-		if !IsAssignableFrom(elementType, elemType) {
+		if !isImplicitCastable(elementType, elemType) {
 
 			err := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
@@ -296,7 +295,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 				report.TYPECHECK_PHASE,
 			)
 
-			if ok, _ := isCastable(elemType, elementType, cm); !ok {
+			if ok, _ := isExplicitCastable(elemType, elementType); !ok {
 				err.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", elementType))
 			}
 

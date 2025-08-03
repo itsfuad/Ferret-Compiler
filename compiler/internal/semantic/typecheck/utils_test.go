@@ -15,24 +15,24 @@ func TestNumericTypeHierarchy(t *testing.T) {
 	float64Type := &stype.PrimitiveType{Name: types.FLOAT64}
 
 	// Test integer promotions
-	if !IsAssignableFrom(int16Type, int8Type) {
+	if !isImplicitCastable(int16Type, int8Type) {
 		t.Error("int8 should promote to int16")
 	}
 
-	if !IsAssignableFrom(int32Type, int16Type) {
+	if !isImplicitCastable(int32Type, int16Type) {
 		t.Error("int16 should promote to int32")
 	}
 
 	// Test float promotions
-	if !IsAssignableFrom(float32Type, int8Type) {
+	if !isImplicitCastable(float32Type, int8Type) {
 		t.Error("int8 should promote to float32")
 	}
 
-	if !IsAssignableFrom(float64Type, float32Type) {
+	if !isImplicitCastable(float64Type, float32Type) {
 		t.Error("float32 should promote to float64")
 	}
 
-	if !IsAssignableFrom(float64Type, int32Type) {
+	if !isImplicitCastable(float64Type, int32Type) {
 		t.Error("int32 should promote to float64")
 	}
 }
@@ -78,11 +78,11 @@ func TestArrayCompatibility(t *testing.T) {
 	int64ArrayType := &stype.ArrayType{ElementType: int64Type, Name: types.ARRAY}
 
 	// Arrays are compatible if element types are assignable
-	if !IsAssignableFrom(int64ArrayType, int32ArrayType) {
+	if !isImplicitCastable(int64ArrayType, int32ArrayType) {
 		t.Error("int32[] should be assignable to int64[] (element promotion)")
 	}
 
-	if IsAssignableFrom(int32ArrayType, int64ArrayType) {
+	if isImplicitCastable(int32ArrayType, int64ArrayType) {
 		t.Error("int64[] should NOT be assignable to int32[] (no element demotion)")
 	}
 }

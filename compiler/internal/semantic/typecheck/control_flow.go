@@ -135,7 +135,7 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 	}
 
 	// Check return type compatibility
-	if !IsAssignableFrom(expectedReturnType, returnValueType) {
+	if !isImplicitCastable(expectedReturnType, returnValueType) {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			returnStmt.Loc(),
