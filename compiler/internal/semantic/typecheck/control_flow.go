@@ -60,7 +60,7 @@ func checkIfCondition(r *analyzer.AnalyzerNode, condition *ast.Expression, cm *m
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			(*condition).Loc(),
-			fmt.Sprintf("If condition must be boolean, got '%s'", conditionType.String()),
+			fmt.Sprintf("If condition must be boolean, got '%s'", conditionType),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -104,7 +104,7 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				returnStmt.Loc(),
-				fmt.Sprintf("Function must return a value of type '%s'", expectedReturnType.String()),
+				fmt.Sprintf("Function must return a value of type '%s'", expectedReturnType),
 				report.TYPECHECK_PHASE,
 			)
 		}
@@ -135,12 +135,12 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 	}
 
 	// Check return type compatibility
-	if !isImplicitCastable(expectedReturnType, returnValueType) {
+	if ok, err := isImplicitCastable(expectedReturnType, returnValueType); !ok {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			returnStmt.Loc(),
-			fmt.Sprintf("Cannot return '%s' in function expecting '%s'",
-				returnValueType.String(), expectedReturnType.String()),
+			fmt.Sprintf("Cannot return '%s' in function expecting '%s': %s",
+				returnValueType, expectedReturnType, err.Error()),
 			report.TYPECHECK_PHASE,
 		)
 	}

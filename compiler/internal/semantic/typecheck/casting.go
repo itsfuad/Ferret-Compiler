@@ -1,8 +1,6 @@
 package typecheck
 
 import (
-	"errors"
-	"ferret/compiler/colors"
 	"ferret/compiler/internal/frontend/ast"
 	"ferret/compiler/internal/modules"
 	"ferret/compiler/internal/report"
@@ -10,11 +8,30 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
+	str "ferret/compiler/internal/utils/strings"
 	"fmt"
+	"slices"
 	"strings"
 )
 
-// checkCastExprType validates type cast expressions and returns the target type
+// all types with same structname with lower size will fit into the larger type
+var auto_promote_map = map[types.TYPE_NAME][]types.TYPE_NAME{
+	// Integer promotions (smaller -> larger)
+	types.INT8:   {}, // INT8 can be assigned to nothing smaller
+	types.INT16:  {types.INT8},
+	types.INT32:  {types.INT8, types.INT16},
+	types.INT64:  {types.INT8, types.INT16, types.INT32},
+	types.UINT8:  {}, // UINT8 can be assigned to nothing smaller
+	types.UINT16: {types.UINT8},
+	types.UINT32: {types.UINT8, types.UINT16},
+	types.UINT64: {types.UINT8, types.UINT16, types.UINT32},
+
+	// Float promotions (int -> float, smaller float -> larger float)
+	types.FLOAT32: {},
+	types.FLOAT64: {types.FLOAT32},
+}
+
 func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules.Module) stype.Type {
 	// Evaluate the source expression type
 	sourceType := evaluateExpressionType(r, *cast.Value, cm)
@@ -40,7 +57,7 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			cast.Loc(),
-			fmt.Sprintf("cannot cast from '%s' to '%s': %v", sourceType.String(), targetType.String(), err),
+			fmt.Sprintf("cannot cast from '%s' to '%s': %v", sourceType, targetType, err),
 			report.TYPECHECK_PHASE,
 		)
 		return nil // Return nil if cast is invalid
@@ -49,205 +66,263 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 	return targetType
 }
 
-// --- EXPLICIT CASTING CHECKS ---
-
-func isExplicitCastable(sourceType, targetType stype.Type) (bool, error) {
-	// primitive types can be casted to each other
-	if sourceType == nil || targetType == nil {
-		return false, errors.New("source or target type is nil")
+func isImplicitCastable(target, source stype.Type) (bool, error) {
+	// Handle primitive types
+	if _, ok := target.(*stype.PrimitiveType); ok {
+		return isPrimitiveImplicitCastable(target, source)
 	}
 
-	if isImplicitCastable(sourceType, targetType) {
-		return true, nil // Implicit cast is also valid for explicit cast
+	// Handle array types
+	if _, ok := target.(*stype.ArrayType); ok {
+		return isArrayImplicitCastable(target, source)
 	}
 
-	sourceUnwrapped := semantic.UnwrapType(sourceType) // Unwrap any type aliases
-	targetUnwrapped := semantic.UnwrapType(targetType) // Unwrap any type aliases
-
-	// Check if both are primitive types
-	if _, ok := sourceUnwrapped.(*stype.PrimitiveType); ok {
-		if _, ok := targetUnwrapped.(*stype.PrimitiveType); ok {
-			// Both are primitive types, check if they are castable
-			return isPrimitiveExplicitCastable(sourceUnwrapped, targetUnwrapped)
-		}
+	// Handle structs (struct-to-struct compatibility)
+	if _, ok := target.(*stype.StructType); ok {
+		fmt.Println("Checking struct compatibility")
+		return isStructCompatible(target, source, true)
 	}
 
-	//structs can be casted to other struct and interfaces and interfaces can be casted to structs
-	if ss, ok := sourceUnwrapped.(*stype.StructType); ok {
-		//target must be a struct or interface. for now skip interface
-		if ts, ok := targetUnwrapped.(*stype.StructType); ok {
-			//both are struct
-			return isStructExplicitCastable(ss, ts)
-		}
+	// Handle interfaces (source implements target)
+	if _, ok := target.(*stype.InterfaceType); ok {
+		return isInterfaceCompatible(target, source)
 	}
 
-	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
+	//if target or source user type, unwrap
+	if _, ok := target.(*stype.UserType); ok {
+		return isImplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+	}
+	if _, ok := source.(*stype.UserType); ok {
+		return isImplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+	}
+
+	return false, fmt.Errorf("implicit cast not supported between %s and %s", source, target)
 }
 
-func isStructExplicitCastable(sourceType, targetType *stype.StructType) (bool, error) {
-	//targets all properties must present
-
-	fieldErrors := make([]string, 0, len(targetType.Fields))
-
-	for fieldName, fieldType := range targetType.Fields {
-		if sourceFieldType, exists := sourceType.Fields[fieldName]; !exists {
-			fieldErrors = append(fieldErrors, colors.RED.Sprintf(" - missing field '%s'", fieldName))
-		} else if !isImplicitCastable(sourceFieldType, fieldType) {
-			fieldErrors = append(fieldErrors, colors.PURPLE.Sprintf(" - field '%s' type required '%s', but got '%s'", fieldName, fieldType.String(), sourceFieldType.String()))
-		}
+func isExplicitCastable(target, source stype.Type) (bool, error) {
+	// Handle primitive types
+	if _, ok := target.(*stype.PrimitiveType); ok {
+		return isPrimitiveExplicitCastable(target, source)
 	}
 
-	if len(fieldErrors) > 0 {
-		errMsg := colors.WHITE.Sprintf("\n%s and %s has field missmatch\n", sourceType.String(), targetType.String())
-		return false, fmt.Errorf("%s%s", errMsg, strings.Join(fieldErrors, "\n"))
+	// Handle array types
+	if _, ok := target.(*stype.ArrayType); ok {
+		return isArrayExplicitCastable(target, source)
 	}
 
-	fmt.Printf("Successfully casted struct '%s' to '%s'\n", sourceType.String(), targetType.String())
+	// Allow struct-to-struct if explicitly compatible
+	if _, ok := target.(*stype.StructType); ok {
+		return isStructCompatible(target, source, false)
+	}
 
-	return true, nil
+	// Allow interface checks via the same logic as implicit
+	if _, ok := target.(*stype.InterfaceType); ok {
+		return isInterfaceCompatible(target, source)
+	}
+
+	//if target or source user type, unwrap
+	if _, ok := target.(*stype.UserType); ok {
+		return isExplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+	}
+	if _, ok := source.(*stype.UserType); ok {
+		return isExplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+	}
+
+	return false, fmt.Errorf("explicit cast not supported between %s and %s", source, target)
 }
 
-func isPrimitiveExplicitCastable(sourceType, targetType stype.Type) (bool, error) {
-	sourcePrim, sOk := sourceType.(*stype.PrimitiveType)
-	targetPrim, tOk := targetType.(*stype.PrimitiveType)
+// --- PRIMITIVES ---
 
-	if !sOk || !tOk {
-		return false, errors.New("both source and target must be primitive types")
-	}
-
-	// Allow ALL numeric to numeric casting with explicit "as" keyword
-	// The developer explicitly requests the conversion, so allow both widening and narrowing
-	if types.IsNumericTypeName(sourcePrim.Name) && types.IsNumericTypeName(targetPrim.Name) {
-		return true, nil
-	}
-
-	// No valid cast found
-	return false, fmt.Errorf("no valid cast found from '%s' to '%s'", sourceType.String(), targetType.String())
-}
-
-// -- IMPLICIT CASTING CHECKS ---
-
-// isImplicitCastable checks if a value of type 'source' can be assigned to 'target'
-// Note: This function has limited type resolution capability. For full alias resolution,
-// the type checker should use resolveTypeAlias with analyzer context.
-func isImplicitCastable(target, source stype.Type) bool {
-	// Handle user types (aliases) - limited resolution without symbol table access
-	resolvedTarget := semantic.UnwrapType(target)
-	resolvedSource := semantic.UnwrapType(source)
-
-	colors.PURPLE.Printf("Checking Implicit Cast: %v → %v ", resolvedSource, resolvedTarget)
-
-	if isPrimitiveImplicitCastable(resolvedTarget, resolvedSource) || isArrayImplicitCastable(resolvedTarget, resolvedSource) || isFunctionImplicitCastable(resolvedTarget, resolvedSource) || isStructImpliticCastable(resolvedTarget, resolvedSource) {
-		colors.GREEN.Println(" ✔ ")
-		return true
-	}
-
-	colors.RED.Println(" ✘ ")
-
-	return false
-}
-
-// ===== HELPER FUNCTIONS =====
-
-// isPrimitiveImplicitCastable checks if source can be promoted to target (implicit conversion)
-func isPrimitiveImplicitCastable(target, source stype.Type) bool {
+func isPrimitiveImplicitCastable(target, source stype.Type) (bool, error) {
 	targetPrim, targetOk := target.(*stype.PrimitiveType)
 	sourcePrim, sourceOk := source.(*stype.PrimitiveType)
 
 	if !targetOk || !sourceOk {
-		return false
+		return false, fmt.Errorf("implicit cast not possible between types: %s to %s", target, source)
 	}
 
-	if targetPrim.TypeName() == sourcePrim.TypeName() {
-		return true // Same type is always assignable
+	// if both typename are the same, it's trivially castable
+	if targetPrim.TypeName == sourcePrim.TypeName {
+		return true, nil
 	}
 
-	// Define promotion rules
-	promotions := map[types.TYPE_NAME][]types.TYPE_NAME{
-		// Integer promotions (smaller -> larger)
-		types.INT16:  {types.INT8},
-		types.INT32:  {types.INT8, types.INT16},
-		types.INT64:  {types.INT8, types.INT16, types.INT32},
-		types.UINT16: {types.UINT8},
-		types.UINT32: {types.UINT8, types.UINT16},
-		types.UINT64: {types.UINT8, types.UINT16, types.UINT32},
-
-		// Float promotions (int -> float, smaller float -> larger float)
-		types.FLOAT32: {},
-		types.FLOAT64: {types.FLOAT32},
-	}
-
-	if allowedSources, exists := promotions[targetPrim.Name]; exists {
-		for _, allowedSource := range allowedSources {
-			if sourcePrim.Name == allowedSource {
-				return true
-			}
+	if allowedSources, exists := auto_promote_map[targetPrim.TypeName]; exists {
+		if slices.Contains(allowedSources, sourcePrim.TypeName) {
+			return true, nil
 		}
 	}
 
-	return false
+	// so the source is larger than target
+	return false, fmt.Errorf("implicit cast not allowed between %s and %s", source, target)
 }
 
-// isArrayImplicitCastable checks array type compatibility
-func isArrayImplicitCastable(target, source stype.Type) bool {
+func isPrimitiveExplicitCastable(target, source stype.Type) (bool, error) {
+
+	//unwrap type aliases
+	targetUnwrapped := semantic.UnwrapType(target)
+	sourceUnwrapped := semantic.UnwrapType(source)
+
+	targetPrim, targetOk := targetUnwrapped.(*stype.PrimitiveType)
+	sourcePrim, sourceOk := sourceUnwrapped.(*stype.PrimitiveType)
+
+	if !targetOk || !sourceOk {
+		return false, fmt.Errorf("explicit cast not possible between non-primitive types: %s to %s", target, source)
+	}
+
+	//any numeric primitive type can be explicitly cast to any other numeric primitive type
+	if semantic.IsNumericTypeName(targetPrim.TypeName) && semantic.IsNumericTypeName(sourcePrim.TypeName) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// --- ARRAYS ---
+
+func isArrayImplicitCastable(target, source stype.Type) (bool, error) {
 	targetArray, targetOk := target.(*stype.ArrayType)
 	sourceArray, sourceOk := source.(*stype.ArrayType)
 
 	if !targetOk || !sourceOk {
-		return false
+		return false, fmt.Errorf("implicit cast not possible between non-array types: %s to %s", target, source)
 	}
 
+	// Check if the element types are compatible
 	return isImplicitCastable(targetArray.ElementType, sourceArray.ElementType)
 }
 
-// isFunctionImplicitCastable checks function type compatibility
-func isFunctionImplicitCastable(target, source stype.Type) bool {
-	targetFunc, targetOk := target.(*stype.FunctionType)
-	sourceFunc, sourceOk := source.(*stype.FunctionType)
+func isArrayExplicitCastable(target, source stype.Type) (bool, error) {
+	targetArray, targetOk := target.(*stype.ArrayType)
+	sourceArray, sourceOk := source.(*stype.ArrayType)
 
 	if !targetOk || !sourceOk {
-		return false
+		return false, fmt.Errorf("explicit cast not possible between non-array types: %s to %s", target, source)
 	}
 
-	// Parameter and return type counts must match
-	if len(targetFunc.Parameters) != len(sourceFunc.Parameters) {
-		return false
-	}
-
-	// Parameters are contravariant, returns are covariant
-	for i := range targetFunc.Parameters {
-		if !isImplicitCastable(sourceFunc.Parameters[i], targetFunc.Parameters[i]) {
-			return false
-		}
-	}
-
-	// Compare return types
-	if targetFunc.ReturnType == nil && sourceFunc.ReturnType == nil {
-		return true
-	}
-	if targetFunc.ReturnType == nil || sourceFunc.ReturnType == nil {
-		return false
-	}
-
-	return isImplicitCastable(targetFunc.ReturnType, sourceFunc.ReturnType)
+	// Check if the element types are compatible
+	return isExplicitCastable(targetArray.ElementType, sourceArray.ElementType)
 }
 
-// isStructImpliticCastable checks structural compatibility of structs
-func isStructImpliticCastable(target, source stype.Type) bool {
+// --- STRUCTS ---
+func isStructCompatible(target, source stype.Type, isImplicit bool) (bool, error) {
+
 	targetStruct, targetOk := target.(*stype.StructType)
 	sourceStruct, sourceOk := source.(*stype.StructType)
 
 	if !targetOk || !sourceOk {
-		return false
+		return false, fmt.Errorf("%s cast not possible between non-struct types: %s to %s", str.Ternary(isImplicit, "implicit", "explicit"), target, source)
 	}
 
-	// Source must have all fields that target requires, with compatible types
-	for fieldName, targetFieldType := range targetStruct.Fields {
-		sourceFieldType, exists := sourceStruct.Fields[fieldName]
-		if !exists || !isImplicitCastable(targetFieldType, sourceFieldType) {
-			return false
+	problems := &[]string{}
+
+	if isImplicit {
+		checkImplicitFields(targetStruct, sourceStruct, problems)
+	} else {
+		checkExplicitFields(targetStruct, sourceStruct, problems)
+	}
+
+	fmt.Printf("Struct compatibility check: target=%s, source=%s, problems=%v\n", targetStruct, sourceStruct, problems)
+
+	if len(*problems) > 0 {
+		return false, fmt.Errorf("\n- %s", strings.Join(*problems, "\n- "))
+	}
+
+	// If we reach here, the structs are compatible
+	return true, nil
+}
+
+func checkImplicitFields(targetStruct, sourceStruct *stype.StructType, problems *[]string) {
+	// Check for extra fields in source struct that are not in target struct
+	for fieldName := range sourceStruct.Fields {
+		field, exists := targetStruct.Fields[fieldName]
+		if !exists {
+			*problems = append(*problems, fmt.Sprintf("extra field %s", fieldName))
+			continue // Skip to next field if it doesn't exist in target
+		}
+		// Check if the field type is implicitly castable
+		if ok, err := isImplicitCastable(field, sourceStruct.Fields[fieldName]); !ok {
+			*problems = append(*problems, fmt.Sprintf("field %s type mismatch: %s", fieldName, err.Error()))
+		}
+	}
+}
+
+func checkExplicitFields(targetStruct, sourceStruct *stype.StructType, problems *[]string) {
+	// target struct's fields must be a subset of source struct's fields
+	for fieldName, fieldType := range sourceStruct.Fields {
+		targetFieldType, exists := targetStruct.Fields[fieldName]
+
+		if !exists {
+			*problems = append(*problems, fmt.Sprintf("missing field %s", fieldName))
+			continue // Skip to next field if it doesn't exist in source
+		}
+
+		if ok, err := isExplicitCastable(fieldType, targetFieldType); !ok {
+			*problems = append(*problems, fmt.Sprintf("field %s type mismatch: %s", fieldName, err.Error()))
+		}
+	}
+}
+
+// --- INTERFACES ---
+func isInterfaceCompatible(target, source stype.Type) (bool, error) {
+	// target must be an interface type
+	targetInterface, targetOk := target.(*stype.InterfaceType)
+	if !targetOk {
+		return false, fmt.Errorf("type %s is not an interface type", target)
+	}
+
+	var problems []string
+
+	var sourceMethods map[string]*stype.FunctionType
+	// source must be an interface type or struct type
+	sourceInterface, sourceOk := source.(*stype.InterfaceType)
+	if !sourceOk {
+		sourceUser, sourceStructOk := source.(*stype.UserType)
+		if !sourceStructOk {
+			return false, fmt.Errorf("type %s is neither an interface nor a user defined type", source)
+		}
+		sourceMethods = sourceUser.Methods
+	} else {
+		sourceMethods = sourceInterface.Methods
+	}
+
+	// Check if source implements all methods of target interface
+	for methodName, targetMethod := range targetInterface.Methods {
+		sourceMethod, exists := sourceMethods[methodName]
+		if !exists {
+			problems = append(problems, fmt.Sprintf("method %s not found in source type %s", methodName, source))
+		}
+		// Check if the method signatures match
+		if ok, err := isFunctionCompatible(targetMethod, sourceMethod); !ok {
+			problems = append(problems, fmt.Sprintf("method %s signature mismatch: %s", methodName, err.Error()))
 		}
 	}
 
-	return true
+	if len(problems) > 0 {
+		return false, fmt.Errorf("\n- %s", strings.Join(problems, "\n- "))
+	}
+
+	return true, nil
+}
+
+// --- FUNCTIONS ---
+func isFunctionCompatible(target, source *stype.FunctionType) (bool, error) {
+	// Check if the number of parameters match
+	if len(target.Parameters) != len(source.Parameters) {
+		return false, fmt.Errorf("function parameter count mismatch: expected %d, got %d", len(target.Parameters), len(source.Parameters))
+	}
+
+	// Check if each parameter type is compatible
+	for i, targetParam := range target.Parameters {
+		sourceParam := source.Parameters[i]
+		if ok, err := isExplicitCastable(targetParam, sourceParam); !ok {
+			return false, fmt.Errorf("%s parameter type mismatch: %s", utils.NumericToOrdinal(i+1), err.Error())
+		}
+	}
+
+	// Check return type compatibility
+	if ok, err := isExplicitCastable(target.ReturnType, source.ReturnType); !ok {
+		return false, fmt.Errorf("function return type mismatch: %s", err.Error())
+	}
+
+	return true, nil
 }

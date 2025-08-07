@@ -9,6 +9,7 @@ import (
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
 	"fmt"
 )
 
@@ -24,15 +25,15 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 	switch e := expr.(type) {
 	// Literals
 	case *ast.StringLiteral:
-		resultType = &stype.PrimitiveType{Name: types.STRING}
+		resultType = &stype.PrimitiveType{TypeName: types.STRING}
 	case *ast.IntLiteral:
-		resultType = &stype.PrimitiveType{Name: types.INT32}
+		resultType = &stype.PrimitiveType{TypeName: types.INT32}
 	case *ast.FloatLiteral:
-		resultType = &stype.PrimitiveType{Name: types.FLOAT64}
+		resultType = &stype.PrimitiveType{TypeName: types.FLOAT64}
 	case *ast.BoolLiteral:
-		resultType = &stype.PrimitiveType{Name: types.BOOL}
+		resultType = &stype.PrimitiveType{TypeName: types.BOOL}
 	case *ast.ByteLiteral:
-		resultType = &stype.PrimitiveType{Name: types.BYTE}
+		resultType = &stype.PrimitiveType{TypeName: types.BYTE}
 
 	// Complex expressions
 	case *ast.IdentifierExpr:
@@ -88,7 +89,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			call.Loc(),
-			"cannot call non-function type: "+functionType.String(),
+			fmt.Sprintf("cannot call non-function type: %s", functionType),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
@@ -116,11 +117,12 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 		}
 
 		expectedType := funcType.Parameters[i]
-		if !isImplicitCastable(expectedType, argType) {
+		if ok, err := isImplicitCastable(expectedType, argType); !ok {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				call.Loc(),
-				fmt.Sprintf("argument %d: cannot use %s as %s", i+1, argType.String(), expectedType.String()),
+				fmt.Sprintf("%s argument error: %s",
+					utils.NumericToOrdinal(i+1), err.Error()),
 				report.TYPECHECK_PHASE,
 			)
 		}
@@ -163,7 +165,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
-			fmt.Sprintf("Cannot access field '%s' on non-struct type '%s'", fieldName, objectType.String()),
+			fmt.Sprintf("Cannot access field '%s' on non-struct type '%s'", fieldName, objectType),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -183,11 +185,11 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 	}
 
 	// Neither field nor method found
-	if _, isUserType := objectType.(*stype.UserType); isUserType {
+	if utype, isUserType := objectType.(*stype.UserType); isUserType {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
-			fmt.Sprintf("Struct '%s' has no field or method named '%s'", structType.String(), fieldName),
+			fmt.Sprintf("Struct '%s' has no field or method named '%s'", utype.Name, fieldName),
 			report.TYPECHECK_PHASE,
 		)
 	} else {
@@ -215,7 +217,7 @@ func findStructMethod(objectType stype.Type, methodName string, cm *modules.Modu
 	// Only UserType (named structs) can have methods
 	userType, ok := objectType.(*stype.UserType)
 	if !ok {
-		return nil, fmt.Errorf("cannot have method '%s' on unnamed struct type '%s'", methodName, objectType.String())
+		return nil, fmt.Errorf("cannot have method '%s' on unnamed struct type '%s'", methodName, objectType)
 	}
 
 	// Get the type name for symbol lookup
@@ -236,7 +238,6 @@ func findStructMethod(objectType stype.Type, methodName string, cm *modules.Modu
 
 // checkStructLiteralType handles struct literal expressions like Person{name: "Alice", age: 30} or struct{x: 10, y: 20}
 func checkStructLiteralType(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) stype.Type {
-
 	// Check if this is an anonymous struct or named struct
 	if structLiteral.IsAnonymous || structLiteral.StructName == nil {
 		return checkAnonymousStructLiteral(r, structLiteral, cm)
@@ -246,7 +247,7 @@ func checkStructLiteralType(r *analyzer.AnalyzerNode, structLiteral *ast.StructL
 }
 
 // checkAnonymousStructLiteral handles unnamed struct literals like @struct{x: 10, y: 20}
-func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) stype.Type {
+func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) *stype.StructType {
 	// Build the field map for the anonymous struct
 	fields := make(map[string]stype.Type)
 
@@ -281,13 +282,12 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 
 	// Create an anonymous struct type
 	return &stype.StructType{
-		Name:   types.TYPE_NAME(""), // Anonymous structs have no name
 		Fields: fields,
 	}
 }
 
 // checkNamedStructLiteral handles named struct literals like @Person{name: "Alice", age: 30}
-func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) stype.Type {
+func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) *stype.UserType {
 	// Look up the struct type by name
 	structTypeName := structLiteral.StructName.Name
 	symbol, found := cm.SymbolTable.Lookup(structTypeName)
@@ -318,19 +318,10 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 }
 
 // validateNamedStructFields validates the fields in a named struct literal
-func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, structType *stype.StructType, structTypeName string, symbolType stype.Type, cm *modules.Module) stype.Type {
+func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, structType *stype.StructType, structTypeName string, symbolType stype.Type, cm *modules.Module) *stype.UserType {
 	// Validate that all provided fields exist and have correct types
 	providedFields := make(map[string]bool)
 	for _, field := range structLiteral.Fields {
-		if field.FieldIdentifier == nil {
-			r.Ctx.Reports.AddSemanticError(
-				r.Program.FullPath,
-				structLiteral.Loc(),
-				"Struct field must have a name",
-				report.TYPECHECK_PHASE,
-			)
-			continue
-		}
 
 		fieldName := field.FieldIdentifier.Name
 		providedFields[fieldName] = true
@@ -338,9 +329,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		// Check if the field exists in the struct definition
 		expectedFieldType, exists := structType.Fields[fieldName]
 		if !exists {
-			r.Ctx.Reports.AddSemanticError(
-				r.Program.FullPath,
-				&field.Location,
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, &field.Location,
 				fmt.Sprintf("Struct '%s' has no field named '%s'", structTypeName, fieldName),
 				report.TYPECHECK_PHASE,
 			)
@@ -350,13 +339,15 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		// Check the type of the field value
 		if field.FieldValue != nil {
 			actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
-			if actualFieldType != nil && !isImplicitCastable(expectedFieldType, actualFieldType) {
-				r.Ctx.Reports.AddSemanticError(
-					r.Program.FullPath,
-					&field.Location,
-					fmt.Sprintf("Field '%s' expects type '%s' but got '%s'", fieldName, expectedFieldType.String(), actualFieldType.String()),
-					report.TYPECHECK_PHASE,
-				)
+			if actualFieldType != nil {
+				if ok, err := isImplicitCastable(expectedFieldType, actualFieldType); !ok {
+					r.Ctx.Reports.AddSemanticError(
+						r.Program.FullPath,
+						&field.Location,
+						fmt.Sprintf("Field error: %s", err.Error()),
+						report.TYPECHECK_PHASE,
+					)
+				}
 			}
 		}
 	}
@@ -373,5 +364,9 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		}
 	}
 
-	return symbolType
+	return &stype.UserType{
+		Name:       structTypeName,
+		Definition: symbolType,
+		Methods:    nil, // No methods for struct literals
+	}
 }

@@ -42,16 +42,16 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
 		if r.Debug {
-			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc().String())
+			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
 		}
 		return
 	}
 
 	// Case: both explicit type and initializer → validate compatibility
-	checkExplicitTypeCompatibility(r, variable, inferredType, initializer, cm)
+	checkTypeCompatibility(r, variable, inferredType, initializer, cm)
 }
 
-func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, inferredType stype.Type, initializer ast.Expression, cm *modules.Module) {
+func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, inferredType stype.Type, initializer ast.Expression, cm *modules.Module) {
 	explicitType, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(
@@ -74,12 +74,12 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 		return
 	}
 
-	if !isImplicitCastable(explicitType, inferredType) {
+	if ok, err := isImplicitCastable(explicitType, inferredType); !ok {
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			initializer.Loc(),
-			fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'",
-				inferredType.String(), variable.Identifier.Name, explicitType),
+			fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s': %s",
+				inferredType, variable.Identifier.Name, explicitType, err.Error()),
 			report.TYPECHECK_PHASE,
 		)
 
@@ -124,11 +124,11 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), "Failed to determine type for assignment", report.TYPECHECK_PHASE)
 			continue
 		}
-		if !isImplicitCastable(lhsType, rhsType) {
-			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
+		if ok, err := isImplicitCastable(lhsType, rhsType); !ok {
+			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s': %s", rhsType, lhsType, err.Error()), report.TYPECHECK_PHASE)
 
 			if ok, _ := isExplicitCastable(rhsType, lhsType); ok {
-				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType.String()))
+				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType))
 			}
 
 			continue
@@ -136,7 +136,7 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 	}
 
 	if r.Debug {
-		colors.TEAL.Printf("Type checked assignment statement at %s\n", assign.Loc().String())
+		colors.TEAL.Printf("Type checked assignment statement at %s\n", assign.Loc())
 	}
 }
 
@@ -277,6 +277,17 @@ func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *m
 		return
 	}
 
+	_, err := semantic.DeriveSemanticType(methodDecl.Receiver.Type, cm)
+	if err != nil {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Receiver.Type.Loc(),
+			fmt.Sprintf("could not resolve receiver type for method '%s': %s", methodDecl.Method.Name, err.Error()),
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
 	// Validate that methods can only be defined on struct types
 	if methodDecl.Receiver != nil && methodDecl.Receiver.Type != nil {
 		if !isValidMethodReceiverType(methodDecl.Receiver.Type) {
@@ -383,25 +394,8 @@ func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral,
 func isValidMethodReceiverType(dataType ast.DataType) bool {
 	switch dataType.(type) {
 	case *ast.UserDefinedType:
-		// This is a named type, which is valid (it should resolve to a struct)
+		// Only UserDefinedType is allowed for method receivers except interface
 		return true
-	case *ast.StructType:
-		// Anonymous struct types are not allowed for methods
-		return false
-	case *ast.IntType, *ast.FloatType, *ast.StringType, *ast.ByteType, *ast.BoolType:
-		// Primitive types are not allowed for methods
-		return false
-	case *ast.ArrayType:
-		// Array types are not allowed for methods
-		return false
-	case *ast.InterfaceType:
-		// Interface types are not allowed for method definitions
-		return false
-	case *ast.FunctionType:
-		// Function types are not allowed for methods
-		return false
-	default:
-		// Unknown type, not allowed
-		return false
 	}
+	return false
 }
