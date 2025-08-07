@@ -23,7 +23,7 @@ func UnwrapType(t stype.Type) stype.Type {
 // IsStringType checks if a stype.Type is string
 func IsStringType(t stype.Type) bool {
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == types.STRING
+		return prim.TypeName == types.STRING
 	}
 	return false
 }
@@ -31,7 +31,7 @@ func IsStringType(t stype.Type) bool {
 // IsBoolType checks if a stype.Type is boolean
 func IsBoolType(t stype.Type) bool {
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == types.BOOL
+		return prim.TypeName == types.BOOL
 	}
 	return false
 }
@@ -39,7 +39,7 @@ func IsBoolType(t stype.Type) bool {
 // IsNumericType checks if a stype.Type is numeric
 func IsNumericType(t stype.Type) bool {
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return IsNumericTypeName(prim.Name)
+		return IsNumericTypeName(prim.TypeName)
 	}
 	return false
 }
@@ -47,7 +47,7 @@ func IsNumericType(t stype.Type) bool {
 // IsIntegerType checks if a stype.Type is an integer stype.Type
 func IsIntegerType(t stype.Type) bool {
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return IsIntegerTypeName(prim.Name)
+		return IsIntegerTypeName(prim.TypeName)
 	}
 	return false
 }
@@ -56,7 +56,7 @@ func IsIntegerType(t stype.Type) bool {
 func IsVoidType(t stype.Type) bool {
 	t = UnwrapType(t) // Unwrap any type aliases
 	if prim, ok := t.(*stype.PrimitiveType); ok {
-		return prim.Name == types.VOID
+		return prim.TypeName == types.VOID
 	}
 	return false
 }
@@ -111,7 +111,7 @@ func DeriveSemanticType(astType ast.DataType, module *modules.Module) (stype.Typ
 
 func derivePrimitiveTypeFromAst(astType ast.DataType) (*stype.PrimitiveType, error) {
 	return &stype.PrimitiveType{
-		Name: astType.Type(),
+		TypeName: astType.Type(),
 	}, nil
 }
 
@@ -151,7 +151,7 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.M
 		if symbol.Type != nil {
 			return symbol.Type, nil
 		}
-		return &stype.UserType{Name: symbol.Type.TypeName(), Definition: nil}, nil // No definition available
+		return &stype.UserType{Name: symbol.Name, Definition: nil}, nil // No definition available
 	}
 	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 }
@@ -176,7 +176,6 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Modu
 	return &stype.FunctionType{
 		Parameters: params,
 		ReturnType: returnType,
-		Name:       function.TypeName,
 	}, nil
 }
 
@@ -193,7 +192,6 @@ func deriveSemanticStructFromAst(structType *ast.StructType, module *modules.Mod
 		}
 	}
 	return &stype.StructType{
-		Name:   structType.TypeName,
 		Fields: fields,
 	}, nil
 }
@@ -205,6 +203,5 @@ func deriveSemanticArrayType(array *ast.ArrayType, module *modules.Module) (styp
 	}
 	return &stype.ArrayType{
 		ElementType: elementType,
-		Name:        array.TypeName,
 	}, nil
 }

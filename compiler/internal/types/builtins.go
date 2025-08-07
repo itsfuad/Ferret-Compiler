@@ -24,3 +24,7 @@ const (
 	MODULE       TYPE_NAME = "module"
 	UNKNOWN_TYPE TYPE_NAME = "unknown"
 )
+
+func (t TYPE_NAME) String() string {
+	return string(t)
+}

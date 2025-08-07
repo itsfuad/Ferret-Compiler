@@ -121,10 +121,6 @@ func printReport(r *Report) {
 
 	//numlen is the length of the line number
 	numlen := len(fmt.Sprint(r.Location.Start.Line))
-
-	// The file path is printed in grey.
-	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
-
 	// The code snippet and underline are printed in the same color.
 	fmt.Print(snippet)
 
@@ -135,8 +131,11 @@ func printReport(r *Report) {
 		reportColor.Println(underline)
 	}
 
+	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
 	// The error message type and the message itself are printed in the same color.
 	reportColor.Print(reportMsgType)
+	// The file path is printed in grey.
+
 	reportColor.Println(r.Message)
 }
 
@@ -171,22 +170,42 @@ func makeParts(r *Report) (snippet, underline string) {
 	padding := strings.Repeat(" ", (((r.Location.Start.Column - 1) + len(lineNumber)) - len(bar)))
 
 	snippet += colors.GREY.Sprintln(bar)
-	// show previous max 2 lines if available, else show empty lines
-	if r.Location.Start.Line > 1 {
-		if r.Location.Start.Line > 2 {
-			snippet += colors.GREY.Sprintf("%s %s\n", bar, lines[r.Location.Start.Line-3])
-		}
-		snippet += colors.GREY.Sprintf("%s %s\n", bar, lines[r.Location.Start.Line-2])
-	} else {
-		snippet += colors.GREY.Sprintf("%s\n", bar)
-	}
 
-	snippet += colors.GREY.Sprint(lineNumber) + line + "\n"
+	addPrevLines(r, &snippet, lines)
+
+	snippet += colors.WHITE.Sprint(lineNumber) + line + "\n"
 	snippet += colors.GREY.Sprint(bar)
 
 	underline = fmt.Sprintf("%s^%s", padding, strings.Repeat("~", hLen))
 
 	return snippet, underline
+}
+
+func addPrevLines(r *Report, snippet *string, lines []string) {
+
+	col := colors.GREY
+
+	// show previous max 2 lines if available
+	if r.Location.Start.Line > 1 {
+		if r.Location.Start.Line > 2 {
+			lineNo := r.Location.Start.Line - 3
+			line := lines[lineNo]
+			//skip if line is empty
+			if strings.TrimSpace(line) != "" {
+				*snippet += col.Sprint(fmt.Sprintf("%d | %s", lineNo+1, line)) + "\n"
+			}
+		}
+
+		lineNo := r.Location.Start.Line - 2
+		line := lines[lineNo]
+
+		isEmpty := strings.TrimSpace(line) == ""
+		if isEmpty {
+			*snippet += col.Sprintf("%s |\n", strings.Repeat(" ", len(fmt.Sprint(lineNo+1))))
+		} else {
+			*snippet += col.Sprint(fmt.Sprintf("%d | %s", lineNo+1, line)) + "\n"
+		}
+	}
 }
 
 // AddHint appends a new hint message to the diagnostic and returns the updated diagnostic.

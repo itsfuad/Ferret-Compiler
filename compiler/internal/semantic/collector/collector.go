@@ -19,7 +19,7 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_COLLECTED {
 			// Already processed or in a later phase, skip
 			if c.Debug {
-				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase.String())
+				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -50,7 +50,7 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		return
 	}
 
-	colors.BROWN.Printf("Collecting symbols from node <%T> at %s\n", node, node.Loc().String())
+	colors.BROWN.Printf("Collecting symbols from node <%T> at %s\n", node, node.Loc())
 	// collect functions for forward declarations
 	switch n := node.(type) {
 	case *ast.ImportStmt:
@@ -108,7 +108,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 		}
 	}()
 
-	colors.BLUE.Printf("Collecting symbols from import '%s' at %s\n", imp.ImportPath.Value, imp.Loc().String())
+	colors.BLUE.Printf("Collecting symbols from import '%s' at %s\n", imp.ImportPath.Value, imp.Loc())
 
 	// Get the current module
 	currentModule, err := collector.Ctx.GetModule(collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
@@ -238,7 +238,7 @@ func declareMethodSymbolInStructScope(c *analyzer.AnalyzerNode, method *ast.Meth
 	functionScope.Imports = structScope.Imports // Ensure method scope has access to imports
 
 	if c.Debug {
-		colors.BRIGHT_BROWN.Printf("Declared method symbol '%s' in struct scope at %s\n", methodName, method.Loc().String())
+		colors.BRIGHT_BROWN.Printf("Declared method symbol '%s' in struct scope at %s\n", methodName, method.Loc())
 	}
 	return functionScope
 }
@@ -257,7 +257,7 @@ func collectMethodReceiver(c *analyzer.AnalyzerNode, method *ast.MethodDecl, met
 	}
 
 	if c.Debug {
-		colors.GREEN.Printf("Declared receiver symbol '%s' (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc().String())
+		colors.GREEN.Printf("Declared receiver symbol '%s' (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
 	}
 }
 
@@ -274,14 +274,14 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 
 func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 
-	colors.AQUA.Printf("Collecting function literal '%s' at %s\n", fn.ID, fn.Loc().String())
+	colors.AQUA.Printf("Collecting function literal '%s' at %s\n", fn.ID, fn.Loc())
 
 	functionScope := declareFunctionSymbol(c, fn, cm)
 	if functionScope == nil {
 		return
 	}
 
-	colors.AQUA.Printf("Declared function symbol '%s' at %s\n", fn.ID, fn.Loc().String())
+	colors.AQUA.Printf("Declared function symbol '%s' at %s\n", fn.ID, fn.Loc())
 
 	// Collect parameters and body in the function's local scope
 	collectFunctionParameters(c, fn, functionScope)
@@ -307,7 +307,7 @@ func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm
 	functionScope.Imports = cm.SymbolTable.Imports // Ensure function scope has access to module imports
 
 	if c.Debug {
-		colors.BRIGHT_BROWN.Printf("Declared function symbol '%s' at %s\n", fn.ID, fn.Loc().String())
+		colors.BRIGHT_BROWN.Printf("Declared function symbol '%s' at %s\n", fn.ID, fn.Loc())
 	}
 	return functionScope
 }
@@ -331,7 +331,7 @@ func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral
 		}
 
 		if c.Debug {
-			colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc().String())
+			colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc())
 		}
 	}
 }
@@ -364,7 +364,7 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 			continue
 		}
 		if c.Debug {
-			colors.GREEN.Printf("Declared variable symbol '%s' (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
+			colors.GREEN.Printf("Declared variable symbol '%s' (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
 		}
 	}
 	// Collect initializers if any
@@ -374,7 +374,7 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 		}
 		collectSymbols(c, initializer, cm) // Collect symbols from the initializer expression
 		if c.Debug {
-			colors.GREEN.Printf("Collected symbols from initializer at %s\n", initializer.Loc().String())
+			colors.GREEN.Printf("Collected symbols from initializer at %s\n", initializer.Loc())
 		}
 	}
 }
@@ -406,7 +406,7 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 		return
 	}
 	if c.Debug {
-		colors.GREEN.Printf("Declared type symbol '%s' (incomplete) at %s\n", aliasName, decl.Alias.Loc().String())
+		colors.GREEN.Printf("Declared type symbol '%s' (incomplete) at %s\n", aliasName, decl.Alias.Loc())
 	}
 }
 

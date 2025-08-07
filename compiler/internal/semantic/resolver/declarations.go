@@ -95,7 +95,7 @@ func createOrUpdateParameterSymbol(param *ast.Parameter, paramType stype.Type, f
 			// Update existing symbol
 			paramSymbol.Type = paramType
 			if r.Debug {
-				colors.YELLOW.Printf("Updated parameter symbol '%s' with type '%s'\n", param.Identifier.Name, paramType.String())
+				colors.YELLOW.Printf("Updated parameter symbol '%s' with type '%s'\n", param.Identifier.Name, paramType)
 			}
 		} else {
 			// Create new symbol (for function literals)
@@ -104,7 +104,7 @@ func createOrUpdateParameterSymbol(param *ast.Parameter, paramType stype.Type, f
 			if err != nil {
 				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+err.Error(), report.RESOLVER_PHASE)
 			} else if r.Debug {
-				colors.GREEN.Printf("Created parameter symbol '%s' with type '%s' for function literal\n", param.Identifier.Name, paramType.String())
+				colors.GREEN.Printf("Created parameter symbol '%s' with type '%s' for function literal\n", param.Identifier.Name, paramType)
 			}
 		}
 	}
@@ -119,7 +119,7 @@ func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *mo
 		}
 		return retType
 	}
-	return &stype.PrimitiveType{Name: types.VOID}
+	return &stype.PrimitiveType{TypeName: types.VOID} // Default return type if none specified
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
@@ -128,7 +128,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 
 	for i, variable := range decl.Variables {
 
-		colors.BLUE.Printf("Resolving variable declaration '%s' at %s\n", variable.Identifier.Name, variable.Identifier.Loc().String())
+		colors.BLUE.Printf("Resolving variable declaration '%s' at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
@@ -153,7 +153,7 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 			// Update the symbol's type
 			symbol.Type = got
 			if r.Debug {
-				colors.TEAL.Printf("Declared variable symbol '%s' with explicit type '%v' at %s\n", variable.Identifier.Name, symbol.Type, variable.Identifier.Loc().String())
+				colors.TEAL.Printf("Declared variable symbol '%s' with explicit type '%v' at %s\n", variable.Identifier.Name, symbol.Type, variable.Identifier.Loc())
 			}
 		}
 	}
@@ -180,7 +180,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 	}
 
 	symbolType := &stype.UserType{
-		Name:       types.TYPE_NAME(aliasName),
+		Name:       aliasName,
 		Definition: typeToDeclare,
 	}
 
@@ -188,7 +188,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 	symbol.Type = symbolType
 
 	if r.Debug {
-		colors.ORANGE.Printf("Resolved type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc().String())
+		colors.ORANGE.Printf("Resolved type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc())
 	}
 }
 
@@ -203,7 +203,7 @@ func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt,
 	}
 
 	if r.Debug {
-		colors.TEAL.Printf("Resolved assignment statement at %s\n", assign.Loc().String())
+		colors.TEAL.Printf("Resolved assignment statement at %s\n", assign.Loc())
 	}
 }
 
@@ -387,7 +387,7 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 	}
 
 	if r.Debug {
-		colors.BLUE.Printf("Resolved function literal '%s' at %s\n", fn.ID, fn.Loc().String())
+		colors.BLUE.Printf("Resolved function literal '%s' at %s\n", fn.ID, fn.Loc())
 	}
 
 	// Resolve parameter types and update function scope symbols

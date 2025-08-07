@@ -1,0 +1,31 @@
+
+
+let plainInt8: i8 = 12 as i8; //error without as i8
+let plainInt64: i64 = 123;
+
+//plainInt8 = plainInt64; // error
+type Integer16 i16;
+
+let typedInteger16: Integer16 = plainInt8;
+
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+type Point3D struct {
+    x: i32,
+    y: i32,
+    z: i32
+};
+
+let namedPoint2d: Point = @struct{x: 12, y: 22};
+
+namedPoint2d.x;
+
+//namedPoint2d.z;
+
+let namedPoint3d = @Point3D{x: 1, y: 2, z: 3};
+namedPoint3d.z;
+
+namedPoint2d = namedPoint3d;

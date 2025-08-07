@@ -1,59 +1,45 @@
 package stype
 
 import (
+	"ferret/compiler/internal/types"
 	"fmt"
 	"sort"
 	"strings"
-
-	"ferret/compiler/internal/types"
 )
 
 // Type represents a semantic type in the type system (without location information)
 type Type interface {
-	TypeName() types.TYPE_NAME
 	String() string
 }
 
 // PrimitiveType represents built-in primitive types (int, string, bool, etc.)
 type PrimitiveType struct {
-	Name types.TYPE_NAME
-}
-
-func (p *PrimitiveType) TypeName() types.TYPE_NAME {
-	return p.Name
+	TypeName types.TYPE_NAME
 }
 
 func (p *PrimitiveType) String() string {
-	return string(p.Name)
+	return p.TypeName.String()
 }
 
 // UserType represents user-defined types and type aliases
 type UserType struct {
-	Name       types.TYPE_NAME
-	Definition Type // For type aliases, this is the underlying type
-}
-
-func (u *UserType) TypeName() types.TYPE_NAME {
-	return u.Name
+	Name       string
+	Definition Type                     // For type aliases, this is the underlying type
+	Methods    map[string]*FunctionType // Methods associated with the user type
 }
 
 func (u *UserType) String() string {
-	return string(u.Name)
+	return u.Name
 }
 
 // StructType represents struct types with named fields
 type StructType struct {
-	Name   types.TYPE_NAME
 	Fields map[string]Type
-}
-
-func (s *StructType) TypeName() types.TYPE_NAME {
-	return s.Name
 }
 
 func (s *StructType) String() string {
 	if len(s.Fields) == 0 {
-		return fmt.Sprintf("%s {}", s.Name)
+		return "struct {}"
 	}
 
 	// Collect field names and sort them for consistent output
@@ -67,9 +53,9 @@ func (s *StructType) String() string {
 	var fieldStrs []string
 	for _, fieldName := range fieldNames {
 		fieldType := s.Fields[fieldName]
-		fieldStrs = append(fieldStrs, fmt.Sprintf("%s: %s", fieldName, fieldType.String()))
+		fieldStrs = append(fieldStrs, fmt.Sprintf("%s: %s", fieldName, fieldType))
 	}
-	return fmt.Sprintf("%s { %s }", s.Name, strings.Join(fieldStrs, ", "))
+	return fmt.Sprintf("struct { %s }", strings.Join(fieldStrs, ", "))
 }
 
 // GetFieldType returns the type of a field in the struct, or nil if not found
@@ -80,26 +66,16 @@ func (s *StructType) GetFieldType(fieldName string) Type {
 // ArrayType represents array types with element type and size
 type ArrayType struct {
 	ElementType Type
-	Name        types.TYPE_NAME
-}
-
-func (a *ArrayType) TypeName() types.TYPE_NAME {
-	return a.Name
 }
 
 func (a *ArrayType) String() string {
-	return fmt.Sprintf("[]%s", a.ElementType.String())
+	return fmt.Sprintf("[]%s", a.ElementType)
 }
 
 // FunctionType represents function types with parameters and return type
 type FunctionType struct {
 	Parameters []Type
 	ReturnType Type // Single return type (multiple returns removed)
-	Name       types.TYPE_NAME
-}
-
-func (f *FunctionType) TypeName() types.TYPE_NAME {
-	return f.Name
 }
 
 func (f *FunctionType) String() string {
@@ -108,22 +84,17 @@ func (f *FunctionType) String() string {
 		paramStrs = append(paramStrs, param.String())
 	}
 
-	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType.String())
+	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType)
 }
 
 // InterfaceType represents interface types with method signatures
 type InterfaceType struct {
-	Name    types.TYPE_NAME
 	Methods map[string]*FunctionType // method name -> method signature
-}
-
-func (i *InterfaceType) TypeName() types.TYPE_NAME {
-	return i.Name
 }
 
 func (i *InterfaceType) String() string {
 	if len(i.Methods) == 0 {
-		return fmt.Sprintf("interface %s {}", i.Name)
+		return "interface {}"
 	}
 
 	// Collect method names and sort them for consistent output
@@ -140,5 +111,5 @@ func (i *InterfaceType) String() string {
 		methodStrs = append(methodStrs, fmt.Sprintf("%s%s", methodName, methodType.String()[2:])) // Remove "fn" prefix
 	}
 
-	return fmt.Sprintf("interface %s { %s }", i.Name, strings.Join(methodStrs, "; "))
+	return fmt.Sprintf("interface { %s }", strings.Join(methodStrs, "; "))
 }

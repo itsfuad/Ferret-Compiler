@@ -19,7 +19,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_RESOLVED {
 			// Already processed or in a later phase, skip
 			if r.Debug {
-				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
+				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -57,10 +57,10 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
-		colors.PINK.Printf("Resolving function declaration '%s' at %s\n", n.Identifier.Name, n.Loc().String())
+		colors.PINK.Printf("Resolving function declaration '%s' at %s\n", n.Identifier.Name, n.Loc())
 		resolveFunctionDecl(r, n, cm)
 	case *ast.MethodDecl:
-		colors.PINK.Printf("Resolving method declaration '%s' at %s\n", n.Method.Name, n.Loc().String())
+		colors.PINK.Printf("Resolving method declaration '%s' at %s\n", n.Method.Name, n.Loc())
 		resolveMethodDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		resolveVariableDeclaration(r, n, cm)
