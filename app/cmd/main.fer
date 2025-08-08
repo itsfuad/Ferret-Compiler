@@ -1,12 +1,11 @@
+let outvar = 10;
 
+fn add(x: i32, y: i32) -> i32 {
+    let invar = 5;
+    return x + y + outvar * invar;
+}
 
-let plainInt8: i8 = 12 as i8; //error without as i8
-let plainInt64: i64 = 123;
-
-//plainInt8 = plainInt64; // error
-type Integer16 i16;
-
-let typedInteger16: Integer16 = plainInt8;
+add(1, 2);
 
 type Point struct {
     x: i32,
@@ -19,6 +18,25 @@ type Point3D struct {
     z: i32
 };
 
+fn (p: Point3D) abs() -> i32 {
+    return p.x * p.x + p.y * p.y + p.z * p.z;
+}
+
+let plainInt8: i8 = 12 as i8; //error without as i8
+let plainInt64: i64 = 123;
+
+//plainInt8 = plainInt64; // error
+type Integer16 i16;
+
+fn (i: Integer16) toString() -> str {
+    return "integer";
+}
+
+let typedInteger16: Integer16 = plainInt8;
+
+let myval = typedInteger16.toString();
+
+
 let namedPoint2d: Point = @struct{x: 12, y: 22};
 
 namedPoint2d.x;
@@ -28,4 +46,5 @@ namedPoint2d.x;
 let namedPoint3d = @Point3D{x: 1, y: 2, z: 3};
 namedPoint3d.z;
 
-namedPoint2d = namedPoint3d;
+namedPoint2d = namedPoint3d as Point;
+//namedPoint3d.coordinates();

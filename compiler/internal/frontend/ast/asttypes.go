@@ -21,6 +21,9 @@ func (t *UserDefinedType) INode() {} // Impliments Node interface
 func (t *UserDefinedType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
+func (t *UserDefinedType) String() string {
+	return string(t.TypeName)
+}
 func (t *UserDefinedType) Loc() *source.Location {
 	return &t.Location
 }

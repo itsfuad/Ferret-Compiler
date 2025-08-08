@@ -276,11 +276,11 @@ func isInterfaceCompatible(target, source stype.Type) (bool, error) {
 	// source must be an interface type or struct type
 	sourceInterface, sourceOk := source.(*stype.InterfaceType)
 	if !sourceOk {
-		sourceUser, sourceStructOk := source.(*stype.UserType)
+		_, sourceStructOk := source.(*stype.UserType)
 		if !sourceStructOk {
 			return false, fmt.Errorf("type %s is neither an interface nor a user defined type", source)
 		}
-		sourceMethods = sourceUser.Methods
+		//sourceMethods = sourceUser.Methods
 	} else {
 		sourceMethods = sourceInterface.Methods
 	}
