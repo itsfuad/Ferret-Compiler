@@ -22,41 +22,38 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 		return
 	}
 
-	// Get function scope from the function symbol itself
-	functionScope := functionSymbol.Scope
-	if functionScope == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function scope for '"+fn.Identifier.Name+"' not found", report.RESOLVER_PHASE)
-		return
-	}
+	colors.PINK.Printf("Resolving function declaration '%s' on %s scope at %s\n", fn.Identifier.Name, functionSymbol.SelfScope.ScopeName, fn.Loc())
 
+	resolveFunctionLike(r, fn.Function, functionSymbol, cm)	
+}
+
+func resolveFunctionLike(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, functionSymbol *symbol.Symbol, cm *modules.Module) {
 	// Resolve parameter types and update function scope symbols
-	paramTypes := resolveParameterTypes(r, fn.Function, cm, functionScope)
+	paramTypes := resolveParameterTypes(r, fn, cm, functionSymbol.SelfScope)
 	if paramTypes == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function '"+fn.Identifier.Name+"'", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return // Error occurred during parameter resolution
 	}
 
 	// Resolve return type
-	returnType := resolveReturnType(r, fn.Function, cm)
+	returnType := resolveReturnType(r, fn, cm)
 	if returnType == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function '"+fn.Identifier.Name+"'", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return // Error occurred during return type resolution
 	}
 
-	fmt.Printf("Resolved function '%s' with parameters: %v and return type: %v\n", fn.Identifier.Name, paramTypes, returnType)
+	fmt.Printf("Resolved function '%s' with parameters: %v and return type: %v\n", fn.ID, paramTypes, returnType)
 	// Resolve function body
-	//set scope
 	originalTable := cm.SymbolTable
-	cm.SymbolTable = functionScope
-	resolveBlock(r, fn.Function.Body, cm)
-	// Restore original module scope
-	cm.SymbolTable = originalTable
+	cm.SymbolTable = functionSymbol.SelfScope // Temporarily switch to function scope
+	resolveBlock(r, fn.Body, cm)
+	cm.SymbolTable = originalTable // Restore original module scope
 	// Create and assign function type
-	functionType := stype.FunctionType{
+	functionType := &stype.FunctionType{
 		Parameters: paramTypes,
 		ReturnType: returnType,
 	}
-	functionSymbol.Type = &functionType
+	functionSymbol.Type = functionType
 }
 
 func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module, functionScope *symbol.SymbolTable) []stype.Type {
@@ -122,13 +119,55 @@ func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *mo
 	return &stype.PrimitiveType{TypeName: types.VOID} // Default return type if none specified
 }
 
+func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) {
+	colors.ORANGE.Printf("Resolving method declaration '%s' at %s\n", method.Method.Name, method.Loc())
+
+	//get the receiver symbol
+	receiverSymbol, found := cm.SymbolTable.Lookup(method.Receiver.Type.Type().String())
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver '%s' not found in method '%s'", method.Receiver.Identifier.Name, method.Method.Name), report.RESOLVER_PHASE)
+		return
+	}
+
+	// resolve the method
+	methodSymbol, found := receiverSymbol.SelfScope.Lookup(method.Method.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Method.Loc(), fmt.Sprintf("Method '%s' not collected during symbol collection phase", method.Method.Name), report.RESOLVER_PHASE)
+		return
+	}
+
+	// Check if the receiver type is valid for methods
+	if !isValidMethodReceiverType(method.Receiver.Type) {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type for method declaration", report.RESOLVER_PHASE)
+		return
+	}
+
+	receiverType, err := semantic.DeriveSemanticType(method.Receiver.Type, cm)
+	if err != nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type: "+err.Error(), report.RESOLVER_PHASE)
+		return
+	}
+
+	colors.PINK.Printf("Resolving method '%s' on receiver type '%s' at %s\n", method.Method.Name, receiverSymbol.Type, method.Method.Loc())
+
+	receiverSymbol.Type = receiverType // Update receiver type
+	receiverParam, found := methodSymbol.SelfScope.Lookup(method.Receiver.Identifier.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver parameter '%s' was not collected during symbol collection phase", method.Receiver.Identifier.Name), report.RESOLVER_PHASE)
+		return
+	}
+
+	// Update the receiver parameter type
+	receiverParam.Type = receiverType
+
+	resolveFunctionLike(r, method.Function, methodSymbol, cm)
+}
+
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
 
-	colors.ORANGE.Printf("Resolving variable declaration\n")
+	colors.ORANGE.Printf("Resolving variable declaration from %s\n", cm.SymbolTable.ScopeName)
 
 	for i, variable := range decl.Variables {
-
-		colors.BLUE.Printf("Resolving variable declaration '%s' at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
 
 		// Check initializer expression if present
 		if i < len(decl.Initializers) && decl.Initializers[i] != nil {
@@ -207,155 +246,6 @@ func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt,
 	}
 }
 
-// resolveMethodDecl resolves method declarations stored in struct scopes
-func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) {
-	if !validateMethodReceiver(r, method, cm) {
-		return
-	}
-
-	receiverTypeName := getReceiverTypeName(method)
-	methodName := method.Method.Name
-
-	structSymbol, methodSymbol, methodScope := getMethodSymbols(r, method, cm, receiverTypeName, methodName)
-	if structSymbol == nil || methodSymbol == nil || methodScope == nil {
-		return
-	}
-
-	receiverType := resolveMethodReceiver(r, method, cm, methodScope)
-	if receiverType == nil {
-		return
-	}
-
-	paramTypes, returnType := resolveMethodSignature(r, method, cm, methodScope, methodName)
-	if paramTypes == nil || returnType == nil {
-		return
-	}
-
-	fmt.Printf("Resolved method '%s.%s' with receiver: %v, parameters: %v and return type: %v\n", receiverTypeName, methodName, receiverType, paramTypes, returnType)
-
-	resolveMethodBody(r, method, cm, methodScope)
-	assignMethodType(methodSymbol, paramTypes, returnType)
-}
-
-// validateMethodReceiver validates that the method receiver is valid for method definitions
-func validateMethodReceiver(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) bool {
-	if method.Receiver == nil || method.Receiver.Type == nil {
-		return true
-	}
-
-	if !isValidMethodReceiverType(method.Receiver.Type) {
-		// Skip processing - error already reported in collector phase for non-UserDefinedType
-		return false
-	}
-
-	// For UserDefinedType, we need to check if it resolves to a struct
-	if userDefinedType, ok := method.Receiver.Type.(*ast.UserDefinedType); ok {
-		if !isUserDefinedTypeValidForMethods(r, userDefinedType, cm) {
-			// Skip processing - error reported in the validation function
-			return false
-		}
-	}
-
-	return true
-}
-
-// getReceiverTypeName extracts the receiver type name from the method declaration
-func getReceiverTypeName(method *ast.MethodDecl) string {
-	if method.Receiver != nil && method.Receiver.Type != nil {
-		return string(method.Receiver.Type.Type())
-	}
-	return ""
-}
-
-// getMethodSymbols retrieves the struct symbol, method symbol, and method scope
-func getMethodSymbols(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module, receiverTypeName, methodName string) (*symbol.Symbol, *symbol.Symbol, *symbol.SymbolTable) {
-	// Find the struct type symbol to get its scope
-	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
-	if !found {
-		colors.RED.Printf("Struct type '%s' not found in symbol table\n", receiverTypeName)
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Struct type '"+receiverTypeName+"' is not declared", report.RESOLVER_PHASE)
-		return nil, nil, nil
-	}
-
-	if structSymbol.Scope == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Struct type '"+receiverTypeName+"' does not have a scope for methods", report.RESOLVER_PHASE)
-		return nil, nil, nil
-	}
-
-	// Look for the method in the struct's scope
-	methodSymbol, found := structSymbol.Scope.Lookup(methodName)
-	if !found {
-		colors.RED.Printf("Method '%s' not found in struct '%s' scope\n", methodName, receiverTypeName)
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Method '"+methodName+"' is not declared for struct '"+receiverTypeName+"'", report.RESOLVER_PHASE)
-		return nil, nil, nil
-	}
-
-	// Get method scope from the method symbol itself
-	methodScope := methodSymbol.Scope
-	if methodScope == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Method scope for '"+methodName+"' not found", report.RESOLVER_PHASE)
-		return nil, nil, nil
-	}
-
-	return structSymbol, methodSymbol, methodScope
-}
-
-// resolveMethodReceiver resolves the receiver type and updates the receiver symbol
-func resolveMethodReceiver(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module, methodScope *symbol.SymbolTable) stype.Type {
-	// Resolve receiver type
-	receiverType, err := semantic.DeriveSemanticType(method.Receiver.Type, cm)
-	if err != nil {
-		colors.RED.Printf("Error deriving type for receiver '%s': %s\n", method.Receiver.Identifier.Name, err.Error())
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type: "+err.Error(), report.RESOLVER_PHASE)
-		return nil
-	}
-
-	// Update receiver symbol with resolved type
-	if receiverSymbol, found := methodScope.Lookup(method.Receiver.Identifier.Name); found {
-		receiverSymbol.Type = receiverType
-		if r.Debug {
-			colors.GREEN.Printf("Updated receiver symbol '%s' with type '%v\n", method.Receiver.Identifier.Name, receiverType)
-		}
-	}
-
-	return receiverType
-}
-
-// resolveMethodSignature resolves parameter types and return type for the method
-func resolveMethodSignature(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module, methodScope *symbol.SymbolTable, methodName string) ([]stype.Type, stype.Type) {
-	// Resolve parameter types and update method scope symbols
-	paramTypes := resolveParameterTypes(r, method.Function, cm, methodScope)
-	if paramTypes == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Failed to resolve parameter types for method '"+methodName+"'", report.RESOLVER_PHASE)
-		return nil, nil
-	}
-
-	// Resolve return type
-	returnType := resolveReturnType(r, method.Function, cm)
-	if returnType == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Loc(), "Failed to resolve return type for method '"+methodName+"'", report.RESOLVER_PHASE)
-		return nil, nil
-	}
-
-	return paramTypes, returnType
-}
-
-// resolveMethodBody resolves the method body within the method scope
-func resolveMethodBody(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module, methodScope *symbol.SymbolTable) {
-	originalTable := cm.SymbolTable
-	cm.SymbolTable = methodScope
-	resolveBlock(r, method.Function.Body, cm)
-	cm.SymbolTable = originalTable
-}
-
-// assignMethodType creates and assigns the method type to the method symbol
-func assignMethodType(methodSymbol *symbol.Symbol, paramTypes []stype.Type, returnType stype.Type) {
-	methodType := stype.FunctionType{
-		Parameters: paramTypes,
-		ReturnType: returnType,
-	}
-	methodSymbol.Type = &methodType
-}
 
 func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 	if fn == nil || fn.ID == "" {
@@ -368,22 +258,16 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 
 	// Create function scope with module scope as parent
 	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
-	functionSymbol.Scope = functionScope
 
 	// Add function literal symbol to module symbol table
 	if err := cm.SymbolTable.Declare(fn.ID, functionSymbol); err != nil {
-		// If it already exists, get the existing symbol
 		existingSymbol, found := cm.SymbolTable.Lookup(fn.ID)
 		if !found {
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to declare function literal symbol: "+err.Error(), report.RESOLVER_PHASE)
 			return
 		}
+		// If it already exists, get the existing symbol (So compiler wont crash and we can still resolve it)
 		functionSymbol = existingSymbol
-		functionScope = functionSymbol.Scope
-		if functionScope == nil {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal scope not found", report.RESOLVER_PHASE)
-			return
-		}
 	}
 
 	if r.Debug {
@@ -430,61 +314,8 @@ func isValidMethodReceiverType(dataType ast.DataType) bool {
 	case *ast.UserDefinedType:
 		// This is a named type, which is valid (it should resolve to a struct)
 		return true
-	case *ast.StructType:
-		// Anonymous struct types are not allowed for methods
-		return false
-	case *ast.IntType, *ast.FloatType, *ast.StringType, *ast.ByteType, *ast.BoolType:
-		// Primitive types are not allowed for methods
-		return false
-	case *ast.ArrayType:
-		// Array types are not allowed for methods
-		return false
-	case *ast.InterfaceType:
-		// Interface types are not allowed for method definitions
-		return false
-	case *ast.FunctionType:
-		// Function types are not allowed for methods
-		return false
 	default:
 		// Unknown type, not allowed
 		return false
 	}
-}
-
-// isUserDefinedTypeValidForMethods checks if a UserDefinedType resolves to a struct type
-// and can have methods defined on it
-func isUserDefinedTypeValidForMethods(r *analyzer.AnalyzerNode, userType *ast.UserDefinedType, cm *modules.Module) bool {
-	// Resolve the user-defined type to its semantic type
-	resolvedType, err := semantic.DeriveSemanticType(userType, cm)
-	if err != nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			userType.Loc(),
-			"Cannot resolve type '"+string(userType.TypeName)+"': "+err.Error(),
-			report.RESOLVER_PHASE,
-		)
-		return false
-	}
-
-	// Check if the resolved type ultimately resolves to a struct
-	if !isResolvedTypeAStruct(resolvedType) {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			userType.Loc(),
-			"Cannot define methods on type '"+string(userType.TypeName)+"' because it does not resolve to a struct type",
-			report.RESOLVER_PHASE,
-		).AddHint("Methods can only be defined on struct types or type aliases that resolve to struct types")
-		return false
-	}
-
-	return true
-}
-
-// isResolvedTypeAStruct checks if a resolved semantic type is ultimately a struct type
-// This handles unwrapping of type aliases to find the underlying type
-func isResolvedTypeAStruct(t stype.Type) bool {
-	// Use the unwrapping utility from semantic package
-	unwrapped := semantic.UnwrapType(t)
-	_, isStruct := unwrapped.(*stype.StructType)
-	return isStruct
 }

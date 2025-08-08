@@ -24,8 +24,7 @@ func (p *PrimitiveType) String() string {
 // UserType represents user-defined types and type aliases
 type UserType struct {
 	Name       string
-	Definition Type                     // For type aliases, this is the underlying type
-	Methods    map[string]*FunctionType // Methods associated with the user type
+	Definition Type // For type aliases, this is the underlying type
 }
 
 func (u *UserType) String() string {
@@ -75,7 +74,7 @@ func (a *ArrayType) String() string {
 // FunctionType represents function types with parameters and return type
 type FunctionType struct {
 	Parameters []Type
-	ReturnType Type // Single return type (multiple returns removed)
+	ReturnType Type // Single return type
 }
 
 func (f *FunctionType) String() string {

@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+type SYMBOL_TABLE_SCOPENAME string
+const (
+	SYMBOL_TABLE_GLOBAL SYMBOL_TABLE_SCOPENAME = "global"
+	SYMBOL_TABLE_FUNCTION SYMBOL_TABLE_SCOPENAME = "function"
+)
+
 // SymbolTable manages scoped symbols (variables, constants, etc.)
 type SymbolTable struct {
 	Symbols map[string]*Symbol
@@ -11,6 +17,7 @@ type SymbolTable struct {
 	Imports map[string]*SymbolTable // alias -> imported module's symbol table
 	// Track import paths to detect duplicate imports of same module
 	ImportPaths map[string]string // alias -> import path
+	ScopeName   SYMBOL_TABLE_SCOPENAME
 }
 
 func NewSymbolTable(parent *SymbolTable) *SymbolTable {
@@ -19,7 +26,19 @@ func NewSymbolTable(parent *SymbolTable) *SymbolTable {
 		Parent:      parent,
 		Imports:     make(map[string]*SymbolTable),
 		ImportPaths: make(map[string]string),
+		ScopeName:   SYMBOL_TABLE_GLOBAL,
 	}
+}
+
+func (st *SymbolTable) IsInFunctionScope() bool {
+	//recursively check if this symbol table is a function scope
+	if st.ScopeName == SYMBOL_TABLE_FUNCTION {
+		return true
+	}
+	if st.Parent != nil {
+		return st.Parent.IsInFunctionScope()
+	}
+	return false
 }
 
 func (st *SymbolTable) Declare(name string, sym *Symbol) error {
@@ -27,11 +46,13 @@ func (st *SymbolTable) Declare(name string, sym *Symbol) error {
 		return fmt.Errorf("symbol '%s' already declared in this scope", name)
 	}
 	st.Symbols[name] = sym
+	st.Symbols[name].SelfScope = NewSymbolTable(st) // Set the scope for this symbol
 	return nil
 }
 
 func (st *SymbolTable) Lookup(name string) (*Symbol, bool) {
 	if sym, ok := st.Symbols[name]; ok {
+		//show symbol and st value
 		return sym, true
 	}
 	if st.Parent != nil {

@@ -13,6 +13,7 @@ const (
 	SymbolConst
 	SymbolType   // For built-in and user-defined types
 	SymbolFunc   // For functions
+	SymbolMethod // For methods associated with user-defined types
 	SymbolStruct // For struct types
 	SymbolField  // For struct fields
 )
@@ -23,7 +24,7 @@ type Symbol struct {
 	Kind     SymbolKind
 	Type     stype.Type
 	Location *source.Location
-	Scope    *SymbolTable
+	SelfScope *SymbolTable // For methods, this holds the scope of the method
 }
 
 // NewSymbol creates a new symbol with the given properties

@@ -30,6 +30,7 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 	receiver := receivers[0]
 
 	funcLit := parseFunctionLiteral(p, &name.Start, true)
+	funcLit.ID = iden.Name
 
 	return &ast.MethodDecl{
 		Method:   &iden,
