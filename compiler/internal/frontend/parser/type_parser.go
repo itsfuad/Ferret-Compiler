@@ -218,10 +218,14 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		end := p.previous().End
 
 		method := ast.InterfaceMethod{
-			Name:       name,
-			Params:     params,
-			ReturnType: returnType,
-			Location:   source.Location{Start: &start, End: &end},
+			Name: name,
+			Method: &ast.FunctionType{
+				Parameters: params,
+				ReturnType: returnType,
+				TypeName:   types.FUNCTION,
+				Location:   *source.NewLocation(&start, &end),
+			},
+			Location: *source.NewLocation(&start, &end),
 		}
 
 		// check if the method name is already declared in the interface
@@ -255,26 +259,12 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 	}, true
 }
 
-func parseFunctionTypeSignature(p *Parser) ([]ast.DataType, ast.DataType) {
-	// parse the parameters
-	parameters := parseParameters(p)
-	parameterTypes := make([]ast.DataType, len(parameters))
-	// parse the return type
-	returnType := parseReturnType(p)
-
-	for i, parameter := range parameters {
-		parameterTypes[i] = parameter.Type
-	}
-
-	return parameterTypes, returnType
-}
-
 func parseFunctionType(p *Parser) (ast.DataType, bool) {
 	//consume the 'fn' token
 	token := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
 
 	// parse the parameters
-	parameters, returnType := parseFunctionTypeSignature(p)
+	parameters, returnType := parseSignature(p, false)
 
 	return &ast.FunctionType{
 		Parameters: parameters,

@@ -7,6 +7,7 @@ import (
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/internal/utils/lists"
+	"fmt"
 )
 
 // detect if it's a function or a method
@@ -20,20 +21,23 @@ import (
 // method: fn (r Receiver, others...) NAME (PARAMS) {BODY} // invalid, but we can still parse it and report an error
 func parseFunctionLike(p *Parser) ast.Node {
 
-	start := p.peek()
+	start := p.peek() // the fn token
 
 	var params []ast.Parameter
 
 	if p.next().Kind == lexer.OPEN_PAREN {
-		p.advance()
+		fmt.Printf("Parsing method or anonymous function\n")
+		p.advance() // consume the fn token
 		// either a method or anonymous function
 		// fn (PARAMS) {BODY} // anonymous
 		// fn (PARAMS) NAME (PARAMS) {BODY} // method
 		params = parseParameters(p)
 		// if identifier, it's a method
 		if p.match(lexer.IDENTIFIER_TOKEN) {
+			fmt.Printf("Parsing method\n")
 			return parseMethodDeclaration(p, &start.Start, params)
 		}
+		fmt.Printf("Parsing anonymous function\n")
 		// anonymous function
 		return parseFunctionLiteral(p, &start.Start, false, params...)
 	} else {

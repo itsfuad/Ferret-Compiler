@@ -24,7 +24,8 @@ func (p *PrimitiveType) String() string {
 // UserType represents user-defined types and type aliases
 type UserType struct {
 	Name       string
-	Definition Type // For type aliases, this is the underlying type
+	Definition Type                     // For type aliases, this is the underlying type
+	Methods    map[string]*FunctionType // Methods associated with this type
 }
 
 func (u *UserType) String() string {
@@ -111,4 +112,12 @@ func (i *InterfaceType) String() string {
 	}
 
 	return fmt.Sprintf("interface { %s }", strings.Join(methodStrs, "; "))
+}
+
+type Invalid struct {
+	// Represents an invalid type, used for error handling
+}
+
+func (i *Invalid) String() string {
+	return "invalid"
 }

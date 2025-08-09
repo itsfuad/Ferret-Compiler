@@ -98,6 +98,8 @@ func DeriveSemanticType(astType ast.DataType, module *modules.Module) (stype.Typ
 		return deriveSemanticArrayType(t, module)
 	case *ast.StructType:
 		return deriveSemanticStructFromAst(t, module)
+	case *ast.InterfaceType:
+		return deriveSemanticInterfaceType(t, module)
 	case *ast.FunctionType:
 		return deriveSemanticFunctionType(t, module)
 	case *ast.TypeScopeResolution:
@@ -129,7 +131,7 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Modul
 			// If type is used before it's declared, that's a forward reference error
 			if usagePos.Line < declarationPos.Line ||
 				(usagePos.Line == declarationPos.Line && usagePos.Column < declarationPos.Column) {
-				return nil, fmt.Errorf("Cannot use type '%s' before it is declared",
+				return nil, fmt.Errorf("cannot use type '%s' before it is declared",
 					userType.TypeName)
 			}
 		}
@@ -159,7 +161,7 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.M
 func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Module) (*stype.FunctionType, error) {
 	var params []stype.Type
 	for _, param := range function.Parameters {
-		paramType, err := DeriveSemanticType(param, module)
+		paramType, err := DeriveSemanticType(param.Type, module)
 		if err != nil {
 			return nil, err
 		}
@@ -193,6 +195,24 @@ func deriveSemanticStructFromAst(structType *ast.StructType, module *modules.Mod
 	}
 	return &stype.StructType{
 		Fields: fields,
+	}, nil
+}
+
+func deriveSemanticInterfaceType(interfaceType *ast.InterfaceType, module *modules.Module) (stype.Type, error) {
+	methods := make(map[string]*stype.FunctionType)
+	for _, method := range interfaceType.Methods {
+		methodType, err := DeriveSemanticType(method.Method, module)
+		if err != nil {
+			return nil, err
+		}
+		if functionType, ok := methodType.(*stype.FunctionType); ok {
+			methods[method.Name.Name] = functionType
+		} else {
+			return nil, fmt.Errorf("interface method '%s' is not a function type", method.Name.Name)
+		}
+	}
+	return &stype.InterfaceType{
+		Methods: methods,
 	}, nil
 }
 

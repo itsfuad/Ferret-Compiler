@@ -24,7 +24,7 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 
 	colors.PINK.Printf("Resolving function declaration '%s' on %s scope at %s\n", fn.Identifier.Name, functionSymbol.SelfScope.ScopeName, fn.Loc())
 
-	resolveFunctionLike(r, fn.Function, functionSymbol, cm)	
+	resolveFunctionLike(r, fn.Function, functionSymbol, cm)
 }
 
 func resolveFunctionLike(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, functionSymbol *symbol.Symbol, cm *modules.Module) {
@@ -53,6 +53,7 @@ func resolveFunctionLike(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, func
 		Parameters: paramTypes,
 		ReturnType: returnType,
 	}
+
 	functionSymbol.Type = functionType
 }
 
@@ -161,6 +162,29 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 	receiverParam.Type = receiverType
 
 	resolveFunctionLike(r, method.Function, methodSymbol, cm)
+
+	// must be user-defined type
+	castedReceiverSymbol, ok := receiverSymbol.Type.(*stype.UserType)
+	if !ok {
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type '%s' is not a user-defined type", receiverSymbol.Type.String()), report.COLLECTOR_PHASE)
+		return
+	}
+
+	unwrappedRecieverType := semantic.UnwrapType(receiverSymbol.Type)
+	//cannot be interface or null or void
+	if _, ok := unwrappedRecieverType.(*stype.InterfaceType); ok || unwrappedRecieverType == nil || unwrappedRecieverType == types.VOID {
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type '%s' cannot be an interface, null or void", receiverSymbol.Type.String()), report.COLLECTOR_PHASE)
+		return
+	}
+
+	// Add the method to the user type's methods map
+	if castedReceiverSymbol.Methods == nil {
+		castedReceiverSymbol.Methods = make(map[string]*stype.FunctionType)
+	}
+	// store function type in the method type
+	fmt.Printf("Before add: %v\n", castedReceiverSymbol.Methods)
+	castedReceiverSymbol.Methods[method.Method.Name] = methodSymbol.Type.(*stype.FunctionType)
+	fmt.Printf("After add: %v\n", castedReceiverSymbol.Methods)
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
@@ -246,7 +270,6 @@ func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt,
 	}
 }
 
-
 func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 	if fn == nil || fn.ID == "" {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.RESOLVER_PHASE)
@@ -296,11 +319,12 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 	cm.SymbolTable = originalTable
 
 	// Create and assign function type
-	functionType := stype.FunctionType{
+	functionType := &stype.FunctionType{
 		Parameters: paramTypes,
 		ReturnType: returnType,
 	}
-	functionSymbol.Type = &functionType
+
+	functionSymbol.Type = functionType
 
 	if r.Debug {
 		colors.ORANGE.Printf("Resolved function literal '%s' with parameters: %v and return type: %v\n", fn.ID, paramTypes, returnType)
