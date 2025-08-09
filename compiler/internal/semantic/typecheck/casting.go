@@ -77,6 +77,13 @@ func isImplicitCastable(target, source stype.Type) (bool, error) {
 		return isArrayImplicitCastable(target, source)
 	}
 
+	// function types
+	if targetFunction, ok := target.(*stype.FunctionType); ok {
+		if sourceFunction, ok := source.(*stype.FunctionType); ok {
+			return isFunctionCompatible(targetFunction, sourceFunction)
+		}
+	}
+
 	// Handle interfaces (source implements target)
 	if _, ok := target.(*stype.InterfaceType); ok {
 		return isInterfaceCompatible(target, source)
@@ -89,7 +96,6 @@ func isImplicitCastable(target, source stype.Type) (bool, error) {
 
 	//if target or source user type, unwrap
 	if a, ok := target.(*stype.UserType); ok {
-		//return isImplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
 		if b, ok := source.(*stype.UserType); ok {
 			if a.Name == b.Name {
 				return true, nil
@@ -150,7 +156,7 @@ func isPrimitiveImplicitCastable(target, source stype.Type) (bool, error) {
 	}
 
 	// so the source is larger than target
-	return false, fmt.Errorf("implicit cast not allowed between %s and %s", source, target)
+	return false, fmt.Errorf("expected %s but got %s", target, source)
 }
 
 func isPrimitiveExplicitCastable(target, source stype.Type) (bool, error) {
@@ -171,7 +177,11 @@ func isPrimitiveExplicitCastable(target, source stype.Type) (bool, error) {
 		return true, nil
 	}
 
-	return false, nil
+	if targetPrim.TypeName == sourcePrim.TypeName {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("explicit cast not possible between types: %s to %s", source, target)
 }
 
 // --- ARRAYS ---
@@ -184,7 +194,6 @@ func isArrayImplicitCastable(target, source stype.Type) (bool, error) {
 		return false, fmt.Errorf("implicit cast not possible between non-array types: %s to %s", target, source)
 	}
 
-	// Check if the element types are compatible
 	return isImplicitCastable(targetArray.ElementType, sourceArray.ElementType)
 }
 
@@ -320,7 +329,7 @@ func isFunctionCompatible(target, source *stype.FunctionType) (bool, error) {
 	// Check if each parameter type is compatible
 	for i, targetParam := range target.Parameters {
 		sourceParam := source.Parameters[i]
-		if ok, err := isExplicitCastable(targetParam, sourceParam); !ok {
+		if ok, err := isExplicitCastable(targetParam.Type, sourceParam.Type); !ok {
 			return false, fmt.Errorf("%s parameter type mismatch: %s", utils.NumericToOrdinal(i+1), err.Error())
 		}
 	}

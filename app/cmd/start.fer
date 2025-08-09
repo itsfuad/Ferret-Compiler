@@ -9,7 +9,7 @@ import "math/geometry";
 import "myapp/cmd/expr";
 import "myapp/cmd/arrays";
 
-let valueOfPi = cc::PI;
+//let valueOfPi = cc::PI;
 
 fn voidfn() {
 
@@ -25,8 +25,8 @@ fn nonVoidfn() -> i32 {
 //vv = 10;
 
 nonVoidfn();
-io::print("Hello, Ferret!");
-geometry::area_circle(3.0);
+//io::print("Hello, Ferret!");
+//geometry::area_circle(3.0);
 
 fn doSomething() {
     // This function does something

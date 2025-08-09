@@ -159,13 +159,13 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.M
 }
 
 func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Module) (*stype.FunctionType, error) {
-	var params []stype.Type
+	var params []stype.ParamsType
 	for _, param := range function.Parameters {
 		paramType, err := DeriveSemanticType(param.Type, module)
 		if err != nil {
 			return nil, err
 		}
-		params = append(params, paramType)
+		params = append(params, stype.ParamsType{Name: param.Identifier.Name, Type: paramType})
 	}
 	var returnType stype.Type
 	if function.ReturnType != nil {

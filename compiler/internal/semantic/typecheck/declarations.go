@@ -9,6 +9,7 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/symbol"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -84,7 +85,7 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 		)
 
 		if ok, _ := isExplicitCastable(inferredType, explicitType); ok {
-			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
+			rp.AddHint(msg.CastHint(explicitType))
 		}
 	}
 }
@@ -126,11 +127,9 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 		}
 		if ok, err := isImplicitCastable(lhsType, rhsType); !ok {
 			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s': %s", rhsType, lhsType, err.Error()), report.TYPECHECK_PHASE)
-
 			if ok, _ := isExplicitCastable(rhsType, lhsType); ok {
-				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType))
+				rp.AddHint(msg.CastHint(lhsType))
 			}
-
 			continue
 		}
 	}

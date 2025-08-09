@@ -1,7 +1,0 @@
-import "std/io";
-
-fn main() -> i32 {
-    // Use io module
-    io::print("Hello world!");
-    return 0;
-}

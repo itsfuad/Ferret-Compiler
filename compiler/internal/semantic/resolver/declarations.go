@@ -57,8 +57,8 @@ func resolveFunctionLike(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, func
 	functionSymbol.Type = functionType
 }
 
-func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module, functionScope *symbol.SymbolTable) []stype.Type {
-	paramTypes := make([]stype.Type, 0) // Initialize as empty slice, not nil slice
+func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module, functionScope *symbol.SymbolTable) []stype.ParamsType {
+	paramTypes := make([]stype.ParamsType, 0)
 
 	// Check if function has no parameters
 	if fn == nil || fn.Params == nil || len(fn.Params) == 0 {
@@ -77,7 +77,8 @@ func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
 			return nil // Return nil to indicate error
 		}
-		paramTypes = append(paramTypes, paramType)
+
+		paramTypes = append(paramTypes, stype.ParamsType{Name: param.Identifier.Name, Type: paramType})
 
 		// Try to update parameter symbol first (for function declarations)
 		// If it doesn't exist, create it (for function literals)
@@ -276,21 +277,11 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 		return
 	}
 
-	// Create a function symbol for this literal
-	functionSymbol := symbol.NewSymbolWithLocation(fn.ID, symbol.SymbolFunc, nil, fn.Loc())
-
-	// Create function scope with module scope as parent
-	functionScope := symbol.NewSymbolTable(cm.SymbolTable)
-
-	// Add function literal symbol to module symbol table
-	if err := cm.SymbolTable.Declare(fn.ID, functionSymbol); err != nil {
-		existingSymbol, found := cm.SymbolTable.Lookup(fn.ID)
-		if !found {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to declare function literal symbol: "+err.Error(), report.RESOLVER_PHASE)
-			return
-		}
-		// If it already exists, get the existing symbol (So compiler wont crash and we can still resolve it)
-		functionSymbol = existingSymbol
+	// Check if function is already declared in the current scope
+	functionSymbol, found := cm.SymbolTable.Lookup(fn.ID)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), fmt.Sprintf("Function '%s' was not collected during symbol collection phase", fn.ID), report.RESOLVER_PHASE)
+		return
 	}
 
 	if r.Debug {
@@ -298,7 +289,7 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 	}
 
 	// Resolve parameter types and update function scope symbols
-	paramTypes := resolveParameterTypes(r, fn, cm, functionScope)
+	paramTypes := resolveParameterTypes(r, fn, cm, functionSymbol.SelfScope)
 	if paramTypes == nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return
@@ -312,7 +303,7 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 	}
 
 	originalTable := cm.SymbolTable
-	cm.SymbolTable = functionScope
+	cm.SymbolTable = functionSymbol.SelfScope // Temporarily switch to function scope
 	// Resolve function body
 	resolveBlock(r, fn.Body, cm)
 	// Restore original module scope
