@@ -485,15 +485,15 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 // UpdateDependency updates a specific dependency to its latest version
 func (dm *DependencyManager) UpdateDependency(moduleSpec string) error {
 	// Parse the module specification
-	_, _, repoName, err := SplitRemotePath(moduleSpec)
+	repoPath, _, _, err := SplitRemotePath(moduleSpec)
 	if err != nil {
 		return fmt.Errorf("invalid module specification: %w", err)
 	}
 
 	colors.BLUE.Printf("Updating dependency: %s to latest version\n", moduleSpec)
 
-	// Force latest version by using "latest" specification
-	latestModuleSpec := repoName + "@latest"
+	// Force latest version by using the full repo path with "latest" specification
+	latestModuleSpec := repoPath + "@latest"
 
 	// Remove the existing dependency first
 	err = dm.RemoveDependency(moduleSpec)

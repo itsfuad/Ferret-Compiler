@@ -12,4 +12,4 @@ enabled = true
 share = true
 
 [dependencies]
-github.com/itsfuad/ferret-mod = v1
+github.com/itsfuad/ferret-mod = v1.0.1
