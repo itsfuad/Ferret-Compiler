@@ -19,8 +19,24 @@ Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming l
 
 2. Build the compiler:
    ```bash
-   cd compiler
-   go build -o ferret cmd/main.go
+   cd scripts
+   ./build.sh    # Linux/macOS/Git Bash
+   ./build.bat   # Windows CMD/PowerShell
+   ```
+
+3. Add the `bin` directory to your PATH environment variable to use `ferret` commands globally.
+
+4. Start coding:
+   ```bash
+   # Initialize a new project
+   ferret init myproject
+   cd myproject
+   
+   # Install dependencies (if any)
+   ferret get
+   
+   # Compile and run
+   ferret main.fer
    ```
 
 ## Language Support Extension
@@ -56,7 +72,7 @@ ferret --debug filename.fer
 #### Help
 ```bash
 ferret
-# Output: Usage: ferret <filename> [--debug] | ferret init [path]
+# Output: Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path/to/project] | ferret get [module] | ferret update [module] | ferret sniff | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1
 ```
 
 ### Project Configuration
@@ -82,12 +98,141 @@ share = false
 # example = "1.0.0"
 ```
 
+## Module Management
+
+Ferret provides a comprehensive module management system for handling dependencies with version control.
+
+### Basic Module Commands
+
+#### Initialize a Project
+```bash
+# Initialize in current directory
+ferret init
+
+# Initialize in specific directory
+ferret init /path/to/project
+```
+
+#### Install Dependencies
+```bash
+# Install all dependencies from fer.ret
+ferret get
+
+# Install specific module
+ferret get github.com/user/repo
+
+# Install specific version
+ferret get github.com/user/repo@v1.0.0
+```
+
+#### Check for Updates
+```bash
+# Check which dependencies have updates available
+ferret sniff
+
+# Example output:
+# 📦 github.com/user/repo: v1.0.0 → v1.2.0 (update available)
+# ✅ github.com/other/module: v2.1.0 (up to date)
+```
+
+#### Update Dependencies
+```bash
+# Update all dependencies to latest versions
+ferret update
+
+# Update specific module to latest version
+ferret update github.com/user/repo
+```
+
+#### Manage Dependencies
+```bash
+# List all dependencies (direct and transitive)
+ferret list
+
+# Remove a dependency
+ferret remove github.com/user/repo
+
+# Clean up unused dependencies
+ferret cleanup
+```
+
+### Dependency Resolution Strategy
+
+Ferret follows a **dependency-driven update strategy** that ensures compatibility:
+
+1. **Direct Dependencies**: Only modules explicitly listed in `fer.ret` are updated by user commands
+2. **Transitive Dependencies**: Automatically resolved to the exact versions specified by their parent modules
+3. **Version Pinning**: Transitive dependencies use their specified versions, not the latest available versions
+
+#### Example Scenario
+```bash
+# Your project uses ModuleA@v1.0
+# ModuleA@v1.0 depends on ModuleB@v2.0
+# ModuleB@v3.0 is available but won't be used
+
+ferret sniff  # Shows: "ModuleA: v1.0 → v1.2 (update available)"
+ferret update     # Updates ModuleA to v1.2
+                  # If ModuleA@v1.2 uses ModuleB@v2.1, then ModuleB gets updated
+                  # If ModuleA@v1.2 still uses ModuleB@v2.0, then ModuleB stays at v2.0
+```
+
+This prevents **dependency hell** by ensuring that modules are only updated to versions that are tested and compatible with their parent dependencies.
+
+### Module Configuration
+
+#### Remote Module Settings
+Enable remote module imports in `fer.ret`:
+```toml
+[remote]
+enabled = true    # Allow downloading modules from GitHub
+share = false     # Whether to share your modules publicly
+```
+
+#### Security Features
+- **Explicit Opt-in**: Remote imports must be explicitly enabled
+- **Version Verification**: All module versions are verified against GitHub releases
+- **Lockfile System**: Exact dependency versions are tracked in `ferret.lock`
+- **Cache Management**: Downloaded modules are cached locally for faster builds
+
+### Advanced Usage
+
+#### Version Specifications
+```bash
+# Latest version
+ferret get github.com/user/repo@latest
+
+# Specific version
+ferret get github.com/user/repo@v1.0.0
+
+# Version without 'v' prefix (auto-detected)
+ferret get github.com/user/repo@1.0.0
+```
+
+#### Project Structure
+```
+myproject/
+├── fer.ret          # Project configuration
+├── ferret.lock      # Dependency lockfile (auto-generated)
+├── .ferret/         # Cache directory
+│   └── modules/     # Downloaded dependencies
+└── src/             # Your Ferret source files
+```
+
+#### Lockfile System
+The `ferret.lock` file tracks:
+- Exact versions of all dependencies (direct and transitive)
+- Dependency relationships and usage tracking
+- Cache paths and download metadata
+- Generation timestamp and integrity checks
+
 ## Key Features
-- Statically Typed: Strong typing ensures that errors are caught early, making your code more predictable and robust.
-- Beginner-Friendly: Ferret's syntax is designed to be easy to read and understand, even for new developers.
-- Expressive Code: With simple syntax and clear semantics, Ferret is made to be highly expressive without unnecessary complexity.
-- First-Class Functions: Functions are treated as first-class citizens, enabling functional programming paradigms while maintaining simplicity.
-- Clear Structs and Interfaces: Structs have methods and are used for simplicity, with implicit interface implementation for cleaner code.
+- **Statically Typed**: Strong typing ensures that errors are caught early, making your code more predictable and robust.
+- **Beginner-Friendly**: Ferret's syntax is designed to be easy to read and understand, even for new developers.
+- **Expressive Code**: With simple syntax and clear semantics, Ferret is made to be highly expressive without unnecessary complexity.
+- **First-Class Functions**: Functions are treated as first-class citizens, enabling functional programming paradigms while maintaining simplicity.
+- **Clear Structs and Interfaces**: Structs have methods and are used for simplicity, with implicit interface implementation for cleaner code.
+- **Advanced Module System**: Comprehensive dependency management with version control, automated resolution, and secure remote module support.
+- **Developer-Friendly Tooling**: Rich error reporting, debug mode, and comprehensive CLI commands for project management.
 
 ## Basic Syntax
 
@@ -200,6 +345,14 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [ ] Range expressions
 - [ ] Error handling
 - [x] Imports and modules
+    - [x] Local imports
+    - [x] Remote module imports (GitHub)
+    - [x] Module dependency resolution
+    - [x] Version management and lockfiles
+    - [x] Dependency update detection
+    - [x] Transitive dependency handling
+    - [x] Module caching system
+    - [x] Security controls for remote imports
 - [ ] Nullable/optional types
 - [ ] Generics
 - [ ] Advanced code generation
