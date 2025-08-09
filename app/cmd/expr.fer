@@ -3,9 +3,9 @@ import "myapp/cmd/types";
 
 type Integer types::Int; // Integer is an alias for Int, which is an alias for i32
 
-let myVar : Integer = 42 as Interger; // myVar is of type Integer, which is an alias for i32
+let myVar : Integer = 42 as Integer; // myVar is of type Integer, which is an alias for i32
 
-let expr : Integer = (10 + 22) * 3;
+let expr : Integer = ((10 + 22) * 3) as Integer;
 
 let myname : types::String = types::name; // name is of type String, which is an alias for str
 

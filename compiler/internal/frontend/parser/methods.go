@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"ferret/compiler/colors"
 	"ferret/compiler/internal/frontend/ast"
 	"ferret/compiler/internal/frontend/lexer"
 	"ferret/compiler/internal/report"
@@ -9,7 +8,7 @@ import (
 )
 
 func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {
-	colors.BLUE.Println("Parsing ")
+
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_METHOD_NAME)
 
 	iden := ast.IdentifierExpr{
@@ -30,6 +29,7 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 	receiver := receivers[0]
 
 	funcLit := parseFunctionLiteral(p, &name.Start, true)
+	funcLit.ID = iden.Name
 
 	return &ast.MethodDecl{
 		Method:   &iden,

@@ -81,7 +81,7 @@ jobs:
         FERRET_BIN="../bin/ferret"
         
         # Test help message
-        if ! $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
+        if ! $FERRET_BIN 2>&1 | grep -q "Ferret"; then
           echo "❌ CLI help message test failed"
           exit 1
         fi

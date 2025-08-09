@@ -9,6 +9,7 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/symbol"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -84,7 +85,7 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 		)
 
 		if ok, _ := isExplicitCastable(inferredType, explicitType); ok {
-			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
+			rp.AddHint(msg.CastHint(explicitType))
 		}
 	}
 }
@@ -126,11 +127,9 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 		}
 		if ok, err := isImplicitCastable(lhsType, rhsType); !ok {
 			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s': %s", rhsType, lhsType, err.Error()), report.TYPECHECK_PHASE)
-
 			if ok, _ := isExplicitCastable(rhsType, lhsType); ok {
-				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType))
+				rp.AddHint(msg.CastHint(lhsType))
 			}
-
 			continue
 		}
 	}
@@ -166,16 +165,6 @@ func checkExprListTypeWithContext(r *analyzer.AnalyzerNode, exprs *ast.Expressio
 
 // checkFunctionDecl validates function declarations and their return paths
 func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm *modules.Module) {
-	if funcDecl.Function == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			funcDecl.Loc(),
-			"Function declaration missing function body",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
 	// Get function symbol and its scope
 	functionSymbol, found := cm.SymbolTable.Lookup(funcDecl.Identifier.Name)
 	if !found {
@@ -188,18 +177,38 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		return
 	}
 
-	if functionSymbol.Scope == nil {
+	// Check the function literal using the helper function
+	checkFunctionLiteral(r, funcDecl.Function, cm, functionSymbol.SelfScope)
+}
+
+func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *modules.Module) {
+
+	//get receiver symbol
+	receiverSymbol, found := cm.SymbolTable.Lookup(methodDecl.Receiver.Type.Type().String())
+	if !found {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			funcDecl.Loc(),
-			fmt.Sprintf("Function scope for '%s' not found", funcDecl.Identifier.Name),
+			methodDecl.Receiver.Type.Loc(),
+			fmt.Sprintf("Receiver type '%s' not found in symbol table", methodDecl.Receiver.Type.Type().String()),
 			report.TYPECHECK_PHASE,
 		)
 		return
 	}
 
-	// Check the function literal using the helper function
-	checkFunctionLiteral(r, funcDecl.Function, cm, functionSymbol.Scope)
+	// Get the method symbol and its scope
+	methodSymbol, found := receiverSymbol.SelfScope.Lookup(methodDecl.Method.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			fmt.Sprintf("Method '%s' not found in symbol table", methodDecl.Method.Name),
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Check the method literal using the helper function
+	checkFunctionLiteral(r, methodDecl.Function, cm, methodSymbol.SelfScope)
 }
 
 // checkFunctionLiteral validates function literals and their return paths
@@ -266,91 +275,6 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 	}
 }
 
-func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *modules.Module) {
-	if methodDecl.Function == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Method declaration missing function body",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	_, err := semantic.DeriveSemanticType(methodDecl.Receiver.Type, cm)
-	if err != nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Receiver.Type.Loc(),
-			fmt.Sprintf("could not resolve receiver type for method '%s': %s", methodDecl.Method.Name, err.Error()),
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	// Validate that methods can only be defined on struct types
-	if methodDecl.Receiver != nil && methodDecl.Receiver.Type != nil {
-		if !isValidMethodReceiverType(methodDecl.Receiver.Type) {
-			// Skip processing - error already reported in collector phase
-			return
-		}
-	}
-
-	// Get the receiver type name to find the struct's scope
-	receiverTypeName := ""
-	if methodDecl.Receiver.Type != nil {
-		receiverTypeName = string(methodDecl.Receiver.Type.Type())
-	}
-	methodName := methodDecl.Method.Name
-
-	// Find the struct type symbol to get its scope
-	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
-	if !found {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Struct type '"+receiverTypeName+"' not found in symbol table",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	if structSymbol.Scope == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Struct type '"+receiverTypeName+"' does not have a scope for methods",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	// Look for the method in the struct's scope
-	methodSymbol, found := structSymbol.Scope.Lookup(methodName)
-	if !found {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Method '"+methodName+"' not found in struct '"+receiverTypeName+"' scope",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	if methodSymbol.Scope == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Method scope for '"+methodName+"' not found",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	// Check the method function using the helper function
-	checkFunctionLiteral(r, methodDecl.Function, cm, methodSymbol.Scope)
-}
-
 // checkFunctionLiteralType checks function literals and returns their type
 func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
 	if fn == nil || fn.ID == "" {
@@ -370,32 +294,9 @@ func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral,
 		return nil
 	}
 
-	// Get function scope from the function symbol itself
-	functionScope := functionSymbol.Scope
-	if functionScope == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			fn.Loc(),
-			"Function literal scope for '"+fn.ID+"' not found",
-			report.TYPECHECK_PHASE,
-		)
-		return nil
-	}
-
 	// Check the function literal using the helper function
-	checkFunctionLiteral(r, fn, cm, functionScope)
+	checkFunctionLiteral(r, fn, cm, functionSymbol.SelfScope)
 
 	// Return the function's type
 	return functionSymbol.Type
-}
-
-// isValidMethodReceiverType checks if a DataType is valid for method receiver
-// Only named struct types (UserDefinedType) are allowed
-func isValidMethodReceiverType(dataType ast.DataType) bool {
-	switch dataType.(type) {
-	case *ast.UserDefinedType:
-		// Only UserDefinedType is allowed for method receivers except interface
-		return true
-	}
-	return false
 }
