@@ -252,8 +252,8 @@ func HandleUpdateCommand(module string) {
 	colors.GREEN.Printf("Successfully updated %s to latest version\n", module)
 }
 
-// HandleUpdatableCommand handles the "ferret updatable" command
-func HandleUpdatableCommand() {
+// HandleSniffCommand handles the "ferret sniff" command
+func HandleSniffCommand() {
 	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
