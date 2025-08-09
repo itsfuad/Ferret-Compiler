@@ -485,30 +485,40 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 // UpdateDependency updates a specific dependency to its latest version
 func (dm *DependencyManager) UpdateDependency(moduleSpec string) error {
 	// Parse the module specification
-	repoPath, _, _, err := SplitRemotePath(moduleSpec)
+	_, _, repoName, err := SplitRemotePath(moduleSpec)
 	if err != nil {
 		return fmt.Errorf("invalid module specification: %w", err)
 	}
 
 	colors.BLUE.Printf("Updating dependency: %s to latest version\n", moduleSpec)
 
-	// Force latest version by using the full repo path with "latest" specification
-	latestModuleSpec := repoPath + "@latest"
-
-	// Remove the existing dependency first
-	err = dm.RemoveDependency(moduleSpec)
+	// Get the actual latest version number instead of using "latest" tag
+	latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
 	if err != nil {
-		colors.YELLOW.Printf("Warning: could not remove existing dependency %s: %v\n", moduleSpec, err)
+		return fmt.Errorf("failed to get latest version for %s: %w", moduleSpec, err)
 	}
 
-	// Install the latest version
-	err = dm.InstallDirectDependency(latestModuleSpec, "")
+	// For updates, we'll update fer.ret directly instead of removing/adding
+	// This avoids unnecessary deletion of transitive dependencies that might be reused
+	err = dm.updateFerRetDependency(moduleSpec, latestVersion)
 	if err != nil {
-		return fmt.Errorf("failed to install latest version of %s: %w", moduleSpec, err)
+		return fmt.Errorf("failed to update fer.ret: %w", err)
+	}
+
+	// Reinstall all dependencies to update the lockfile
+	err = dm.InstallAllDependencies()
+	if err != nil {
+		return fmt.Errorf("failed to install updated dependencies: %w", err)
 	}
 
 	colors.GREEN.Printf("Successfully updated %s to latest version\n", moduleSpec)
 	return nil
+}
+
+// updateFerRetDependency updates a dependency version in fer.ret file
+func (dm *DependencyManager) updateFerRetDependency(moduleSpec, newVersion string) error {
+	// Use the existing WriteFerRetDependency method to update the version
+	return WriteFerRetDependency(dm.projectRoot, moduleSpec, newVersion, "")
 }
 
 // UpdateAllDependencies updates all dependencies to their latest versions

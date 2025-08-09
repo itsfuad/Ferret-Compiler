@@ -76,7 +76,7 @@ echo %YELLOW% Step 7: Testing CLI functionality...%NC%
 cd /d %BIN_DIR%
 
 REM Test help message
-ferret.exe 2>&1 | findstr /C:"Usage: ferret" >nul
+ferret.exe 2>&1 | findstr /C:"Ferret" >nul
 if errorlevel 1 (
     echo %RED% CLI help message test failed%NC%
     exit /b 1
