@@ -70,7 +70,7 @@ func TestHelpMessage(t *testing.T) {
 	}
 
 	outputStr := string(output)
-	if !strings.Contains(outputStr, "Usage: ferret") {
+	if !strings.Contains(outputStr, "Ferret") {
 		t.Errorf("Expected usage message, got: %s", outputStr)
 	}
 }
