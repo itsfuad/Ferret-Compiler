@@ -48,23 +48,6 @@ Source Code → Lexer → Parser → AST → Collector → Resolver → TypeChec
 
 ## Development Guidelines
 
-### Code Organization
-```
-compiler/
-├── cmd/                  # CLI entry point and main compilation driver
-├── colors/              # Terminal output formatting utilities
-├── internal/            # Internal compiler packages (not public API)
-│   ├── config/         # Project configuration handling
-│   ├── ctx/            # Compiler context and state management
-│   ├── frontend/       # Frontend compilation pipeline
-│   ├── semantic/       # Semantic analysis pipeline
-│   ├── backend/        # Code generation (low priority)
-│   ├── source/         # Source location and position tracking
-│   ├── report/         # Error reporting and diagnostics
-│   ├── types/          # Type system definitions
-│   └── utils/          # Shared utilities
-```
-
 ### Language Feature Priorities
 
 **Core Features (Implement First)**
@@ -163,6 +146,38 @@ func TestParserFeature(t *testing.T) {
         })
     }
 }
+```
+
+### Ferret Language Syntax
+#### Variable Declaration
+```ferret
+let x = 10; // type inferred
+let y: i32 = 20; // explicit type declaration
+let z: str; // string type
+```
+#### Array
+```ferret
+let arr: []i32 = [1, 2, 3]; // array of integers
+let arr2: [3]i32 = [1, 2, 3]; // fixed-size array not supported yet
+```
+
+#### Types
+```ferret
+// any types can be declared
+type MyType OtherType;
+
+type MyStruct struct {
+    field1: i32,
+    field2: str
+};
+
+type MyInterface interface {
+    method1(param: i32) -> str;
+    method2() -> void;
+}
+
+// struct literals
+let myStruct = @MyStruct{field1: 10, field2: "hello"}; // Literals has @ prefix
 ```
 
 ## Development Workflow

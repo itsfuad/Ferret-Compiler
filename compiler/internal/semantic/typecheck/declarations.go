@@ -9,6 +9,7 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/symbol"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -42,16 +43,16 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
 		if r.Debug {
-			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc().String())
+			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
 		}
 		return
 	}
 
 	// Case: both explicit type and initializer → validate compatibility
-	checkExplicitTypeCompatibility(r, variable, inferredType, initializer, cm)
+	checkTypeCompatibility(r, variable, inferredType, initializer, cm)
 }
 
-func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, inferredType stype.Type, initializer ast.Expression, cm *modules.Module) {
+func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDeclare, inferredType stype.Type, initializer ast.Expression, cm *modules.Module) {
 	explicitType, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(
@@ -74,17 +75,17 @@ func checkExplicitTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.Vari
 		return
 	}
 
-	if !isImplicitCastable(explicitType, inferredType) {
+	if ok, err := isImplicitCastable(explicitType, inferredType); !ok {
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			initializer.Loc(),
-			fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s'",
-				inferredType.String(), variable.Identifier.Name, explicitType),
+			fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s': %s",
+				inferredType, variable.Identifier.Name, explicitType, err.Error()),
 			report.TYPECHECK_PHASE,
 		)
 
 		if ok, _ := isExplicitCastable(inferredType, explicitType); ok {
-			rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", explicitType))
+			rp.AddHint(msg.CastHint(explicitType))
 		}
 	}
 }
@@ -124,19 +125,17 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), "Failed to determine type for assignment", report.TYPECHECK_PHASE)
 			continue
 		}
-		if !isImplicitCastable(lhsType, rhsType) {
-			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s'", rhsType.String(), lhsType.String()), report.TYPECHECK_PHASE)
-
+		if ok, err := isImplicitCastable(lhsType, rhsType); !ok {
+			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s': %s", rhsType, lhsType, err.Error()), report.TYPECHECK_PHASE)
 			if ok, _ := isExplicitCastable(rhsType, lhsType); ok {
-				rp.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", lhsType.String()))
+				rp.AddHint(msg.CastHint(lhsType))
 			}
-
 			continue
 		}
 	}
 
 	if r.Debug {
-		colors.TEAL.Printf("Type checked assignment statement at %s\n", assign.Loc().String())
+		colors.TEAL.Printf("Type checked assignment statement at %s\n", assign.Loc())
 	}
 }
 
@@ -166,16 +165,6 @@ func checkExprListTypeWithContext(r *analyzer.AnalyzerNode, exprs *ast.Expressio
 
 // checkFunctionDecl validates function declarations and their return paths
 func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm *modules.Module) {
-	if funcDecl.Function == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			funcDecl.Loc(),
-			"Function declaration missing function body",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
 	// Get function symbol and its scope
 	functionSymbol, found := cm.SymbolTable.Lookup(funcDecl.Identifier.Name)
 	if !found {
@@ -188,18 +177,38 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		return
 	}
 
-	if functionSymbol.Scope == nil {
+	// Check the function literal using the helper function
+	checkFunctionLiteral(r, funcDecl.Function, cm, functionSymbol.SelfScope)
+}
+
+func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *modules.Module) {
+
+	//get receiver symbol
+	receiverSymbol, found := cm.SymbolTable.Lookup(methodDecl.Receiver.Type.Type().String())
+	if !found {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			funcDecl.Loc(),
-			fmt.Sprintf("Function scope for '%s' not found", funcDecl.Identifier.Name),
+			methodDecl.Receiver.Type.Loc(),
+			fmt.Sprintf("Receiver type '%s' not found in symbol table", methodDecl.Receiver.Type.Type().String()),
 			report.TYPECHECK_PHASE,
 		)
 		return
 	}
 
-	// Check the function literal using the helper function
-	checkFunctionLiteral(r, funcDecl.Function, cm, functionSymbol.Scope)
+	// Get the method symbol and its scope
+	methodSymbol, found := receiverSymbol.SelfScope.Lookup(methodDecl.Method.Name)
+	if !found {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			methodDecl.Loc(),
+			fmt.Sprintf("Method '%s' not found in symbol table", methodDecl.Method.Name),
+			report.TYPECHECK_PHASE,
+		)
+		return
+	}
+
+	// Check the method literal using the helper function
+	checkFunctionLiteral(r, methodDecl.Function, cm, methodSymbol.SelfScope)
 }
 
 // checkFunctionLiteral validates function literals and their return paths
@@ -266,72 +275,6 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 	}
 }
 
-func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *modules.Module) {
-	if methodDecl.Function == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Method declaration missing function body",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	// Get the receiver type name to find the struct's scope
-	receiverTypeName := ""
-	if methodDecl.Receiver.Type != nil {
-		receiverTypeName = string(methodDecl.Receiver.Type.Type())
-	}
-	methodName := methodDecl.Method.Name
-
-	// Find the struct type symbol to get its scope
-	structSymbol, found := cm.SymbolTable.Lookup(receiverTypeName)
-	if !found {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Struct type '"+receiverTypeName+"' not found in symbol table",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	if structSymbol.Scope == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Struct type '"+receiverTypeName+"' does not have a scope for methods",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	// Look for the method in the struct's scope
-	methodSymbol, found := structSymbol.Scope.Lookup(methodName)
-	if !found {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Method '"+methodName+"' not found in struct '"+receiverTypeName+"' scope",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	if methodSymbol.Scope == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			methodDecl.Loc(),
-			"Method scope for '"+methodName+"' not found",
-			report.TYPECHECK_PHASE,
-		)
-		return
-	}
-
-	// Check the method function using the helper function
-	checkFunctionLiteral(r, methodDecl.Function, cm, methodSymbol.Scope)
-}
-
 // checkFunctionLiteralType checks function literals and returns their type
 func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
 	if fn == nil || fn.ID == "" {
@@ -351,20 +294,8 @@ func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral,
 		return nil
 	}
 
-	// Get function scope from the function symbol itself
-	functionScope := functionSymbol.Scope
-	if functionScope == nil {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			fn.Loc(),
-			"Function literal scope for '"+fn.ID+"' not found",
-			report.TYPECHECK_PHASE,
-		)
-		return nil
-	}
-
 	// Check the function literal using the helper function
-	checkFunctionLiteral(r, fn, cm, functionScope)
+	checkFunctionLiteral(r, fn, cm, functionSymbol.SelfScope)
 
 	// Return the function's type
 	return functionSymbol.Type

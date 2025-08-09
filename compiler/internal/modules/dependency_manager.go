@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ferret/compiler/colors"
+	"ferret/compiler/internal/config"
 )
 
 const (
@@ -479,4 +480,211 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 	repoName := parts[1] + "/" + parts[2] // user/repo
 	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", "github.com", repoName+"@"+version)
 	_ = os.RemoveAll(cachePath)
+}
+
+// UpdateDependency updates a specific dependency to its latest version
+func (dm *DependencyManager) UpdateDependency(moduleSpec string) error {
+	// Parse the module specification
+	_, _, repoName, err := SplitRemotePath(moduleSpec)
+	if err != nil {
+		return fmt.Errorf("invalid module specification: %w", err)
+	}
+
+	colors.BLUE.Printf("Updating dependency: %s to latest version\n", moduleSpec)
+
+	// Get the actual latest version number instead of using "latest" tag
+	latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
+	if err != nil {
+		return fmt.Errorf("failed to get latest version for %s: %w", moduleSpec, err)
+	}
+
+	// For updates, we'll update fer.ret directly instead of removing/adding
+	// This avoids unnecessary deletion of transitive dependencies that might be reused
+	err = dm.updateFerRetDependency(moduleSpec, latestVersion)
+	if err != nil {
+		return fmt.Errorf("failed to update fer.ret: %w", err)
+	}
+
+	// Reinstall all dependencies to update the lockfile
+	err = dm.InstallAllDependencies()
+	if err != nil {
+		return fmt.Errorf("failed to install updated dependencies: %w", err)
+	}
+
+	colors.GREEN.Printf("Successfully updated %s to latest version\n", moduleSpec)
+	return nil
+}
+
+// updateFerRetDependency updates a dependency version in fer.ret file
+func (dm *DependencyManager) updateFerRetDependency(moduleSpec, newVersion string) error {
+	// Use the existing WriteFerRetDependency method to update the version
+	return WriteFerRetDependency(dm.projectRoot, moduleSpec, newVersion, "")
+}
+
+// UpdateAllDependencies updates all dependencies to their latest versions
+func (dm *DependencyManager) UpdateAllDependencies() error {
+	// First, check what updates are available
+	updates, err := dm.CheckAvailableUpdates()
+	if err != nil {
+		return fmt.Errorf("failed to check for available updates: %w", err)
+	}
+
+	// Filter to only modules that have updates
+	var modulesToUpdate []ModuleUpdateInfo
+	for _, update := range updates {
+		if update.HasUpdate {
+			modulesToUpdate = append(modulesToUpdate, update)
+		}
+	}
+
+	if len(modulesToUpdate) == 0 {
+		colors.YELLOW.Println("All dependencies are already up to date.")
+		return nil
+	}
+
+	colors.BLUE.Printf("Found %d dependencies to update:\n", len(modulesToUpdate))
+	for _, update := range modulesToUpdate {
+		colors.BLUE.Printf("  %s: %s → %s\n", update.Name, update.CurrentVersion, update.LatestVersion)
+	}
+	colors.BLUE.Println()
+
+	var failed []string
+	updated := 0
+
+	for _, update := range modulesToUpdate {
+		colors.BLUE.Printf("Updating %s...\n", update.Name)
+		err := dm.UpdateDependency(update.Name)
+		if err != nil {
+			colors.RED.Printf("Failed to update %s: %v\n", update.Name, err)
+			failed = append(failed, update.Name)
+		} else {
+			updated++
+		}
+	}
+
+	if len(failed) > 0 {
+		colors.YELLOW.Printf("Successfully updated %d dependencies\n", updated)
+		colors.RED.Printf("Failed to update %d dependencies: %v\n", len(failed), failed)
+		return fmt.Errorf("some dependencies failed to update")
+	}
+
+	colors.GREEN.Printf("Successfully updated all %d dependencies to latest versions!\n", updated)
+	return nil
+}
+
+// ModuleUpdateInfo represents information about a module that can be updated
+type ModuleUpdateInfo struct {
+	Name           string
+	CurrentVersion string
+	LatestVersion  string
+	HasUpdate      bool
+	IsDirect       bool // Whether this is a direct dependency or transitive
+}
+
+// CheckAvailableUpdates checks for available updates for all dependencies
+func (dm *DependencyManager) CheckAvailableUpdates() ([]ModuleUpdateInfo, error) {
+	return dm.CheckAvailableUpdatesWithOptions(false) // Default: direct only
+}
+
+// CheckAvailableUpdatesIncludingTransitive checks for updates including transitive dependencies
+func (dm *DependencyManager) CheckAvailableUpdatesIncludingTransitive() ([]ModuleUpdateInfo, error) {
+	return dm.CheckAvailableUpdatesWithOptions(true)
+}
+
+// CheckAvailableUpdatesWithOptions checks for available updates with option to include transitive deps
+func (dm *DependencyManager) CheckAvailableUpdatesWithOptions(includeTransitive bool) ([]ModuleUpdateInfo, error) {
+	var updates []ModuleUpdateInfo
+	var err error
+
+	if includeTransitive {
+		updates, err = getTransitive(dm)
+	} else {
+		updates, err = getNonTransitive(dm)
+	}
+
+	return updates, err
+}
+
+func getTransitive(dm *DependencyManager) ([]ModuleUpdateInfo, error) {
+	// Check all dependencies from lockfile (direct + transitive)
+	allDeps := dm.lockfile.GetAllDependencies()
+	if len(allDeps) == 0 {
+		return []ModuleUpdateInfo{}, nil
+	}
+
+	updates := []ModuleUpdateInfo{}
+
+	for depKey, entry := range allDeps {
+		// Parse dependency key to get module name and current version
+		moduleName, currentVersion := depEntryKeyParts(depKey)
+		if moduleName == "" || currentVersion == "" {
+			continue
+		}
+
+		colors.BLUE.Printf("Checking for updates for %s (%s)...\n", moduleName,
+			map[bool]string{true: "direct", false: "transitive"}[entry.Direct])
+
+		updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, entry.Direct)
+		if err != nil {
+			colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
+			continue
+		}
+
+		updates = append(updates, updateInfo)
+	}
+
+	return updates, nil
+}
+
+func getNonTransitive(dm *DependencyManager) ([]ModuleUpdateInfo, error) {
+	// Check only direct dependencies from fer.ret
+	projectConfig, err := config.LoadProjectConfig(dm.projectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load project configuration: %w", err)
+	}
+
+	if len(projectConfig.Dependencies.Modules) == 0 {
+		return []ModuleUpdateInfo{}, nil
+	}
+
+	updates := []ModuleUpdateInfo{}
+
+	for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
+		colors.BLUE.Printf("Checking for updates for %s (direct)...\n", moduleName)
+
+		updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, true)
+		if err != nil {
+			colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
+			continue
+		}
+
+		updates = append(updates, updateInfo)
+	}
+
+	return updates, nil
+}
+
+// checkSingleModuleUpdate checks for updates for a single module
+func (dm *DependencyManager) checkSingleModuleUpdate(moduleName, currentVersion string, isDirect bool) (ModuleUpdateInfo, error) {
+	// Parse the module specification to get repo info
+	_, _, repoName, err := SplitRemotePath(moduleName)
+	if err != nil {
+		return ModuleUpdateInfo{}, fmt.Errorf("could not parse module %s: %w", moduleName, err)
+	}
+
+	// Check latest version available
+	latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
+	if err != nil {
+		return ModuleUpdateInfo{}, fmt.Errorf("could not get latest version for %s: %w", moduleName, err)
+	}
+
+	hasUpdate := currentVersion != latestVersion && currentVersion != "latest"
+
+	return ModuleUpdateInfo{
+		Name:           moduleName,
+		CurrentVersion: currentVersion,
+		LatestVersion:  latestVersion,
+		HasUpdate:      hasUpdate,
+		IsDirect:       isDirect,
+	}, nil
 }

@@ -36,14 +36,6 @@ func (p ModulePhase) String() string {
 	}
 }
 
-type Module struct {
-	AST         *ast.Program
-	SymbolTable *symbol.SymbolTable
-	Phase       ModulePhase // Current processing phase
-	IsBuiltin   bool        // Whether this is a builtin module
-	Type        ModuleType
-}
-
 // ModuleType represents the category of a module
 type ModuleType int
 
@@ -65,6 +57,15 @@ func (mt ModuleType) String() string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+type Module struct {
+	AST         *ast.Program
+	SymbolTable *symbol.SymbolTable
+	Phase       ModulePhase     // Current processing phase
+	IsBuiltin   bool            // Whether this is a builtin module
+	UsedImports map[string]bool // Track which imports are used in this file
+	Type        ModuleType
 }
 
 // Built-in modules that are part of the standard library

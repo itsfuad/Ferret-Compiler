@@ -19,7 +19,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_RESOLVED {
 			// Already processed or in a later phase, skip
 			if r.Debug {
-				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
+				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -37,6 +37,9 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		resolveNode(r, node, currentModule)
 	}
 
+	// Check for unused imports and report warnings
+	checkUnusedImports(r, currentModule)
+
 	// Mark module as resolved
 	r.Ctx.SetModulePhase(importPath, modules.PHASE_RESOLVED)
 
@@ -51,10 +54,8 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
-		colors.PINK.Printf("Resolving function declaration '%s' at %s\n", n.Identifier.Name, n.Loc().String())
 		resolveFunctionDecl(r, n, cm)
 	case *ast.MethodDecl:
-		colors.PINK.Printf("Resolving method declaration '%s' at %s\n", n.Method.Name, n.Loc().String())
 		resolveMethodDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		resolveVariableDeclaration(r, n, cm)
@@ -76,6 +77,31 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 		resolveFunctionLiteral(r, n, cm)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for resolution", n), report.RESOLVER_PHASE)
+	}
+}
+
+// checkUnusedImports compares imported modules vs used modules and reports warnings
+func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module) {
+	if r.Debug {
+		colors.YELLOW.Printf("Checking unused imports. Used imports: %v\n", currentModule.UsedImports)
+	}
+
+	// Collect all imports from the AST
+	for _, node := range r.Program.Nodes {
+		if importStmt, ok := node.(*ast.ImportStmt); ok {
+			alias := importStmt.ModuleName
+			if r.Debug {
+				colors.YELLOW.Printf("Found import '%s' (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, currentModule.UsedImports[alias])
+			}
+			if !currentModule.UsedImports[alias] {
+				r.Ctx.Reports.AddWarning(
+					r.Program.FullPath,
+					importStmt.Loc(),
+					fmt.Sprintf("Unused import: '%s'", importStmt.ImportPath.Value),
+					report.RESOLVER_PHASE,
+				).AddHint("Remove the import or use symbols from this module")
+			}
+		}
 	}
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"ferret/compiler/cmd"
@@ -12,7 +11,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path/to/project] | ferret get [module] | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
+		flags.Usage()
 		os.Exit(1)
 	}
 
@@ -27,6 +26,18 @@ func main() {
 	// Handle get command
 	if args.GetCommand {
 		cli.HandleGetCommand(args.GetModule)
+		return
+	}
+
+	// Handle update command
+	if args.UpdateCommand {
+		cli.HandleUpdateCommand(args.UpdateModule)
+		return
+	}
+
+	// Handle sniff command
+	if args.SniffCommand {
+		cli.HandleSniffCommand()
 		return
 	}
 
@@ -50,7 +61,7 @@ func main() {
 
 	// Check for filename argument
 	if args.Filename == "" {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path] | ferret get [module] | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
+		flags.Usage()
 		os.Exit(1)
 	}
 

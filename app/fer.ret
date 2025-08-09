@@ -8,8 +8,8 @@ version = 0.1.0
 path = .ferret/cache
 
 [remote]
-enabled = true
 share = true
+enabled = true
 
 [dependencies]
-github.com/itsfuad/ferret-mod = v1
+github.com/itsfuad/ferret-mod = v1.0.1

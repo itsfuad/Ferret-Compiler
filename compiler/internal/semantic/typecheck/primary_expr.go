@@ -8,6 +8,7 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -36,7 +37,7 @@ func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *module
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			e.Loc(),
-			"invalid binary operation: "+leftType.String()+" "+e.Operator.Value+" "+rightType.String(),
+			fmt.Sprintf("invalid binary operation: %s %s %s", leftType, e.Operator.Value, rightType),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -64,7 +65,7 @@ func getBinaryOperationResultType(operator string, left, right stype.Type) stype
 func getArithmeticResultType(operator string, left, right stype.Type) stype.Type {
 	// String concatenation
 	if operator == "+" && semantic.IsStringType(left) && semantic.IsStringType(right) {
-		return &stype.PrimitiveType{Name: types.STRING}
+		return &stype.PrimitiveType{TypeName: types.STRING}
 	}
 
 	// Numeric operations
@@ -77,16 +78,21 @@ func getArithmeticResultType(operator string, left, right stype.Type) stype.Type
 
 // getComparisonResultType handles comparison operations
 func getComparisonResultType(left, right stype.Type) stype.Type {
-	if isImplicitCastable(left, right) || isImplicitCastable(right, left) {
-		return &stype.PrimitiveType{Name: types.BOOL}
+
+	leftToRight, _ := isImplicitCastable(left, right)
+	rightToLeft, _ := isImplicitCastable(right, left)
+
+	if leftToRight || rightToLeft {
+		return &stype.PrimitiveType{TypeName: types.BOOL}
 	}
+
 	return nil
 }
 
 // getLogicalResultType handles logical operations
 func getLogicalResultType(left, right stype.Type) stype.Type {
 	if semantic.IsBoolType(left) && semantic.IsBoolType(right) {
-		return &stype.PrimitiveType{Name: types.BOOL}
+		return &stype.PrimitiveType{TypeName: types.BOOL}
 	}
 	return nil
 }
@@ -118,8 +124,8 @@ func getCommonNumericType(left, right stype.Type) stype.Type {
 		types.FLOAT32: 5, types.FLOAT64: 6,
 	}
 
-	leftLevel, leftExists := hierarchy[leftPrim.Name]
-	rightLevel, rightExists := hierarchy[rightPrim.Name]
+	leftLevel, leftExists := hierarchy[leftPrim.TypeName]
+	rightLevel, rightExists := hierarchy[rightPrim.TypeName]
 
 	if !leftExists || !rightExists {
 		return nil
@@ -156,24 +162,24 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 			continue
 		}
 
-		if !isImplicitCastable(elementType, elemType) {
+		if ok, err := isImplicitCastable(elementType, elemType); !ok {
 
-			err := r.Ctx.Reports.AddSemanticError(
+			semanticError := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				element.Loc(),
-				fmt.Sprintf("array elements must be of type %s, but got %s", elementType, elemType),
+				fmt.Sprintf("error: %s\narray elements must be of type %s, but got %s", err.Error(), elementType, elemType),
 				report.TYPECHECK_PHASE,
 			)
 
 			if ok, _ := isExplicitCastable(elemType, elementType); !ok {
-				err.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", elementType))
+				semanticError.AddHint(msg.CastHint(elementType))
 			}
 
 			return nil
 		}
 	}
 
-	return &stype.ArrayType{ElementType: elementType, Name: types.ARRAY}
+	return &stype.ArrayType{ElementType: elementType}
 }
 
 // checkIndexableType infers types for array/map indexing

@@ -1,7 +1,0 @@
-// Test simple function literal without nesting
-let add = fn(a: i32, b: i32) -> i32 {
-    let temp: i32 = a + b;
-    return temp;
-};
-
-let result: i32 = add(10, 20);

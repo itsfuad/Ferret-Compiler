@@ -1,8 +1,13 @@
 package flags
 
 import (
+	"fmt"
 	"os"
+
+	"ferret/compiler/colors"
 )
+
+const FERRET_VERSION = "0.0.1"
 
 // Args holds the parsed command line arguments
 type Args struct {
@@ -13,6 +18,9 @@ type Args struct {
 	OutputPath     string
 	GetCommand     bool
 	GetModule      string
+	UpdateCommand  bool
+	UpdateModule   string
+	SniffCommand   bool
 	RemoveCommand  bool
 	RemoveModule   string
 	ListCommand    bool
@@ -36,6 +44,9 @@ func parseCommandWithValue(command string, args []string, i *int, result *Args) 
 	case "get":
 		result.GetCommand = true
 		result.GetModule = value
+	case "update":
+		result.UpdateCommand = true
+		result.UpdateModule = value
 	case "remove":
 		result.RemoveCommand = true
 		result.RemoveModule = value
@@ -55,7 +66,7 @@ func ParseArgs() *Args {
 
 		switch arg {
 		// Dispatch commands that take a value to the helper
-		case "init", "get", "remove":
+		case "init", "get", "update", "remove":
 			parseCommandWithValue(arg, args, &i, result)
 			commandSet = true
 
@@ -64,6 +75,9 @@ func ParseArgs() *Args {
 			parseCommandWithValue(arg, args, &i, result)
 
 		// Handle simple boolean commands/flags directly
+		case "sniff":
+			result.SniffCommand = true
+			commandSet = true
 		case "list":
 			result.ListCommand = true
 			commandSet = true
@@ -81,4 +95,41 @@ func ParseArgs() *Args {
 		}
 	}
 	return result
+}
+
+// Usage prints a beautiful, formatted usage message
+func Usage() {
+	colors.GREEN.Print("Ferret")
+	fmt.Println(" - A statically typed, beginner-friendly programming language")
+	fmt.Println()
+
+	colors.YELLOW.Println("USAGE:")
+	fmt.Println("  ferret <filename> [options]          Compile a Ferret source file")
+	fmt.Println()
+
+	colors.YELLOW.Println("MODULE MANAGEMENT:")
+	fmt.Println("  ferret init [path]                   Initialize a new Ferret project")
+	fmt.Println("  ferret get <module>                  Install a module dependency")
+	fmt.Println("  ferret update [module]               Update module(s) to latest version")
+	fmt.Println("  ferret remove <module>               Remove a module dependency")
+	fmt.Println("  ferret list                          List all installed modules")
+	fmt.Println("  ferret sniff                         Check for available module updates")
+	fmt.Println("  ferret cleanup                       Remove unused module cache")
+	fmt.Println()
+
+	colors.YELLOW.Println("OPTIONS:")
+	fmt.Println("  -debug, --debug, -d                  Enable debug mode")
+	fmt.Println("  -output, --output, -o <path>         Specify output file path")
+	fmt.Println()
+
+	colors.CYAN.Println("EXAMPLES:")
+	fmt.Println("  ferret main.fer                      Compile main.fer")
+	fmt.Println("  ferret main.fer --debug              Compile with debug output")
+	fmt.Println("  ferret init my-project               Create new project in my-project/")
+	fmt.Println("  ferret get github.com/user/module    Install a module from GitHub")
+	fmt.Println("  ferret update                        Update all modules")
+	fmt.Println()
+
+	colors.BLUE.Print("Version: ")
+	fmt.Println(FERRET_VERSION)
 }

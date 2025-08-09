@@ -45,8 +45,8 @@ func TestAddPreludeSymbols(t *testing.T) {
 			t.Errorf("Symbol %q: type is not *stype.PrimitiveType, got %T", tt.name, sym.Type)
 			continue
 		}
-		if prim.Name != tt.wantPrim {
-			t.Errorf("Symbol %q: got primitive name %v, want %v", tt.name, prim.Name, tt.wantPrim)
+		if prim.TypeName != tt.wantPrim {
+			t.Errorf("Symbol %q: got primitive name %v, want %v", tt.name, prim.TypeName, tt.wantPrim)
 		}
 	}
 }

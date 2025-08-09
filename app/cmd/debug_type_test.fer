@@ -1,7 +1,0 @@
-fn testFunction(x: i32) {
-    let y = x + "test";
-}
-
-fn main() {
-    testFunction(42);
-}
