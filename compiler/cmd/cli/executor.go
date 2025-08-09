@@ -11,9 +11,12 @@ import (
 )
 
 const (
-	CONFIG_FILE            = "fer.ret"
-	INVALID_LOCATION_ERROR = "You must run this command from the directory containing fer.ret (the project root)."
-	DEPENDENCY_ERROR       = "Failed to create dependency manager: %s\n"
+	CONFIG_FILE                = "fer.ret"
+	INVALID_LOCATION_ERROR     = "You must run this command from the directory containing fer.ret (the project root)."
+	DEPENDENCY_ERROR           = "Failed to create dependency manager: %s\n"
+	CONFIG_LOAD_ERROR          = "Error loading project configuration: %v\n"
+	REMOTE_IMPORTS_DISABLED    = "❌ Remote module imports are disabled in this project."
+	REMOTE_IMPORTS_ENABLE_HELP = "To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret"
 )
 
 // HandleGetCommand handles the "ferret get" command
@@ -37,14 +40,14 @@ func HandleGetCommand(module string) {
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Error loading project configuration: %v\n", err)
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)
 	}
 
 	// ✅ SECURITY CHECK: Check if remote imports are enabled
 	if !projectConfig.Remote.Enabled {
-		colors.RED.Println("❌ Remote module imports are disabled in this project.")
-		colors.YELLOW.Println("To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret")
+		colors.RED.Println(REMOTE_IMPORTS_DISABLED)
+		colors.YELLOW.Println(REMOTE_IMPORTS_ENABLE_HELP)
 		os.Exit(1)
 	}
 
@@ -94,14 +97,14 @@ func HandleRemoveCommand(module string) {
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Error loading project configuration: %v\n", err)
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)
 	}
 
 	// ✅ SECURITY CHECK: Check if remote imports are enabled
 	if !projectConfig.Remote.Enabled {
-		colors.RED.Println("❌ Remote module imports are disabled in this project.")
-		colors.YELLOW.Println("To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret")
+		colors.RED.Println(REMOTE_IMPORTS_DISABLED)
+		colors.YELLOW.Println(REMOTE_IMPORTS_ENABLE_HELP)
 		os.Exit(1)
 	}
 
@@ -209,14 +212,14 @@ func HandleUpdateCommand(module string) {
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Error loading project configuration: %v\n", err)
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)
 	}
 
 	// ✅ SECURITY CHECK: Check if remote imports are enabled
 	if !projectConfig.Remote.Enabled {
-		colors.RED.Println("❌ Remote module imports are disabled in this project.")
-		colors.YELLOW.Println("To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret")
+		colors.RED.Println(REMOTE_IMPORTS_DISABLED)
+		colors.YELLOW.Println(REMOTE_IMPORTS_ENABLE_HELP)
 		os.Exit(1)
 	}
 
@@ -270,14 +273,14 @@ func HandleUpdatableCommand() {
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		colors.RED.Printf("Error loading project configuration: %v\n", err)
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)
 	}
 
 	// ✅ SECURITY CHECK: Check if remote imports are enabled
 	if !projectConfig.Remote.Enabled {
-		colors.RED.Println("❌ Remote module imports are disabled in this project.")
-		colors.YELLOW.Println("To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret")
+		colors.RED.Println(REMOTE_IMPORTS_DISABLED)
+		colors.YELLOW.Println(REMOTE_IMPORTS_ENABLE_HELP)
 		os.Exit(1)
 	}
 

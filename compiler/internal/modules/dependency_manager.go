@@ -584,54 +584,71 @@ func (dm *DependencyManager) CheckAvailableUpdatesIncludingTransitive() ([]Modul
 // CheckAvailableUpdatesWithOptions checks for available updates with option to include transitive deps
 func (dm *DependencyManager) CheckAvailableUpdatesWithOptions(includeTransitive bool) ([]ModuleUpdateInfo, error) {
 	var updates []ModuleUpdateInfo
+	var err error
 
 	if includeTransitive {
-		// Check all dependencies from lockfile (direct + transitive)
-		allDeps := dm.lockfile.GetAllDependencies()
-		if len(allDeps) == 0 {
-			return []ModuleUpdateInfo{}, nil
-		}
-
-		for depKey, entry := range allDeps {
-			// Parse dependency key to get module name and current version
-			moduleName, currentVersion := depEntryKeyParts(depKey)
-			if moduleName == "" || currentVersion == "" {
-				continue
-			}
-
-			colors.BLUE.Printf("Checking for updates for %s (%s)...\n", moduleName,
-				map[bool]string{true: "direct", false: "transitive"}[entry.Direct])
-
-			updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, entry.Direct)
-			if err != nil {
-				colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
-				continue
-			}
-
-			updates = append(updates, updateInfo)
-		}
+		updates, err = getTransitive(dm)
 	} else {
-		// Check only direct dependencies from fer.ret
-		projectConfig, err := config.LoadProjectConfig(dm.projectRoot)
+		updates, err = getNonTransitive(dm)
+	}
+
+	return updates, err
+}
+
+func getTransitive(dm *DependencyManager) ([]ModuleUpdateInfo, error) {
+	// Check all dependencies from lockfile (direct + transitive)
+	allDeps := dm.lockfile.GetAllDependencies()
+	if len(allDeps) == 0 {
+		return []ModuleUpdateInfo{}, nil
+	}
+
+	updates := []ModuleUpdateInfo{}
+
+	for depKey, entry := range allDeps {
+		// Parse dependency key to get module name and current version
+		moduleName, currentVersion := depEntryKeyParts(depKey)
+		if moduleName == "" || currentVersion == "" {
+			continue
+		}
+
+		colors.BLUE.Printf("Checking for updates for %s (%s)...\n", moduleName,
+			map[bool]string{true: "direct", false: "transitive"}[entry.Direct])
+
+		updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, entry.Direct)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load project configuration: %w", err)
+			colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
+			continue
 		}
 
-		if len(projectConfig.Dependencies.Modules) == 0 {
-			return []ModuleUpdateInfo{}, nil
+		updates = append(updates, updateInfo)
+	}
+
+	return updates, nil
+}
+
+func getNonTransitive(dm *DependencyManager) ([]ModuleUpdateInfo, error) {
+	// Check only direct dependencies from fer.ret
+	projectConfig, err := config.LoadProjectConfig(dm.projectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load project configuration: %w", err)
+	}
+
+	if len(projectConfig.Dependencies.Modules) == 0 {
+		return []ModuleUpdateInfo{}, nil
+	}
+
+	updates := []ModuleUpdateInfo{}
+
+	for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
+		colors.BLUE.Printf("Checking for updates for %s (direct)...\n", moduleName)
+
+		updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, true)
+		if err != nil {
+			colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
+			continue
 		}
 
-		for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
-			colors.BLUE.Printf("Checking for updates for %s (direct)...\n", moduleName)
-
-			updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, true)
-			if err != nil {
-				colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
-				continue
-			}
-
-			updates = append(updates, updateInfo)
-		}
+		updates = append(updates, updateInfo)
 	}
 
 	return updates, nil
