@@ -1,12 +1,13 @@
+import "myapp/cmd/expr";
 
+let outvar = 10;
 
-let plainInt8: i8 = 12 as i8; //error without as i8
-let plainInt64: i64 = 123;
+fn add(x: i32, y: i32) -> i32 {
+    let invar = 8;
+    return x + y + outvar * invar;
+}
 
-//plainInt8 = plainInt64; // error
-type Integer16 i16;
-
-let typedInteger16: Integer16 = plainInt8;
+add(1, 3);
 
 type Point struct {
     x: i32,
@@ -19,7 +20,30 @@ type Point3D struct {
     z: i32
 };
 
-let namedPoint2d: Point = @struct{x: 12, y: 22};
+fn (p: Point3D) abs() -> i32 {
+    return p.x * p.x + p.y * p.y + p.z * p.z;
+}
+
+fn (p: Point3D) coordinateX() -> i32 {
+    return p.x;
+}
+
+let plainInt8: i8 = 12 as i8; //error without as i8
+let plainInt64: i64 = 123;
+
+//plainInt8 = plainInt64; // error
+type Integer16 i16;
+
+fn (i: Integer16) toString() -> str {
+    return "integer";
+}
+
+let typedInteger16: Integer16 = plainInt8 as Integer16; // implicit cast
+let typedInteger16_2: Integer16 = 10 as Integer16;
+
+let myval = typedInteger16.toString();
+
+let namedPoint2d: Point = @struct{x: 12, y: 22} as Point;
 
 namedPoint2d.x;
 
@@ -28,4 +52,37 @@ namedPoint2d.x;
 let namedPoint3d = @Point3D{x: 1, y: 2, z: 3};
 namedPoint3d.z;
 
-namedPoint2d = namedPoint3d;
+namedPoint2d = namedPoint3d as Point;
+//namedPoint3d.coordinates();
+
+type I interface {
+    fn abs() -> i32,
+    fn coordinateX() -> i32
+};
+
+type II I;
+
+// fn (i: II) IIAbs() -> i32 {
+//     return i.abs();
+// }
+
+fn getAbs(i: I) -> i32 {
+    return i.abs();
+}
+
+let iPoint: I = namedPoint3d as I;
+
+fn(xw: i32) -> i32 {
+    return xw * 2;
+}(23); // IIFE
+
+fn outer() -> fn(x: i32) -> i32 {
+    return fn(x: i32) -> i32 {
+        return x * 2;
+    };
+}
+
+let innerFn = outer();
+let result = innerFn(10.2 as i32);
+
+let doubleCall = outer()(2);

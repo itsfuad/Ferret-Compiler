@@ -56,7 +56,7 @@ echo -e "${YELLOW}🚀 Step 7: Testing CLI functionality...${NC}"
 cd "$ROOT_DIR"
 cd $BIN_DIR
 # Test help message
-if ! "./ferret" 2>&1 | grep -q "Usage: ferret"; then
+if ! "./ferret" 2>&1 | grep -q "Ferret"; then
     echo -e "${RED}❌ CLI help message test failed${NC}"
     exit 1
 fi

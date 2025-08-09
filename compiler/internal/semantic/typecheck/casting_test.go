@@ -58,7 +58,7 @@ func TestImplicitCast(t *testing.T) {
 		{float32Type, int32Type, false},
 		{float32Type, float64Type, true},
 		{userType2, userType1, false},
-		{userType1, userType2, true},
+		{userType1, userType2, false},
 		{userType3, userType1, false},
 		{userType1, userType3, false},
 		{userType4, userType3, false},

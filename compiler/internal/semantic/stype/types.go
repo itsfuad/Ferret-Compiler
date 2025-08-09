@@ -25,7 +25,7 @@ func (p *PrimitiveType) String() string {
 type UserType struct {
 	Name       string
 	Definition Type                     // For type aliases, this is the underlying type
-	Methods    map[string]*FunctionType // Methods associated with the user type
+	Methods    map[string]*FunctionType // Methods associated with this type
 }
 
 func (u *UserType) String() string {
@@ -72,16 +72,21 @@ func (a *ArrayType) String() string {
 	return fmt.Sprintf("[]%s", a.ElementType)
 }
 
+type ParamsType struct {
+	Name string
+	Type Type
+}
+
 // FunctionType represents function types with parameters and return type
 type FunctionType struct {
-	Parameters []Type
-	ReturnType Type // Single return type (multiple returns removed)
+	Parameters []ParamsType
+	ReturnType Type // Single return type
 }
 
 func (f *FunctionType) String() string {
 	var paramStrs []string
 	for _, param := range f.Parameters {
-		paramStrs = append(paramStrs, param.String())
+		paramStrs = append(paramStrs, fmt.Sprintf("%s: %s", param.Name, param.Type))
 	}
 
 	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType)
@@ -112,4 +117,12 @@ func (i *InterfaceType) String() string {
 	}
 
 	return fmt.Sprintf("interface { %s }", strings.Join(methodStrs, "; "))
+}
+
+type Invalid struct {
+	// Represents an invalid type, used for error handling
+}
+
+func (i *Invalid) String() string {
+	return "invalid"
 }

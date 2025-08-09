@@ -33,9 +33,6 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		return
 	}
 
-	// Track used imports for this specific file/module (reset for each file)
-	r.UsedImports = make(map[string]bool)
-
 	for _, node := range r.Program.Nodes {
 		resolveNode(r, node, currentModule)
 	}
@@ -57,10 +54,8 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
-		colors.PINK.Printf("Resolving function declaration '%s' at %s\n", n.Identifier.Name, n.Loc())
 		resolveFunctionDecl(r, n, cm)
 	case *ast.MethodDecl:
-		colors.PINK.Printf("Resolving method declaration '%s' at %s\n", n.Method.Name, n.Loc())
 		resolveMethodDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		resolveVariableDeclaration(r, n, cm)
@@ -88,7 +83,7 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 // checkUnusedImports compares imported modules vs used modules and reports warnings
 func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module) {
 	if r.Debug {
-		colors.YELLOW.Printf("Checking unused imports. Used imports: %v\n", r.UsedImports)
+		colors.YELLOW.Printf("Checking unused imports. Used imports: %v\n", currentModule.UsedImports)
 	}
 
 	// Collect all imports from the AST
@@ -96,9 +91,9 @@ func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module)
 		if importStmt, ok := node.(*ast.ImportStmt); ok {
 			alias := importStmt.ModuleName
 			if r.Debug {
-				colors.YELLOW.Printf("Found import '%s' (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, r.UsedImports[alias])
+				colors.YELLOW.Printf("Found import '%s' (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, currentModule.UsedImports[alias])
 			}
-			if !r.UsedImports[alias] {
+			if !currentModule.UsedImports[alias] {
 				r.Ctx.Reports.AddWarning(
 					r.Program.FullPath,
 					importStmt.Loc(),

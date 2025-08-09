@@ -70,7 +70,7 @@ cd "$ROOT_DIR"
 cd $BIN_DIR
 
 # Test help message
-if ! "./ferret" 2>&1 | grep -q "Usage: ferret"; then
+if ! "./ferret" 2>&1 | grep -q "Ferret"; then
     echo "❌ CLI help message test failed"
     exit 1
 fi

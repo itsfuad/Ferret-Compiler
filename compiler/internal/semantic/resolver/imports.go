@@ -61,12 +61,12 @@ func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution
 		colors.CYAN.Printf("Looking for module '%s' in imports of '%s'\n", res.Module.Name, cm.AST.Modulename)
 	}
 
-	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
-	if !ok {
+	symbolTable, err := cm.SymbolTable.GetImportedModule(res.Module.Name)
+	if err != nil {
 		if r.Debug {
 			colors.RED.Printf("Available imports in '%s': %v\n", cm.AST.Modulename, getImportKeys(cm.SymbolTable.Imports))
 		}
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Module '%s' is not imported", res.Module.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -76,9 +76,11 @@ func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution
 	}
 
 	// Mark the import as used when successfully resolving a symbol from it
-	if r.UsedImports != nil {
-		r.UsedImports[res.Module.Name] = true
+	if cm.UsedImports == nil {
+		cm.UsedImports = make(map[string]bool)
 	}
+
+	cm.UsedImports[res.Module.Name] = true
 
 	if r.Debug {
 		//print symbol X found in module Y imported from Z

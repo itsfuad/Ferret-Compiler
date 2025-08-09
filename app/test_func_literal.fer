@@ -1,6 +1,0 @@
-// Test function literal
-let add = fn(a: i32, b: i32) -> i32 {
-    return a + b;
-};
-
-let result: i32 = add(10, 20);

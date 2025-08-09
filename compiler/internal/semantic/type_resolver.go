@@ -98,6 +98,8 @@ func DeriveSemanticType(astType ast.DataType, module *modules.Module) (stype.Typ
 		return deriveSemanticArrayType(t, module)
 	case *ast.StructType:
 		return deriveSemanticStructFromAst(t, module)
+	case *ast.InterfaceType:
+		return deriveSemanticInterfaceType(t, module)
 	case *ast.FunctionType:
 		return deriveSemanticFunctionType(t, module)
 	case *ast.TypeScopeResolution:
@@ -129,7 +131,7 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Modul
 			// If type is used before it's declared, that's a forward reference error
 			if usagePos.Line < declarationPos.Line ||
 				(usagePos.Line == declarationPos.Line && usagePos.Column < declarationPos.Column) {
-				return nil, fmt.Errorf("Cannot use type '%s' before it is declared",
+				return nil, fmt.Errorf("cannot use type '%s' before it is declared",
 					userType.TypeName)
 			}
 		}
@@ -141,29 +143,39 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Modul
 func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.Module) (stype.Type, error) {
 	// Handle type scope resolution (e.g., module::TypeName)
 	moduleName := res.Module.Name
-	typeName := res.TypeNode.Type()
-	symbolTable, found := module.SymbolTable.Imports[moduleName]
-	if !found {
-		return nil, fmt.Errorf("module '%s' is not imported", moduleName)
+	typeName := res.TypeNode.Type().String()
+	symbolTable, err := module.SymbolTable.GetImportedModule(moduleName)
+	if err != nil {
+		return nil, err
 	}
+
 	// Look up the type in the imported module's symbol table
-	if symbol, ok := symbolTable.Lookup(string(typeName)); ok {
+	if symbol, ok := symbolTable.Lookup(typeName); ok {
+
+		if module.UsedImports == nil {
+			module.UsedImports = make(map[string]bool)
+		}
+
+		module.UsedImports[res.Module.Name] = true
+
 		if symbol.Type != nil {
 			return symbol.Type, nil
 		}
+
 		return &stype.UserType{Name: symbol.Name, Definition: nil}, nil // No definition available
 	}
+
 	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 }
 
 func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Module) (*stype.FunctionType, error) {
-	var params []stype.Type
+	var params []stype.ParamsType
 	for _, param := range function.Parameters {
-		paramType, err := DeriveSemanticType(param, module)
+		paramType, err := DeriveSemanticType(param.Type, module)
 		if err != nil {
 			return nil, err
 		}
-		params = append(params, paramType)
+		params = append(params, stype.ParamsType{Name: param.Identifier.Name, Type: paramType})
 	}
 	var returnType stype.Type
 	if function.ReturnType != nil {
@@ -193,6 +205,24 @@ func deriveSemanticStructFromAst(structType *ast.StructType, module *modules.Mod
 	}
 	return &stype.StructType{
 		Fields: fields,
+	}, nil
+}
+
+func deriveSemanticInterfaceType(interfaceType *ast.InterfaceType, module *modules.Module) (stype.Type, error) {
+	methods := make(map[string]*stype.FunctionType)
+	for _, method := range interfaceType.Methods {
+		methodType, err := DeriveSemanticType(method.Method, module)
+		if err != nil {
+			return nil, err
+		}
+		if functionType, ok := methodType.(*stype.FunctionType); ok {
+			methods[method.Name.Name] = functionType
+		} else {
+			return nil, fmt.Errorf("interface method '%s' is not a function type", method.Name.Name)
+		}
+	}
+	return &stype.InterfaceType{
+		Methods: methods,
 	}, nil
 }
 
