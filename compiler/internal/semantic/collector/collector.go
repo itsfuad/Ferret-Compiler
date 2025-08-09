@@ -7,7 +7,6 @@ import (
 	"ferret/compiler/internal/report"
 	"ferret/compiler/internal/semantic/analyzer"
 
-	//"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/symbol"
 	"fmt"
 )
@@ -324,7 +323,7 @@ func collectSymbolsFromBlock(c *analyzer.AnalyzerNode, block *ast.Block, cm *mod
 }
 
 func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) {
-	
+
 	//collect reciever
 	if method.Receiver == nil {
 		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, method.Loc(), "Method receiver cannot be nil", report.COLLECTOR_PHASE)
@@ -352,7 +351,7 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 
 	// Declare the method symbol with placeholder type
 	methodSymbol := symbol.NewSymbolWithLocation(method.Method.Name, symbol.SymbolMethod, nil, method.Method.Loc())
-	
+
 	// new scope for method
 	methodScope := symbol.NewSymbolTable(receiverSymbol.SelfScope)
 	methodScope.ScopeName = symbol.SYMBOL_TABLE_FUNCTION

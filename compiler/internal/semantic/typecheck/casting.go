@@ -36,7 +36,7 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 	// Evaluate the source expression type
 	sourceType := evaluateExpressionType(r, *cast.Value, cm)
 	if sourceType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Convert AST target type to semantic type
@@ -48,11 +48,11 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 			fmt.Sprintf("invalid target type in cast expression: %v", err),
 			report.TYPECHECK_PHASE,
 		)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Check if the cast is valid
-	isValid, err := isExplicitCastable(sourceType, targetType)
+	isValid, err := isExplicitCastable(targetType, sourceType)
 	if err != nil || !isValid {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -60,7 +60,7 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 			fmt.Sprintf("cannot cast from '%s' to '%s': %v", sourceType, targetType, err),
 			report.TYPECHECK_PHASE,
 		)
-		return nil // Return nil if cast is invalid
+		return &stype.Invalid{}
 	}
 
 	return targetType
@@ -77,26 +77,27 @@ func isImplicitCastable(target, source stype.Type) (bool, error) {
 		return isArrayImplicitCastable(target, source)
 	}
 
-	// Handle structs (struct-to-struct compatibility)
-	if _, ok := target.(*stype.StructType); ok {
-		fmt.Println("Checking struct compatibility")
-		return isStructCompatible(target, source, true)
-	}
-
 	// Handle interfaces (source implements target)
 	if _, ok := target.(*stype.InterfaceType); ok {
 		return isInterfaceCompatible(target, source)
 	}
 
-	//if target or source user type, unwrap
-	if _, ok := target.(*stype.UserType); ok {
-		return isImplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
-	}
-	if _, ok := source.(*stype.UserType); ok {
-		return isImplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+	// Handle structs (struct-to-struct compatibility)
+	if _, ok := target.(*stype.StructType); ok {
+		return isStructCompatible(target, source, true)
 	}
 
-	return false, fmt.Errorf("implicit cast not supported between %s and %s", source, target)
+	//if target or source user type, unwrap
+	if a, ok := target.(*stype.UserType); ok {
+		//return isImplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+		if b, ok := source.(*stype.UserType); ok {
+			if a.Name == b.Name {
+				return true, nil
+			}
+		}
+	}
+
+	return false, fmt.Errorf("type '%s' and '%s' are not compatible", source, target)
 }
 
 func isExplicitCastable(target, source stype.Type) (bool, error) {
@@ -110,22 +111,18 @@ func isExplicitCastable(target, source stype.Type) (bool, error) {
 		return isArrayExplicitCastable(target, source)
 	}
 
-	// Allow struct-to-struct if explicitly compatible
-	if _, ok := target.(*stype.StructType); ok {
-		return isStructCompatible(target, source, false)
-	}
-
 	// Allow interface checks via the same logic as implicit
 	if _, ok := target.(*stype.InterfaceType); ok {
 		return isInterfaceCompatible(target, source)
 	}
 
-	//if target or source user type, unwrap
-	if _, ok := target.(*stype.UserType); ok {
-		return isExplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+	// Allow struct-to-struct if explicitly compatible
+	if _, ok := target.(*stype.StructType); ok {
+		return isStructCompatible(target, source, false)
 	}
-	if _, ok := source.(*stype.UserType); ok {
-		return isExplicitCastable(semantic.UnwrapType(target), semantic.UnwrapType(source))
+
+	if _, ok := target.(*stype.UserType); ok {
+		return isExplicitCastable(semantic.UnwrapType(target), source)
 	}
 
 	return false, fmt.Errorf("explicit cast not supported between %s and %s", source, target)
@@ -206,10 +203,11 @@ func isArrayExplicitCastable(target, source stype.Type) (bool, error) {
 // --- STRUCTS ---
 func isStructCompatible(target, source stype.Type, isImplicit bool) (bool, error) {
 
-	targetStruct, targetOk := target.(*stype.StructType)
-	sourceStruct, sourceOk := source.(*stype.StructType)
+	targetStruct, targetStructOk := semantic.UnwrapType(target).(*stype.StructType)
+	//targetInterface, targetInterfaceOk := semantic.UnwrapType(target).(*stype.InterfaceType)
+	sourceStruct, sourceOk := semantic.UnwrapType(source).(*stype.StructType)
 
-	if !targetOk || !sourceOk {
+	if !targetStructOk || !sourceOk {
 		return false, fmt.Errorf("%s cast not possible between non-struct types: %s to %s", str.Ternary(isImplicit, "implicit", "explicit"), target, source)
 	}
 
@@ -248,15 +246,15 @@ func checkImplicitFields(targetStruct, sourceStruct *stype.StructType, problems 
 
 func checkExplicitFields(targetStruct, sourceStruct *stype.StructType, problems *[]string) {
 	// target struct's fields must be a subset of source struct's fields
-	for fieldName, fieldType := range sourceStruct.Fields {
-		targetFieldType, exists := targetStruct.Fields[fieldName]
+	for fieldName, targetFieldType := range targetStruct.Fields {
+		sourceFieldType, exists := sourceStruct.Fields[fieldName]
 
 		if !exists {
 			*problems = append(*problems, fmt.Sprintf("missing field %s", fieldName))
 			continue // Skip to next field if it doesn't exist in source
 		}
 
-		if ok, err := isExplicitCastable(fieldType, targetFieldType); !ok {
+		if ok, err := isExplicitCastable(targetFieldType, sourceFieldType); !ok {
 			*problems = append(*problems, fmt.Sprintf("field %s type mismatch: %s", fieldName, err.Error()))
 		}
 	}
@@ -276,11 +274,13 @@ func isInterfaceCompatible(target, source stype.Type) (bool, error) {
 	// source must be an interface type or struct type
 	sourceInterface, sourceOk := source.(*stype.InterfaceType)
 	if !sourceOk {
-		_, sourceStructOk := source.(*stype.UserType)
+		sourceUser, sourceStructOk := source.(*stype.UserType)
 		if !sourceStructOk {
 			return false, fmt.Errorf("type %s is neither an interface nor a user defined type", source)
 		}
-		//sourceMethods = sourceUser.Methods
+		fmt.Printf("set methods for user type %s\n", sourceUser.Name)
+		sourceMethods = sourceUser.Methods
+		fmt.Printf("sourceMethods: %v\n", sourceMethods)
 	} else {
 		sourceMethods = sourceInterface.Methods
 	}
@@ -290,6 +290,7 @@ func isInterfaceCompatible(target, source stype.Type) (bool, error) {
 		sourceMethod, exists := sourceMethods[methodName]
 		if !exists {
 			problems = append(problems, fmt.Sprintf("method %s not found in source type %s", methodName, source))
+			continue // Skip to next method if it doesn't exist in source
 		}
 		// Check if the method signatures match
 		if ok, err := isFunctionCompatible(targetMethod, sourceMethod); !ok {
@@ -306,6 +307,11 @@ func isInterfaceCompatible(target, source stype.Type) (bool, error) {
 
 // --- FUNCTIONS ---
 func isFunctionCompatible(target, source *stype.FunctionType) (bool, error) {
+
+	if target == nil || source == nil {
+		return false, fmt.Errorf("function type cannot be nil")
+	}
+
 	// Check if the number of parameters match
 	if len(target.Parameters) != len(source.Parameters) {
 		return false, fmt.Errorf("function parameter count mismatch: expected %d, got %d", len(target.Parameters), len(source.Parameters))

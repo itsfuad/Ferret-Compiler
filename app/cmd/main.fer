@@ -22,6 +22,10 @@ fn (p: Point3D) abs() -> i32 {
     return p.x * p.x + p.y * p.y + p.z * p.z;
 }
 
+fn (p: Point3D) coordinateX() -> i32 {
+    return p.x;
+}
+
 let plainInt8: i8 = 12 as i8; //error without as i8
 let plainInt64: i64 = 123;
 
@@ -32,12 +36,12 @@ fn (i: Integer16) toString() -> str {
     return "integer";
 }
 
-let typedInteger16: Integer16 = plainInt8;
+let typedInteger16: Integer16 = plainInt8 as Integer16; // implicit cast
+let typedInteger16_2: Integer16 = 10 as Integer16;
 
 let myval = typedInteger16.toString();
 
-
-let namedPoint2d: Point = @struct{x: 12, y: 22};
+let namedPoint2d: Point = @struct{x: 12, y: 22} as Point;
 
 namedPoint2d.x;
 
@@ -48,3 +52,26 @@ namedPoint3d.z;
 
 namedPoint2d = namedPoint3d as Point;
 //namedPoint3d.coordinates();
+
+type I interface {
+    fn abs() -> i32,
+    fn coordinateX() -> i32
+};
+
+type II I;
+
+// fn (i: II) IIAbs() -> i32 {
+//     return i.abs();
+// }
+
+fn getAbs(i: I) -> i32 {
+    return i.abs();
+}
+
+let iPoint: I = namedPoint3d as I;
+
+fn outer() -> fn(x: i32) -> i32 {
+    return fn(x: i32) -> i32 {
+        return x * 2;
+    };
+}

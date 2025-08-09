@@ -141,9 +141,8 @@ func (s *StructType) Type() types.TYPE_NAME { return s.TypeName }
 func (s *StructType) Loc() *source.Location { return &s.Location }
 
 type InterfaceMethod struct {
-	Name       *IdentifierExpr
-	Params     []Parameter
-	ReturnType DataType
+	Name   *IdentifierExpr
+	Method *FunctionType // Function type for the method
 	source.Location
 }
 
@@ -159,7 +158,7 @@ func (i *InterfaceType) Type() types.TYPE_NAME { return i.TypeName }
 func (i *InterfaceType) Loc() *source.Location { return &i.Location }
 
 type FunctionType struct {
-	Parameters []DataType
+	Parameters []Parameter
 	ReturnType DataType
 	TypeName   types.TYPE_NAME
 	source.Location

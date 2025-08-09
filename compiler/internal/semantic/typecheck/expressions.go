@@ -65,7 +65,7 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 		resultType = checkStructLiteralType(r, e, cm)
 	default:
 		// Unknown expression type
-		resultType = nil
+		resultType = &stype.Invalid{}
 		r.Ctx.Reports.AddCriticalError(
 			r.Program.FullPath,
 			e.Loc(),
@@ -162,10 +162,11 @@ func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccess
 
 // checkStructFieldOrMethodAccess checks field or method access on struct types
 func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.Type, propName string, location *source.Location, cm *modules.Module) stype.Type {
-
 	// only struct types have fields, also user-defined types can be alias to structs
 	// only user-defined types can have methods
-	if structType, ok := semantic.UnwrapType(objectType).(*stype.StructType); ok {
+
+	unwrapped := semantic.UnwrapType(objectType)
+	if structType, ok := unwrapped.(*stype.StructType); ok {
 		// Check for struct field
 		if fieldType := findStructField(structType, propName); fieldType != nil {
 			return fieldType // Return the field type if found
@@ -177,6 +178,20 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			report.TYPECHECK_PHASE,
 		)
 		return nil // Field not found
+	}
+
+	if interfaceType, ok := unwrapped.(*stype.InterfaceType); ok {
+		// Check for interface method
+		if methodType, found := interfaceType.Methods[propName]; found {
+			return methodType // Return the method type if found
+		}
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			location,
+			fmt.Sprintf("Interface has no method named '%s'", propName),
+			report.TYPECHECK_PHASE,
+		)
+		return nil // Method not found
 	}
 
 	// Check for user-defined type methods
@@ -284,7 +299,19 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 	}
 
 	// Get the struct type from the symbol, handling UserType wrappers
-	unwrapped := semantic.UnwrapType(symbol.Type)
+	//symbol type must be user type
+	userType, ok := symbol.Type.(*stype.UserType)
+	if !ok {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			structLiteral.Loc(),
+			fmt.Sprintf("type '%s' is not a user defined type", structTypeName),
+			report.TYPECHECK_PHASE,
+		)
+		return nil
+	}
+
+	unwrapped := semantic.UnwrapType(userType.Definition)
 	structType, ok := unwrapped.(*stype.StructType)
 	if !ok {
 		r.Ctx.Reports.AddSemanticError(
@@ -296,11 +323,13 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 		return nil
 	}
 
-	return validateNamedStructFields(r, structLiteral, structType, structTypeName, symbol.Type, cm)
+	validateNamedStructFields(r, structLiteral, structType, structTypeName, cm)
+
+	return userType // Return the user type wrapper
 }
 
 // validateNamedStructFields validates the fields in a named struct literal
-func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, structType *stype.StructType, structTypeName string, symbolType stype.Type, cm *modules.Module) *stype.UserType {
+func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, structType *stype.StructType, structTypeName string, cm *modules.Module) {
 	// Validate that all provided fields exist and have correct types
 	providedFields := make(map[string]bool)
 	for _, field := range structLiteral.Fields {
@@ -344,10 +373,5 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 				report.TYPECHECK_PHASE,
 			)
 		}
-	}
-
-	return &stype.UserType{
-		Name:       structTypeName,
-		Definition: symbolType,
 	}
 }

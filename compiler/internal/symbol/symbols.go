@@ -20,10 +20,10 @@ const (
 
 // Symbol represents a named entity in the program (variable, constant, type, etc.)
 type Symbol struct {
-	Name     string
-	Kind     SymbolKind
-	Type     stype.Type
-	Location *source.Location
+	Name      string
+	Kind      SymbolKind
+	Type      stype.Type
+	Location  *source.Location
 	SelfScope *SymbolTable // For methods, this holds the scope of the method
 }
 
