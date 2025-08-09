@@ -198,8 +198,8 @@ func isArrayImplicitCastable(target, source stype.Type) (bool, error) {
 }
 
 func isArrayExplicitCastable(target, source stype.Type) (bool, error) {
-	targetArray, targetOk := target.(*stype.ArrayType)
-	sourceArray, sourceOk := source.(*stype.ArrayType)
+	targetArray, targetOk := semantic.UnwrapType(target).(*stype.ArrayType)
+	sourceArray, sourceOk := semantic.UnwrapType(source).(*stype.ArrayType)
 
 	if !targetOk || !sourceOk {
 		return false, fmt.Errorf("explicit cast not possible between non-array types: %s to %s", target, source)

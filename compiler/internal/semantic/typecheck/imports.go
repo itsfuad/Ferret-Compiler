@@ -41,9 +41,9 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.
 
 func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) stype.Type {
 
-	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
-	if !ok {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Module '%s' is not imported", res.Module.Name), report.RESOLVER_PHASE)
+	symbolTable, err := cm.SymbolTable.GetImportedModule(res.Module.Name)
+	if err != nil {
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return nil
 	}
 

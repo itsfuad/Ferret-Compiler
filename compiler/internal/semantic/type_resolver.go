@@ -143,18 +143,28 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Modul
 func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.Module) (stype.Type, error) {
 	// Handle type scope resolution (e.g., module::TypeName)
 	moduleName := res.Module.Name
-	typeName := res.TypeNode.Type()
-	symbolTable, found := module.SymbolTable.Imports[moduleName]
-	if !found {
-		return nil, fmt.Errorf("module '%s' is not imported", moduleName)
+	typeName := res.TypeNode.Type().String()
+	symbolTable, err := module.SymbolTable.GetImportedModule(moduleName)
+	if err != nil {
+		return nil, err
 	}
+
 	// Look up the type in the imported module's symbol table
-	if symbol, ok := symbolTable.Lookup(string(typeName)); ok {
+	if symbol, ok := symbolTable.Lookup(typeName); ok {
+
+		if module.UsedImports == nil {
+			module.UsedImports = make(map[string]bool)
+		}
+
+		module.UsedImports[res.Module.Name] = true
+
 		if symbol.Type != nil {
 			return symbol.Type, nil
 		}
+
 		return &stype.UserType{Name: symbol.Name, Definition: nil}, nil // No definition available
 	}
+
 	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
 }
 

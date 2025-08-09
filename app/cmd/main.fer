@@ -1,11 +1,13 @@
+import "myapp/cmd/expr";
+
 let outvar = 10;
 
 fn add(x: i32, y: i32) -> i32 {
-    let invar = 5;
+    let invar = 8;
     return x + y + outvar * invar;
 }
 
-add(1, 2);
+add(1, 3);
 
 type Point struct {
     x: i32,
