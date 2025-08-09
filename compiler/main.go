@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path/to/project] | ferret get [module] | ferret update [module] | ferret updatable | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path/to/project] | ferret get [module] | ferret update [module] | ferret updatable [--all] | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
 		os.Exit(1)
 	}
 
@@ -62,7 +62,7 @@ func main() {
 
 	// Check for filename argument
 	if args.Filename == "" {
-		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path] | ferret get [module] | ferret update [module] | ferret updatable | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
+		fmt.Println("Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path] | ferret get [module] | ferret update [module] | ferret updatable [--all] | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1")
 		os.Exit(1)
 	}
 

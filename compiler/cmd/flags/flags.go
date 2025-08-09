@@ -39,8 +39,9 @@ func parseCommandWithValue(command string, args []string, i *int, result *Args) 
 	case "get":
 		result.GetCommand = true
 		result.GetModule = value
-	case "updatable":
+	case "update":
 		result.UpdateCommand = true
+		result.UpdateModule = value
 	case "remove":
 		result.RemoveCommand = true
 		result.RemoveModule = value
@@ -60,7 +61,7 @@ func ParseArgs() *Args {
 
 		switch arg {
 		// Dispatch commands that take a value to the helper
-		case "init", "get", "remove":
+		case "init", "get", "update", "remove":
 			parseCommandWithValue(arg, args, &i, result)
 			commandSet = true
 

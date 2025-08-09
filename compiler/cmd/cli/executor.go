@@ -288,7 +288,7 @@ func HandleUpdatableCommand() {
 		os.Exit(1)
 	}
 
-	// Check for available updates
+	// Check for available updates (direct dependencies only)
 	colors.BLUE.Println("Checking for available updates...")
 	updates, err := dm.CheckAvailableUpdates()
 	if err != nil {
@@ -318,6 +318,9 @@ func HandleUpdatableCommand() {
 		colors.BLUE.Println("\nTo update dependencies, run:")
 		colors.BLUE.Println("  ferret update          # Update all dependencies")
 		colors.BLUE.Println("  ferret update <module> # Update specific module")
+		colors.CYAN.Println("\nNote: Updating direct dependencies will automatically update their")
+		colors.CYAN.Println("transitive dependencies to compatible versions as specified by the")
+		colors.CYAN.Println("updated modules.")
 	} else {
 		colors.GREEN.Println("\n🎉 All dependencies are up to date!")
 	}

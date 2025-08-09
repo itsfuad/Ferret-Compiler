@@ -568,48 +568,96 @@ type ModuleUpdateInfo struct {
 	CurrentVersion string
 	LatestVersion  string
 	HasUpdate      bool
+	IsDirect       bool // Whether this is a direct dependency or transitive
 }
 
 // CheckAvailableUpdates checks for available updates for all dependencies
 func (dm *DependencyManager) CheckAvailableUpdates() ([]ModuleUpdateInfo, error) {
-	// Load project configuration to get current dependencies
-	projectConfig, err := config.LoadProjectConfig(dm.projectRoot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load project configuration: %w", err)
-	}
+	return dm.CheckAvailableUpdatesWithOptions(false) // Default: direct only
+}
 
-	if len(projectConfig.Dependencies.Modules) == 0 {
-		return []ModuleUpdateInfo{}, nil
-	}
+// CheckAvailableUpdatesIncludingTransitive checks for updates including transitive dependencies
+func (dm *DependencyManager) CheckAvailableUpdatesIncludingTransitive() ([]ModuleUpdateInfo, error) {
+	return dm.CheckAvailableUpdatesWithOptions(true)
+}
 
+// CheckAvailableUpdatesWithOptions checks for available updates with option to include transitive deps
+func (dm *DependencyManager) CheckAvailableUpdatesWithOptions(includeTransitive bool) ([]ModuleUpdateInfo, error) {
 	var updates []ModuleUpdateInfo
 
-	for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
-		colors.BLUE.Printf("Checking for updates for %s...\n", moduleName)
-
-		// Parse the module specification to get repo info
-		_, _, repoName, err := SplitRemotePath(moduleName)
-		if err != nil {
-			colors.YELLOW.Printf("Warning: Could not parse module %s: %v\n", moduleName, err)
-			continue
+	if includeTransitive {
+		// Check all dependencies from lockfile (direct + transitive)
+		allDeps := dm.lockfile.GetAllDependencies()
+		if len(allDeps) == 0 {
+			return []ModuleUpdateInfo{}, nil
 		}
 
-		// Check latest version available
-		latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
+		for depKey, entry := range allDeps {
+			// Parse dependency key to get module name and current version
+			moduleName, currentVersion := depEntryKeyParts(depKey)
+			if moduleName == "" || currentVersion == "" {
+				continue
+			}
+
+			colors.BLUE.Printf("Checking for updates for %s (%s)...\n", moduleName,
+				map[bool]string{true: "direct", false: "transitive"}[entry.Direct])
+
+			updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, entry.Direct)
+			if err != nil {
+				colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
+				continue
+			}
+
+			updates = append(updates, updateInfo)
+		}
+	} else {
+		// Check only direct dependencies from fer.ret
+		projectConfig, err := config.LoadProjectConfig(dm.projectRoot)
 		if err != nil {
-			colors.YELLOW.Printf("Warning: Could not get latest version for %s: %v\n", moduleName, err)
-			continue
+			return nil, fmt.Errorf("failed to load project configuration: %w", err)
 		}
 
-		hasUpdate := currentVersion != latestVersion && currentVersion != "latest"
+		if len(projectConfig.Dependencies.Modules) == 0 {
+			return []ModuleUpdateInfo{}, nil
+		}
 
-		updates = append(updates, ModuleUpdateInfo{
-			Name:           moduleName,
-			CurrentVersion: currentVersion,
-			LatestVersion:  latestVersion,
-			HasUpdate:      hasUpdate,
-		})
+		for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
+			colors.BLUE.Printf("Checking for updates for %s (direct)...\n", moduleName)
+
+			updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, true)
+			if err != nil {
+				colors.YELLOW.Printf("Warning: Could not check updates for %s: %v\n", moduleName, err)
+				continue
+			}
+
+			updates = append(updates, updateInfo)
+		}
 	}
 
 	return updates, nil
+}
+
+// checkSingleModuleUpdate checks for updates for a single module
+func (dm *DependencyManager) checkSingleModuleUpdate(moduleName, currentVersion string, isDirect bool) (ModuleUpdateInfo, error) {
+	// Parse the module specification to get repo info
+	_, _, repoName, err := SplitRemotePath(moduleName)
+	if err != nil {
+		return ModuleUpdateInfo{}, fmt.Errorf("could not parse module %s: %w", moduleName, err)
+	}
+
+	// Check latest version available
+	latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
+	if err != nil {
+		return ModuleUpdateInfo{}, fmt.Errorf("could not get latest version for %s: %w", moduleName, err)
+	}
+
+	hasUpdate := currentVersion != latestVersion && currentVersion != "latest"
+
+	return ModuleUpdateInfo{
+		Name:           moduleName,
+		CurrentVersion: currentVersion,
+		LatestVersion:  latestVersion,
+		HasUpdate:      hasUpdate,
+		IsDirect:       isDirect,
+	}, nil
 }
