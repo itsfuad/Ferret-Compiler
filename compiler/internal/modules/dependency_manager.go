@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ferret/compiler/colors"
+	"ferret/compiler/internal/config"
 )
 
 const (
@@ -479,4 +480,136 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 	repoName := parts[1] + "/" + parts[2] // user/repo
 	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", "github.com", repoName+"@"+version)
 	_ = os.RemoveAll(cachePath)
+}
+
+// UpdateDependency updates a specific dependency to its latest version
+func (dm *DependencyManager) UpdateDependency(moduleSpec string) error {
+	// Parse the module specification
+	_, _, repoName, err := SplitRemotePath(moduleSpec)
+	if err != nil {
+		return fmt.Errorf("invalid module specification: %w", err)
+	}
+
+	colors.BLUE.Printf("Updating dependency: %s to latest version\n", moduleSpec)
+
+	// Force latest version by using "latest" specification
+	latestModuleSpec := repoName + "@latest"
+
+	// Remove the existing dependency first
+	err = dm.RemoveDependency(moduleSpec)
+	if err != nil {
+		colors.YELLOW.Printf("Warning: could not remove existing dependency %s: %v\n", moduleSpec, err)
+	}
+
+	// Install the latest version
+	err = dm.InstallDirectDependency(latestModuleSpec, "")
+	if err != nil {
+		return fmt.Errorf("failed to install latest version of %s: %w", moduleSpec, err)
+	}
+
+	colors.GREEN.Printf("Successfully updated %s to latest version\n", moduleSpec)
+	return nil
+}
+
+// UpdateAllDependencies updates all dependencies to their latest versions
+func (dm *DependencyManager) UpdateAllDependencies() error {
+	// First, check what updates are available
+	updates, err := dm.CheckAvailableUpdates()
+	if err != nil {
+		return fmt.Errorf("failed to check for available updates: %w", err)
+	}
+
+	// Filter to only modules that have updates
+	var modulesToUpdate []ModuleUpdateInfo
+	for _, update := range updates {
+		if update.HasUpdate {
+			modulesToUpdate = append(modulesToUpdate, update)
+		}
+	}
+
+	if len(modulesToUpdate) == 0 {
+		colors.YELLOW.Println("All dependencies are already up to date.")
+		return nil
+	}
+
+	colors.BLUE.Printf("Found %d dependencies to update:\n", len(modulesToUpdate))
+	for _, update := range modulesToUpdate {
+		colors.BLUE.Printf("  %s: %s → %s\n", update.Name, update.CurrentVersion, update.LatestVersion)
+	}
+	colors.BLUE.Println()
+
+	var failed []string
+	updated := 0
+
+	for _, update := range modulesToUpdate {
+		colors.BLUE.Printf("Updating %s...\n", update.Name)
+		err := dm.UpdateDependency(update.Name)
+		if err != nil {
+			colors.RED.Printf("Failed to update %s: %v\n", update.Name, err)
+			failed = append(failed, update.Name)
+		} else {
+			updated++
+		}
+	}
+
+	if len(failed) > 0 {
+		colors.YELLOW.Printf("Successfully updated %d dependencies\n", updated)
+		colors.RED.Printf("Failed to update %d dependencies: %v\n", len(failed), failed)
+		return fmt.Errorf("some dependencies failed to update")
+	}
+
+	colors.GREEN.Printf("Successfully updated all %d dependencies to latest versions!\n", updated)
+	return nil
+}
+
+// ModuleUpdateInfo represents information about a module that can be updated
+type ModuleUpdateInfo struct {
+	Name           string
+	CurrentVersion string
+	LatestVersion  string
+	HasUpdate      bool
+}
+
+// CheckAvailableUpdates checks for available updates for all dependencies
+func (dm *DependencyManager) CheckAvailableUpdates() ([]ModuleUpdateInfo, error) {
+	// Load project configuration to get current dependencies
+	projectConfig, err := config.LoadProjectConfig(dm.projectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load project configuration: %w", err)
+	}
+
+	if len(projectConfig.Dependencies.Modules) == 0 {
+		return []ModuleUpdateInfo{}, nil
+	}
+
+	var updates []ModuleUpdateInfo
+
+	for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
+		colors.BLUE.Printf("Checking for updates for %s...\n", moduleName)
+
+		// Parse the module specification to get repo info
+		_, _, repoName, err := SplitRemotePath(moduleName)
+		if err != nil {
+			colors.YELLOW.Printf("Warning: Could not parse module %s: %v\n", moduleName, err)
+			continue
+		}
+
+		// Check latest version available
+		latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
+		if err != nil {
+			colors.YELLOW.Printf("Warning: Could not get latest version for %s: %v\n", moduleName, err)
+			continue
+		}
+
+		hasUpdate := currentVersion != latestVersion && currentVersion != "latest"
+
+		updates = append(updates, ModuleUpdateInfo{
+			Name:           moduleName,
+			CurrentVersion: currentVersion,
+			LatestVersion:  latestVersion,
+			HasUpdate:      hasUpdate,
+		})
+	}
+
+	return updates, nil
 }
