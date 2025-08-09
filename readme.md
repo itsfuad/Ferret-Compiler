@@ -328,7 +328,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
     - [x] Struct field access
     - [x] Struct field assignment
     - [x] Methods
-- [ ] Interfaces
+- [x] Interfaces
 - [x] Functions
     - [x] Dead code elimination
     - [x] Function calls
