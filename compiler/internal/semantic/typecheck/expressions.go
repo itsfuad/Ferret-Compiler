@@ -11,6 +11,7 @@ import (
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/internal/utils"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -117,15 +118,18 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 			continue // Skip if we can't determine argument type
 		}
 
-		expectedType := funcType.Parameters[i]
-		if ok, err := isImplicitCastable(expectedType, argType); !ok {
-			r.Ctx.Reports.AddSemanticError(
+		expectedParam := funcType.Parameters[i]
+		if ok, err := isImplicitCastable(expectedParam.Type, argType); !ok {
+			rp := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
-				call.Loc(),
-				fmt.Sprintf("%s argument error: %s",
+				arg.Loc(),
+				fmt.Sprintf("invalid %s argument: %s",
 					utils.NumericToOrdinal(i+1), err.Error()),
 				report.TYPECHECK_PHASE,
 			)
+			if ok, _ := isExplicitCastable(expectedParam.Type, argType); ok {
+				rp.AddHint(msg.CastHint(expectedParam.Type))
+			}
 		}
 	}
 
@@ -348,17 +352,26 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		}
 
 		// Check the type of the field value
-		if field.FieldValue != nil {
-			actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
-			if actualFieldType != nil {
-				if ok, err := isImplicitCastable(expectedFieldType, actualFieldType); !ok {
-					r.Ctx.Reports.AddSemanticError(
-						r.Program.FullPath,
-						&field.Location,
-						fmt.Sprintf("Field error: %s", err.Error()),
-						report.TYPECHECK_PHASE,
-					)
-				}
+		if field.FieldValue == nil {
+			return
+		}
+
+		actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
+
+		if actualFieldType == nil {
+			return
+		}
+
+		if ok, err := isImplicitCastable(expectedFieldType, actualFieldType); !ok {
+			rp := r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				&field.Location,
+				fmt.Sprintf("Field error: %s", err.Error()),
+				report.TYPECHECK_PHASE,
+			)
+
+			if ok, _ := isExplicitCastable(expectedFieldType, actualFieldType); ok {
+				rp.AddHint(msg.CastHint(expectedFieldType))
 			}
 		}
 	}

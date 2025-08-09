@@ -8,6 +8,7 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/source"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -136,13 +137,16 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 
 	// Check return type compatibility
 	if ok, err := isImplicitCastable(expectedReturnType, returnValueType); !ok {
-		r.Ctx.Reports.AddSemanticError(
+		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			returnStmt.Loc(),
 			fmt.Sprintf("Cannot return '%s' in function expecting '%s': %s",
 				returnValueType, expectedReturnType, err.Error()),
 			report.TYPECHECK_PHASE,
 		)
+		if ok, _ := isExplicitCastable(expectedReturnType, returnValueType); ok {
+			rp.AddHint(msg.CastHint(expectedReturnType))
+		}
 	}
 }
 

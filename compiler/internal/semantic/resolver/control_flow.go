@@ -24,17 +24,6 @@ func resolveIfStmt(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Mod
 	}
 }
 
-// resolveBlock resolves all nodes in a block
-func resolveBlock(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module) {
-	if block == nil {
-		return
-	}
-
-	for _, node := range block.Nodes {
-		resolveNode(r, node, cm)
-	}
-}
-
 // resolveReturnStmt resolves a return statement
 func resolveReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *modules.Module) {
 	// Resolve the return value expression if present

@@ -70,8 +70,17 @@ fn getAbs(i: I) -> i32 {
 
 let iPoint: I = namedPoint3d as I;
 
+fn(xw: i32) -> i32 {
+    return xw * 2;
+}(23); // IIFE
+
 fn outer() -> fn(x: i32) -> i32 {
     return fn(x: i32) -> i32 {
         return x * 2;
     };
 }
+
+let innerFn = outer();
+let result = innerFn(10.2 as i32);
+
+let doubleCall = outer()(2);

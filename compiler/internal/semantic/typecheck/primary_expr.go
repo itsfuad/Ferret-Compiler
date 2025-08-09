@@ -8,6 +8,7 @@ import (
 	"ferret/compiler/internal/semantic/analyzer"
 	"ferret/compiler/internal/semantic/stype"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils/msg"
 	"fmt"
 )
 
@@ -171,7 +172,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 			)
 
 			if ok, _ := isExplicitCastable(elemType, elementType); !ok {
-				semanticError.AddHint(fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", elementType))
+				semanticError.AddHint(msg.CastHint(elementType))
 			}
 
 			return nil

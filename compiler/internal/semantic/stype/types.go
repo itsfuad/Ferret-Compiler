@@ -72,16 +72,21 @@ func (a *ArrayType) String() string {
 	return fmt.Sprintf("[]%s", a.ElementType)
 }
 
+type ParamsType struct {
+	Name string
+	Type Type
+}
+
 // FunctionType represents function types with parameters and return type
 type FunctionType struct {
-	Parameters []Type
+	Parameters []ParamsType
 	ReturnType Type // Single return type
 }
 
 func (f *FunctionType) String() string {
 	var paramStrs []string
 	for _, param := range f.Parameters {
-		paramStrs = append(paramStrs, param.String())
+		paramStrs = append(paramStrs, fmt.Sprintf("%s: %s", param.Name, param.Type))
 	}
 
 	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType)

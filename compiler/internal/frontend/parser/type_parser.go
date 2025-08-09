@@ -264,7 +264,7 @@ func parseFunctionType(p *Parser) (ast.DataType, bool) {
 	token := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
 
 	// parse the parameters
-	parameters, returnType := parseSignature(p, false)
+	parameters, returnType := parseSignature(p, true)
 
 	return &ast.FunctionType{
 		Parameters: parameters,

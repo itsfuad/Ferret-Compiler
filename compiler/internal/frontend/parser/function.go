@@ -136,9 +136,9 @@ func parseReturnType(p *Parser) ast.DataType {
 	return returnType
 }
 
-func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, ast.DataType) {
+func parseSignature(p *Parser, paramNotParsedYet bool, params ...ast.Parameter) ([]ast.Parameter, ast.DataType) {
 
-	if len(params) == 0 && parseNewParams {
+	if len(params) == 0 && paramNotParsedYet {
 		params = parseParameters(p)
 	}
 
@@ -151,9 +151,9 @@ func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]
 	return params, nil
 }
 
-func parseFunctionLiteral(p *Parser, start *source.Position, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
+func parseFunctionLiteral(p *Parser, start *source.Position, paramNotParsedYet bool, params ...ast.Parameter) *ast.FunctionLiteral {
 
-	params, returnType := parseSignature(p, parseNewParams, params...)
+	params, returnType := parseSignature(p, paramNotParsedYet, params...)
 
 	block := parseBlock(p)
 
