@@ -6,17 +6,20 @@ import (
 
 // Args holds the parsed command line arguments
 type Args struct {
-	Filename       string
-	Debug          bool
-	InitProject    bool
-	InitPath       string
-	OutputPath     string
-	GetCommand     bool
-	GetModule      string
-	RemoveCommand  bool
-	RemoveModule   string
-	ListCommand    bool
-	CleanupCommand bool
+	Filename         string
+	Debug            bool
+	InitProject      bool
+	InitPath         string
+	OutputPath       string
+	GetCommand       bool
+	GetModule        string
+	UpdateCommand    bool
+	UpdateModule     string
+	UpdatableCommand bool
+	RemoveCommand    bool
+	RemoveModule     string
+	ListCommand      bool
+	CleanupCommand   bool
 }
 
 // parseCommandWithValue handles commands that expect a subsequent value (e.g., "init <path>").
@@ -36,6 +39,8 @@ func parseCommandWithValue(command string, args []string, i *int, result *Args) 
 	case "get":
 		result.GetCommand = true
 		result.GetModule = value
+	case "updatable":
+		result.UpdateCommand = true
 	case "remove":
 		result.RemoveCommand = true
 		result.RemoveModule = value
@@ -64,6 +69,9 @@ func ParseArgs() *Args {
 			parseCommandWithValue(arg, args, &i, result)
 
 		// Handle simple boolean commands/flags directly
+		case "updatable":
+			result.UpdatableCommand = true
+			commandSet = true
 		case "list":
 			result.ListCommand = true
 			commandSet = true
