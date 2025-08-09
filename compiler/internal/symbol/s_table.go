@@ -116,3 +116,14 @@ func (st *SymbolTable) IsImportUsed(alias string) bool {
 	}
 	return false
 }
+
+func (st *SymbolTable) GetImportedModule(alias string) (*SymbolTable, error) {
+	//resolve to parent module if alias is not found
+	if moduleTable, exists := st.Imports[alias]; exists {
+		return moduleTable, nil
+	}
+	if st.Parent != nil {
+		return st.Parent.GetImportedModule(alias)
+	}
+	return nil, fmt.Errorf("imported module '%s' not found", alias)
+}

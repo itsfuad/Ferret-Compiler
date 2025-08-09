@@ -36,7 +36,6 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 		resolveExpr(r, *e.Object, cm)
 	case *ast.VarScopeResolution:
 		resolveImportedSymbol(r, e, cm)
-
 	// Literal expressions - no resolution needed, just validate they exist
 	case *ast.StringLiteral:
 		// String literals don't need resolution
