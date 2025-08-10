@@ -1,7 +1,7 @@
 package stype
 
 import (
-	"ferret/compiler/internal/types"
+	"ferret/internal/types"
 	"fmt"
 	"sort"
 	"strings"

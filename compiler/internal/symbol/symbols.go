@@ -1,8 +1,8 @@
 package symbol
 
 import (
-	"ferret/compiler/internal/semantic/stype"
-	"ferret/compiler/internal/source"
+	"ferret/internal/semantic/stype"
+	"ferret/internal/source"
 )
 
 // SymbolKind represents the kind of symbol (variable, constant, function, type, etc.)

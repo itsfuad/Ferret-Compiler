@@ -1,0 +1,77 @@
+{
+    "name": "LOCK",
+    "scopeName": "source.lock",
+    "patterns": [
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#constant" },
+        { "include": "#punctuation" },
+        { "include": "#comment" }
+    ],
+    "repository": {
+        "string": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.lock",
+                    "begin": "\"",
+                    "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.lock" } },
+                    "end": "\"",
+                    "endCaptures": { "0": { "name": "punctuation.definition.string.end.lock" } },
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.lock",
+                            "match": "\\\\."
+                        }
+                    ]
+                }
+            ]
+        },
+        "number": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.lock",
+                    "match": "-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?"
+                }
+            ]
+        },
+        "constant": {
+            "patterns": [
+                {
+                    "name": "constant.language.lock",
+                    "match": "\\b(true|false|null)\\b"
+                }
+            ]
+        },
+        "punctuation": {
+            "patterns": [
+                {
+                    "name": "punctuation.separator.key-value.lock",
+                    "match": ":"
+                },
+                {
+                    "name": "punctuation.separator.object.lock",
+                    "match": ","
+                },
+                {
+                    "name": "punctuation.definition.array.begin.lock",
+                    "match": "\\["
+                },
+                {
+                    "name": "punctuation.definition.array.end.lock",
+                    "match": "\\]"
+                },
+                {
+                    "name": "punctuation.definition.object.begin.lock",
+                    "match": "\\{"
+                },
+                {
+                    "name": "punctuation.definition.object.end.lock",
+                    "match": "\\}"
+                }
+            ]
+        },
+        "comment": {
+            "patterns": []
+        }
+    }
+}

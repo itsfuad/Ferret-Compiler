@@ -3,7 +3,7 @@ package lexer
 import (
 	"testing"
 
-	"ferret/compiler/internal/testutil"
+	"ferret/internal/testutil"
 )
 
 func TestNumberTokenization(t *testing.T) {

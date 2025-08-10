@@ -1,10 +1,10 @@
 package collector
 
 import (
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/modules"
-	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/colors"
+	"ferret/internal/frontend/ast"
+	"ferret/internal/modules"
+	"ferret/internal/semantic/analyzer"
 )
 
 // collectSymbolsFromBlock collects symbols from all nodes in a block

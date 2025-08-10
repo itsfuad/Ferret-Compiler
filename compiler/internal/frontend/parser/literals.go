@@ -3,11 +3,11 @@ package parser
 import (
 	"strings"
 
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/utils/numeric"
+	"ferret/internal/frontend/ast"
+	"ferret/internal/frontend/lexer"
+	"ferret/internal/source"
+	"ferret/internal/utils/numeric"
+	"ferret/report"
 )
 
 func parseNumberLiteral(p *Parser) ast.Expression {
