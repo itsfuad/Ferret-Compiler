@@ -71,13 +71,15 @@ func HandleGetCommand(module string) {
 	}
 
 	// Install specific module
-	err = dm.InstallDirectDependency(module, "")
+	installed, err := dm.InstallDirectDependency(module, "")
 	if err != nil {
 		colors.RED.Printf("Failed to install module: %s\n", err)
 		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("Successfully installed %s\n", module)
+	if installed {
+		colors.GREEN.Printf("Successfully installed %s\n", module)
+	}
 }
 
 // HandleRemoveCommand handles the "ferret remove" command
