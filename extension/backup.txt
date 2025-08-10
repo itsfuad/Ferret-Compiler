@@ -1,0 +1,7 @@
+  "scripts": {
+    "bundle": "esbuild src/client.ts --bundle --platform=node --outfile=out/client.js --external:vscode",
+    "vscode:prepublish": "go build -C ./../lsp -o ./../language-support/bin/walrus-lsp.exe && npm run bundle",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },

@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
+	"ferret/internal/frontend/ast"
+	"ferret/internal/frontend/lexer"
+	"ferret/internal/source"
+	"ferret/report"
 )
 
 func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {

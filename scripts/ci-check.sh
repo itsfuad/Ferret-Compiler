@@ -24,31 +24,35 @@ fi
 echo -e "${GREEN}✅ Go is available: $(go version)${NC}"
 
 echo -e "${YELLOW}📦 Step 2: Downloading dependencies...${NC}"
-cd "$ROOT_DIR"
+cd "$COMPILER_DIR"
 go mod download
 echo -e "${GREEN}✅ Dependencies downloaded${NC}"
 
 echo -e "${YELLOW}🎨 Step 3: Checking code formatting...${NC}"
-if [ "$(gofmt -s -l ./compiler | wc -l)" -gt 0 ]; then
+cd "$COMPILER_DIR"
+if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
     echo -e "${RED}❌ The following files are not formatted correctly:${NC}"
-    gofmt -s -l ./compiler
-    echo -e "${YELLOW}Please run: gofmt -s -w ./compiler${NC}"
+    gofmt -s -l .
+    echo -e "${YELLOW}Please run: gofmt -s -w .${NC}"
     exit 1
 else
     echo -e "${GREEN}✅ All Go files are properly formatted${NC}"
 fi
 
 echo -e "${YELLOW}🔍 Step 4: Running go vet...${NC}"
-go vet ./compiler/...
+cd "$COMPILER_DIR"
+go vet ./...
 echo -e "${GREEN}✅ go vet passed${NC}"
 
 echo -e "${YELLOW}🧪 Step 5: Running tests...${NC}"
-go test -v ./compiler/...
+cd "$COMPILER_DIR"
+go test -v ./...
 echo -e "${GREEN}✅ All tests passed${NC}"
 
 echo -e "${YELLOW}🔨 Step 6: Building compiler...${NC}"
 mkdir -p "$BIN_DIR"
-go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v ./compiler
+cd "$COMPILER_DIR"
+go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v .
 chmod +x "$BIN_DIR/ferret"
 echo -e "${GREEN}✅ Compiler built successfully${NC}"
 
@@ -89,8 +93,8 @@ if ! command -v gosec &> /dev/null; then
     fi
 fi
 
-cd "$ROOT_DIR"
-gosec -fmt sarif -out "$ROOT_DIR/gosec.sarif" -stderr ./compiler/... || true
+cd "$COMPILER_DIR"
+gosec -fmt sarif -out "$ROOT_DIR/gosec.sarif" -stderr ./... || true
 
 if [ ! -f "$ROOT_DIR/gosec.sarif" ] || [ ! -s "$ROOT_DIR/gosec.sarif" ]; then
     echo -e "${YELLOW}Creating minimal SARIF file (no security issues found)${NC}"

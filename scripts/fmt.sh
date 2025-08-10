@@ -3,7 +3,7 @@
 # Clear the screen
 clear
 
-cd ..
+cd ../compiler
 
 echo "Cleaning up imports..."
 # Remove unused imports
@@ -12,7 +12,7 @@ go mod tidy
 echo "Formatting code..."
 
 # Format the code
-go fmt ./compiler/...
+go fmt ./...
 
 if [ $? -eq 0 ]; then
     echo "✅ Formatting successful"

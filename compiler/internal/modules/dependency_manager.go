@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/config"
+	"ferret/colors"
+	"ferret/internal/config"
 )
 
 const (
