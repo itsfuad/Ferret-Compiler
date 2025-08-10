@@ -1,5 +1,5 @@
 import * as path from "path";
-import { workspace, ExtensionContext } from "vscode";
+import { workspace, ExtensionContext, commands, window } from "vscode";
 import { spawn, ChildProcess } from "child_process";
 import * as net from "net";
 
@@ -10,8 +10,9 @@ import {
   StreamInfo,
 } from "vscode-languageclient/node";
 
-let client: LanguageClient;
+let client: LanguageClient | null = null;
 let serverProcess: ChildProcess | null = null;
+let isLSPEnabled: boolean = true;
 
 function createSocketConnection(port: number): Promise<StreamInfo> {
   return new Promise<StreamInfo>((resolve, reject) => {
@@ -70,7 +71,15 @@ function setupServerProcess(serverExec: string, resolve: (value: StreamInfo) => 
   });
 }
 
-export function activate(context: ExtensionContext) {
+// Function to start the LSP client
+function startLSPClient(context: ExtensionContext) {
+  if (client) {
+    console.log("LSP client already exists, skipping start");
+    return;
+  }
+
+  console.log("Starting Ferret LSP client...");
+  
   const serverExec = context.asAbsolutePath(
     path.join("bin", "ferret-lsp.exe")
   );
@@ -91,7 +100,7 @@ export function activate(context: ExtensionContext) {
     },
   };
 
-  // Create the language client and start the client.
+  // Create the language client
   client = new LanguageClient(
     "ferretLanguageServer",
     "ferret Language Server",
@@ -99,19 +108,81 @@ export function activate(context: ExtensionContext) {
     clientOptions
   );
 
-  // Start the client. This will also launch the server
+  // Start the client (this will launch the server automatically)
   client.start();
+  console.log("Ferret LSP client started");
+}
+
+// Function to stop the LSP client
+async function stopLSPClient(): Promise<void> {
+  console.log("Stopping Ferret LSP client...");
+  
+  if (client) {
+    try {
+      await client.stop();
+      console.log("LSP client stopped successfully");
+    } catch (error) {
+      console.error("Error stopping LSP client:", error);
+    }
+    client = null;
+  }
+  
+  // The server process will be cleaned up automatically by the client.stop()
+  serverProcess = null;
+}
+
+// Function to toggle LSP server
+async function toggleLSP(context: ExtensionContext) {
+  const config = workspace.getConfiguration('ferretLanguageServer');
+  const currentState = config.get<boolean>('enabled', true);
+  const newState = !currentState;
+  
+  try {
+    if (newState) {
+      // Enable LSP - clean restart
+      if (client) {
+        await stopLSPClient();
+      }
+      
+      startLSPClient(context);
+      await config.update('enabled', newState, true);
+      isLSPEnabled = newState;
+      window.showInformationMessage('Ferret LSP Server enabled');
+    } else {
+      // Disable LSP - just stop
+      await stopLSPClient();
+      await config.update('enabled', newState, true);
+      isLSPEnabled = newState;
+      window.showInformationMessage('Ferret LSP Server disabled (syntax highlighting only)');
+    }
+  } catch (error) {
+    console.error("Error toggling LSP:", error);
+    window.showErrorMessage(`Failed to toggle LSP: ${error}`);
+  }
+}
+
+export function activate(context: ExtensionContext) {
+  // Get initial LSP state from configuration
+  const config = workspace.getConfiguration('ferretLanguageServer');
+  isLSPEnabled = config.get<boolean>('enabled', true);
+
+  // Register toggle command
+  const toggleCommand = commands.registerCommand('ferret.toggleLSP', () => {
+    toggleLSP(context);
+  });
+  context.subscriptions.push(toggleCommand);
+
+  // Start LSP if enabled
+  if (isLSPEnabled) {
+    startLSPClient(context);
+  } else {
+    console.log("Ferret LSP is disabled. Only syntax highlighting is active.");
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  // Clean up the server process
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
+  if (client) {
+    return stopLSPClient().then(() => undefined);
   }
-  
-  if (!client) {
-    return undefined;
-  }
-  return client.stop();
+  return undefined;
 }
