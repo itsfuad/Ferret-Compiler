@@ -1,4 +1,4 @@
-import "myapp/cmd/expr";
+//import "myapp/cmd/expr";
 
 let outvar = 10;
 
@@ -57,7 +57,7 @@ namedPoint2d = namedPoint3d as Point;
 
 type I interface {
     fn abs() -> i32,
-    fn coordinateX() -> i32,
+    fn coordinateX() -> i32
 };
 
 type II I;
