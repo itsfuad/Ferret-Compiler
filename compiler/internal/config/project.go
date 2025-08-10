@@ -54,10 +54,10 @@ func CreateDefaultProjectConfig(projectRoot string) error {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
 
-	// Generate config content using strings
-	configContent := generateDefaultConfig()
+	// Generate config using TOML data structure for consistency
+	configData := generateDefaultConfigData()
 
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := toml.WriteTOMLFile(configPath, configData, nil); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -106,10 +106,8 @@ func ReadBoolFromPrompt(prompt string, defaultValue bool) (bool, error) {
 	}
 }
 
-// generateDefaultConfig creates the default configuration content
-func generateDefaultConfig() string {
-	var sb strings.Builder
-
+// generateDefaultConfigData creates the default configuration data structure using TOML
+func generateDefaultConfigData() toml.TOMLData {
 	// Get project name
 	projectName, err := ReadFromPrompt("Enter project name (press enter for default: app): ", "app")
 	if err != nil {
@@ -137,32 +135,26 @@ func generateDefaultConfig() string {
 		os.Exit(1)
 	}
 
-	// Build configuration content
-	sb.WriteString("[default]\n")
-	sb.WriteString(fmt.Sprintf("name = \"%s\"\n", projectName))
-	sb.WriteString("version = \"1.0.0\"\n\n")
-
-	sb.WriteString("[compiler]\n")
-	sb.WriteString("version = \"0.1.0\"\n\n")
-
-	sb.WriteString("[cache]\n")
-	sb.WriteString("path = \".ferret/cache\"\n\n")
-
-	sb.WriteString("[remote]\n")
-	if remoteEnabled {
-		sb.WriteString("enabled = true\n")
-	} else {
-		sb.WriteString("enabled = false\n")
-	}
-	if shareEnabled {
-		sb.WriteString("share = true\n\n")
-	} else {
-		sb.WriteString("share = false\n\n")
+	// Build configuration data structure
+	configData := toml.TOMLData{
+		"default": toml.TOMLTable{
+			"name":    projectName,
+			"version": "1.0.0",
+		},
+		"compiler": toml.TOMLTable{
+			"version": "0.1.0",
+		},
+		"cache": toml.TOMLTable{
+			"path": ".ferret/cache",
+		},
+		"remote": toml.TOMLTable{
+			"enabled": remoteEnabled,
+			"share":   shareEnabled,
+		},
+		"dependencies": toml.TOMLTable{},
 	}
 
-	sb.WriteString("[dependencies]\n")
-
-	return sb.String()
+	return configData
 }
 
 func ValidateProjectConfig(config *ProjectConfig) error {

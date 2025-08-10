@@ -255,21 +255,11 @@ func ensureDependenciesSection(file *os.File, data TOMLData) {
 
 // needsQuoting determines if a string value needs to be quoted
 func needsQuoting(s string) bool {
-	// Quote if contains spaces, special characters, or looks like a number/boolean
-	if strings.Contains(s, " ") || strings.Contains(s, "#") || strings.Contains(s, "=") {
-		return true
-	}
-
-	// Quote if it could be parsed as a number or boolean
-	if _, err := strconv.Atoi(s); err == nil {
-		return true
-	}
-	if _, err := strconv.ParseFloat(s, 64); err == nil {
-		return true
-	}
+	// Don't quote boolean values
 	if s == "true" || s == "false" {
-		return true
+		return false
 	}
 
-	return false
+	// Quote everything else (all strings, numbers, etc.)
+	return true
 }
