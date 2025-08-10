@@ -1,8 +1,8 @@
 package typecheck
 
 import (
-	"ferret/compiler/internal/semantic/stype"
-	"ferret/compiler/internal/types"
+	"ferret/internal/semantic/stype"
+	"ferret/internal/types"
 	"fmt"
 	"testing"
 )

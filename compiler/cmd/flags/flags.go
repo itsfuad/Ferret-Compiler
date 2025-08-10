@@ -3,8 +3,9 @@ package flags
 import (
 	"fmt"
 	"os"
+	"strings"
 
-	"ferret/compiler/colors"
+	"ferret/colors"
 )
 
 const FERRET_VERSION = "0.0.1"
@@ -14,7 +15,7 @@ type Args struct {
 	Filename       string
 	Debug          bool
 	InitProject    bool
-	InitPath       string
+	ProjectName    string
 	OutputPath     string
 	GetCommand     bool
 	GetModule      string
@@ -37,10 +38,13 @@ func parseCommandWithValue(command string, args []string, i *int, result *Args) 
 		value = args[*i]
 	}
 
+	// trim whitespace
+	value = strings.TrimSpace(value)
+
 	switch command {
 	case "init":
 		result.InitProject = true
-		result.InitPath = value
+		result.ProjectName = value
 	case "get":
 		result.GetCommand = true
 		result.GetModule = value

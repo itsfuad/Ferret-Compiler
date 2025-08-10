@@ -1,12 +1,12 @@
 package parser
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/utils"
-	"ferret/compiler/internal/utils/lists"
+	"ferret/internal/frontend/ast"
+	"ferret/internal/frontend/lexer"
+	"ferret/internal/source"
+	"ferret/internal/utils"
+	"ferret/internal/utils/lists"
+	"ferret/report"
 	"fmt"
 )
 

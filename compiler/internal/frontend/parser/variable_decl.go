@@ -3,10 +3,10 @@ package parser
 import (
 	"fmt"
 
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/frontend/lexer"
-	"ferret/compiler/internal/report"
-	"ferret/compiler/internal/source"
+	"ferret/internal/frontend/ast"
+	"ferret/internal/frontend/lexer"
+	"ferret/internal/source"
+	"ferret/report"
 )
 
 func parseIdentifiers(p *Parser) ([]*ast.VariableToDeclare, int) {

@@ -1,8 +1,8 @@
 package symbol
 
 import (
-	"ferret/compiler/internal/semantic/stype"
-	"ferret/compiler/internal/types"
+	"ferret/internal/semantic/stype"
+	"ferret/internal/types"
 )
 
 func AddPreludeSymbols(table *SymbolTable) *SymbolTable {

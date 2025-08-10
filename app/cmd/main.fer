@@ -10,7 +10,7 @@ fn add(x: i32, y: i32) -> i32 {
 add(1, 3);
 
 type Point struct {
-    x: i32,
+    x: i32, 
     y: i32
 };
 
@@ -57,7 +57,7 @@ namedPoint2d = namedPoint3d as Point;
 
 type I interface {
     fn abs() -> i32,
-    fn coordinateX() -> i32
+    fn coordinateX() -> i32,
 };
 
 type II I;

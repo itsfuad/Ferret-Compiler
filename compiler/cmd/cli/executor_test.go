@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"ferret/compiler/cmd/flags"
+	"ferret/cmd/flags"
 )
 
 // Integration test for the init functionality
@@ -25,8 +25,8 @@ func TestInitFunctionality(t *testing.T) {
 	if !args.InitProject {
 		t.Fatal("Expected initProject to be true")
 	}
-	if args.InitPath != tempDir {
-		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.InitPath)
+	if args.ProjectName != tempDir {
+		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.ProjectName)
 	}
 	if args.Filename != "" {
 		t.Errorf("Expected filename to be empty, got %s", args.Filename)

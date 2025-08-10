@@ -70,7 +70,7 @@ func TestParseArgs(t *testing.T) {
 		{
 			name:     "init command with path",
 			args:     []string{"program", "init", testInitPath},
-			expected: &Args{InitProject: true, InitPath: testInitPath},
+			expected: &Args{InitProject: true, ProjectName: testInitPath},
 		},
 		{
 			name:     "get command with module",
@@ -85,7 +85,7 @@ func TestParseArgs(t *testing.T) {
 		{
 			name:     "init with debug flag",
 			args:     []string{"program", "init", testInitPath, "-d"},
-			expected: &Args{InitProject: true, InitPath: testInitPath, Debug: true},
+			expected: &Args{InitProject: true, ProjectName: testInitPath, Debug: true},
 		},
 		{
 			name:     "get with output flag",
@@ -102,7 +102,7 @@ func TestParseArgs(t *testing.T) {
 		{
 			name:     "init without path",
 			args:     []string{"program", "init"},
-			expected: &Args{InitProject: true, InitPath: ""},
+			expected: &Args{InitProject: true, ProjectName: ""},
 		},
 		{
 			name:     "get without module",
@@ -117,7 +117,7 @@ func TestParseArgs(t *testing.T) {
 		{
 			name:     "filename after command is ignored",
 			args:     []string{"program", "init", testInitPath, "extra.fer"},
-			expected: &Args{InitProject: true, InitPath: testInitPath},
+			expected: &Args{InitProject: true, ProjectName: testInitPath},
 		},
 		{
 			name:     "argument starting with dash is not a filename",

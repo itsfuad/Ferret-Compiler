@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "dependencies": {
+    "github.com/itsfuad/ferret-mod@v1": {
+      "version": "v1",
+      "direct": true,
+      "description": "",
+      "dependencies": [
+        "github.com/itsfuad/ferret-remote-mod@v0.0.1"
+      ],
+      "used_by": []
+    },
+    "github.com/itsfuad/ferret-remote-mod@v0.0.1": {
+      "version": "v0.0.1",
+      "direct": false,
+      "description": "",
+      "dependencies": null,
+      "used_by": [
+        "github.com/itsfuad/ferret-mod@v1"
+      ]
+    }
+  },
+  "generated_at": "2025-07-29T14:53:25+06:00"
+}

@@ -1,13 +1,13 @@
 @echo off
-cd ..
+cd ..\compiler
 setlocal EnableDelayedExpansion
 
 set "passed=0"
 set "failed=0"
 set "skipped=0"
 
-:: Run go test and parse each output line
-for /f "delims=" %%A in ('go test ./compiler/... -v 2^>nul') do (
+::ԚϮ뎚ؠҺӻ⪆ۡ Run go test and parse each output line
+for /f "delims=" %%A in ('go test ./... -v 2^>nul') do (
     set "line=%%A"
     call :CheckLine
 )

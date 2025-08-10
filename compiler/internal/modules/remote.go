@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"ferret/compiler/colors"
+	"ferret/colors"
 )
 
 const (

@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"ferret/compiler/cmd"
-	"ferret/compiler/cmd/cli"
-	"ferret/compiler/cmd/flags"
-	"ferret/compiler/colors"
+	"ferret/cmd"
+	"ferret/cmd/cli"
+	"ferret/cmd/flags"
+	"ferret/colors"
 )
 
 func main() {
@@ -55,7 +55,7 @@ func main() {
 
 	// Handle init command
 	if args.InitProject {
-		cli.HandleInitCommand(args.InitPath)
+		cli.HandleInitCommand(args.ProjectName)
 		return
 	}
 

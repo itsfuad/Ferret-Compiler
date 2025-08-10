@@ -72,7 +72,7 @@ ferret --debug filename.fer
 #### Help
 ```bash
 ferret
-# Output: Usage: ferret <filename> [-debug] [-o <output>] | ferret init [path/to/project] | ferret get [module] | ferret update [module] | ferret sniff | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1
+# Output: Usage: ferret <filename> [-debug] [-o <output>] | ferret init [project-name] | ferret get [module] | ferret update [module] | ferret sniff | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1
 ```
 
 ### Project Configuration
@@ -328,7 +328,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
     - [x] Struct field access
     - [x] Struct field assignment
     - [x] Methods
-- [ ] Interfaces
+- [x] Interfaces
 - [x] Functions
     - [x] Dead code elimination
     - [x] Function calls

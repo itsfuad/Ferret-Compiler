@@ -1,9 +1,9 @@
 package collector
 
 import (
-	"ferret/compiler/internal/frontend/ast"
-	"ferret/compiler/internal/modules"
-	"ferret/compiler/internal/semantic/analyzer"
+	"ferret/internal/frontend/ast"
+	"ferret/internal/modules"
+	"ferret/internal/semantic/analyzer"
 )
 
 // collectSymbolsFromIfStmt collects symbols from an if statement and its branches

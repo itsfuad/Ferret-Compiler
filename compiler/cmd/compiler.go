@@ -5,18 +5,18 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
-	"ferret/compiler/colors"
-	"ferret/compiler/internal/ctx"
+	"ferret/colors"
+	"ferret/internal/ctx"
 
-	"ferret/compiler/internal/frontend/parser"
+	"ferret/internal/frontend/parser"
 
-	"ferret/compiler/internal/semantic/analyzer"
-	"ferret/compiler/internal/semantic/collector"
-	"ferret/compiler/internal/semantic/resolver"
-	"ferret/compiler/internal/semantic/typecheck"
+	"ferret/internal/semantic/analyzer"
+	"ferret/internal/semantic/collector"
+	"ferret/internal/semantic/resolver"
+	"ferret/internal/semantic/typecheck"
 )
 
-func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.CompilerContext {
+func Compile(filePath string, isDebugEnabled bool, outputPath string) (context *ctx.CompilerContext) {
 	fullPath, err := filepath.Abs(filePath)
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
@@ -24,7 +24,7 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.Compi
 
 	fullPath = filepath.ToSlash(fullPath) // Ensure forward slashes for consistency
 
-	context := ctx.NewCompilerContext(fullPath)
+	context = ctx.NewCompilerContext(fullPath)
 
 	defer func() {
 		context.Reports.DisplayAll()

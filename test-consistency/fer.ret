@@ -1,0 +1,14 @@
+name = "testapp"
+version = "1.0.0"
+
+[compiler]
+version = "0.1.0"
+
+[cache]
+path = .ferret/cache
+
+[remote]
+enabled = false
+share = false
+
+[dependencies]

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"ferret/compiler/toml"
+	"ferret/toml"
 	"os"
 	"path/filepath"
 	"strings"
