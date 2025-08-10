@@ -28,10 +28,10 @@
       {
         "id": "ferret-mod",
         "aliases": ["Ferret Module", "RET"],
-        "extensions": [".ret", ".fer.ret"],
+        "extensions": [".ret"],
         "filenames": ["fer.ret"],
         "configuration": "./language-configuration.json",
-        "icon": {"dark": "ferret_mod-high.png", "light": "ferret_mod-high.png"}
+        "icon": {"dark": "ferret_mod.png", "light": "ferret_mod.png"}
       },
       {
         "id": "ferret-lock",
@@ -65,11 +65,15 @@
     "snippets": [
       {
         "language": "ferret-fer",
-        "path": "./snippets/ferret.json"
+        "path": "./snippets/toml.json"
       },
       {
-        "language": "ferret-ferret",
-        "path": "./snippets/ferret.json"
+        "language": "ferret-mod",
+        "path": "./snippets/toml.json"
+      },
+      {
+        "language": "ferret-lock",
+        "path": "./snippets/toml.json"
       }
     ],
     "configurationDefaults": {
@@ -77,9 +81,9 @@
         "*.fer": "ferret-fer",
         "*.ret": "ferret-mod",
         "fer.ret": "ferret-mod",
-        "*.lock": "json",
-        "ferret.lock": "json",
-        "fer.lock": "json"
+        "*.lock": "ferret-lock",
+        "ferret.lock": "ferret-lock",
+        "fer.lock": "ferret-lock"
       }
     },
     "configuration": {
@@ -99,7 +103,7 @@
       }
     }
   },
-  "main": "./out/lsp.js",
+  "main": "./out/client.js",
   "scripts": {
     "bundle": "esbuild src/client.ts --bundle --platform=node --outfile=out/client.js --external:vscode",
     "vscode:prepublish": "npm run compile && npm run bundle",

@@ -16,7 +16,7 @@ import (
 	"ferret/internal/semantic/typecheck"
 )
 
-func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.CompilerContext {
+func Compile(filePath string, isDebugEnabled bool, outputPath string) (context *ctx.CompilerContext) {
 	fullPath, err := filepath.Abs(filePath)
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
@@ -24,7 +24,7 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) *ctx.Compi
 
 	fullPath = filepath.ToSlash(fullPath) // Ensure forward slashes for consistency
 
-	context := ctx.NewCompilerContext(fullPath)
+	context = ctx.NewCompilerContext(fullPath)
 
 	defer func() {
 		context.Reports.DisplayAll()
