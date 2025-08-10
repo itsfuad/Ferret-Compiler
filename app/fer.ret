@@ -13,4 +13,3 @@ enabled = true
 
 [dependencies]
 github.com/itsfuad/ferret-mod = v1.0.1
-github.com/itsfuad/Ferret-Compiler = v0.1.0

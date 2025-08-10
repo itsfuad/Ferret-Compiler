@@ -36,11 +36,12 @@ func NewDependencyManager(projectRoot string) (*DependencyManager, error) {
 }
 
 // InstallDirectDependency installs a direct dependency and its transitive dependencies
-func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description string) error {
+// Returns true if anything was actually installed/updated, false if everything was already up to date
+func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description string) (bool, error) {
 	// Parse the module specification
 	_, requestedVersion, repoName, err := SplitRemotePath(moduleSpec)
 	if err != nil {
-		return fmt.Errorf("invalid module specification: %w", err)
+		return false, fmt.Errorf("invalid module specification: %w", err)
 	}
 
 	colors.BLUE.Printf("Installing direct dependency: %s", moduleSpec)
@@ -52,7 +53,7 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	// Check if the module exists on GitHub and get the actual version
 	actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
 	if err != nil {
-		return fmt.Errorf("module not found: %w", err)
+		return false, fmt.Errorf("module not found: %w", err)
 	}
 
 	colors.GREEN.Printf("Found version: %s\n", actualVersion)
@@ -61,9 +62,10 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules")
 	err = os.MkdirAll(cachePath, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to create cache directory: %w", err)
+		return false, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
+	downloadedNewModule := false
 	// Check if already cached
 	if IsModuleCached(cachePath, repoName, actualVersion) {
 		colors.YELLOW.Printf("Module %s@%s is already cached\n", repoName, actualVersion)
@@ -71,19 +73,32 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 		// Download and cache the module
 		err = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
 		if err != nil {
-			return fmt.Errorf("failed to download module: %w", err)
+			return false, fmt.Errorf("failed to download module: %w", err)
 		}
+		downloadedNewModule = true
+	}
+
+	// Check if already exists in fer.ret with the same version
+	fullRepoPath := REMOTE_HOST + repoName
+	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
+	if err != nil {
+		return false, fmt.Errorf("failed to read fer.ret dependencies: %w", err)
+	}
+
+	if existingDep, exists := dependencies[fullRepoPath]; exists && existingDep.Version == actualVersion {
+		colors.GREEN.Printf("Module %s@%s is already installed and up to date\n", repoName, actualVersion)
+		return downloadedNewModule, nil // Return true only if we downloaded something new
 	}
 
 	// Add to fer.ret as direct dependency
-	fullRepoPath := REMOTE_HOST + repoName
 	err = WriteFerRetDependency(dm.projectRoot, fullRepoPath, actualVersion, description)
 	if err != nil {
-		return fmt.Errorf("failed to update fer.ret: %w", err)
+		return false, fmt.Errorf("failed to update fer.ret: %w", err)
 	}
 
 	// After updating fer.ret, regenerate the lockfile
-	return dm.InstallAllDependencies()
+	err = dm.InstallAllDependencies()
+	return true, err // Return true because we updated fer.ret
 }
 
 // CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
@@ -261,18 +276,51 @@ func (dm *DependencyManager) RemoveDependency(moduleName string) error {
 		return fmt.Errorf("failed to load lockfile: %w", err)
 	}
 
-	foundAny, errs := dm.processDependencyRemoval(moduleName, lockfile)
+	// Check if dependency exists in lockfile and remove it
+	foundInLockfile, lockfileErrs := dm.processDependencyRemoval(moduleName, lockfile)
 
-	if !foundAny {
-		return fmt.Errorf("module %s is not installed as a direct dependency", moduleName)
+	// Check if dependency exists in fer.ret
+	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to read fer.ret dependencies: %w", err)
 	}
 
-	if len(errs) > 0 {
-		return errors.New(strings.Join(errs, "; "))
+	foundInFerRet := false
+	for depName := range dependencies {
+		if depName == moduleName {
+			foundInFerRet = true
+			break
+		}
 	}
 
-	dm.lockfile = lockfile
-	return dm.saveLockfile()
+	// If not found in either place, it's not a valid dependency to remove
+	if !foundInLockfile && !foundInFerRet {
+		return fmt.Errorf("module %s is not found in project dependencies", moduleName)
+	}
+
+	// Report any lockfile removal errors
+	if len(lockfileErrs) > 0 {
+		return errors.New(strings.Join(lockfileErrs, "; "))
+	}
+
+	// Remove from fer.ret if it exists there
+	if foundInFerRet {
+		err = RemoveFerRetDependency(dm.projectRoot, moduleName)
+		if err != nil {
+			return fmt.Errorf("failed to remove %s from fer.ret: %w", moduleName, err)
+		}
+	}
+
+	// Save lockfile if any changes were made to it
+	if foundInLockfile {
+		dm.lockfile = lockfile
+		err = dm.saveLockfile()
+		if err != nil {
+			return fmt.Errorf("failed to save lockfile: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // processDependencyRemoval processes the removal of dependencies matching the module name
