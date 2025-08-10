@@ -11,10 +11,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	
+
 	// own modules
 	"lsp/wio"
-	
+
 	// ferret modules
 	"ferret/cmd"
 	"ferret/report"
@@ -56,17 +56,32 @@ func main() {
 
 	log.Printf("LSP Server listening on port %d", port)
 
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Fatalf("Failed to accept connection: %v", err)
-	}
-	defer conn.Close()
+	// Accept multiple connections in a loop
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Failed to accept connection: %v", err)
+			continue
+		}
 
-	log.Printf("Client connected from: %s", conn.RemoteAddr())
-	handleConnection(conn)
+		log.Printf("Client connected from: %s", conn.RemoteAddr())
+
+		// Handle each connection in a separate goroutine
+		go func(c net.Conn) {
+			defer c.Close()
+			handleConnection(c)
+			log.Printf("Client disconnected: %s", c.RemoteAddr())
+		}(conn)
+	}
 }
 
 func handleConnection(conn net.Conn) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in handleConnection: %v", r)
+		}
+	}()
+
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 
@@ -233,32 +248,69 @@ func writeRawMessage(writer *bufio.Writer, msg interface{}) {
 }
 
 func processDiagnostics(writer *bufio.Writer, uri string) {
+
+	var reports report.Reports
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in processDiagnostics: %v", r)
+			makeDiagnostics(nil, writer, uri)
+		}
+	}()
+
 	log.Println("Processing diagnostics for:", uri)
 
 	filePath, err := wio.UriToFilePath(uri)
 	if err != nil {
 		log.Println("Error converting URI to file path:", err)
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
 		return
 	}
 
 	log.Println("File path:", filePath)
 
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		log.Printf("File does not exist: %s", filePath)
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		return
+	}
+
 	context := cmd.Compile(filePath, false, "")
+
+	// Check if context or Reports is nil
+	if context == nil {
+		log.Println("Compilation context is nil")
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		return
+	}
+	
+	reports = context.Reports
+
+	makeDiagnostics(reports, writer, uri)
+	
+	context.Destroy()
+}
+
+func makeDiagnostics(reports report.Reports, writer *bufio.Writer, uri string) {
+	if reports == nil {
+		log.Println("Compilation reports is nil")
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		return
+	}
 
 	diagnostics := make([]map[string]interface{}, 0)
 
-	report := context.Reports
+	log.Printf("Found %d problems\n", len(reports))
 
-	log.Printf("Found %d problems\n", len(report))
-
-	for _, r := range report {
+	for _, report := range reports {
 		diagnostics = append(diagnostics, map[string]interface{}{
 			"range": map[string]interface{}{
-				"start": map[string]int{"line": r.Location.Start.Line - 1, "character": r.Location.Start.Column - 1},
-				"end":   map[string]int{"line": r.Location.End.Line - 1, "character": r.Location.End.Column - 1},
+				"start": map[string]int{"line": report.Location.Start.Line - 1, "character": report.Location.Start.Column - 1},
+				"end":   map[string]int{"line": report.Location.End.Line - 1, "character": report.Location.End.Column - 1},
 			},
-			"message":  r.Message,
-			"severity": getSeverity(r.Level),
+			"message":  report.Message,
+			"severity": getSeverity(report.Level),
 		})
 	}
 
@@ -267,16 +319,14 @@ func processDiagnostics(writer *bufio.Writer, uri string) {
 
 func getSeverity(level report.PROBLEM_TYPE) int {
 	switch level {
-	case report.CRITICAL_ERROR, report.SYNTAX_ERROR:
+	case report.CRITICAL_ERROR, report.SYNTAX_ERROR, report.NORMAL_ERROR, report.SEMANTIC_ERROR:
 		return 1
-	case report.NORMAL_ERROR, report.SEMANTIC_ERROR:
-		return 2
 	case report.WARNING:
-		return 3
+		return 2
 	case report.INFO:
-		return 4
+		return 3
 	default:
-		return 5 // Default severity for unknown types
+		return 4
 	}
 }
 
