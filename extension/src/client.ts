@@ -51,7 +51,12 @@ function handleServerData(data: Buffer, resolve: (value: StreamInfo) => void, re
 }
 
 function setupServerProcess(serverExec: string, resolve: (value: StreamInfo) => void, reject: (reason?: any) => void): void {
-  serverProcess = spawn(serverExec);
+  // If needed, get desired port from settings or default to dynamic
+  const config = workspace.getConfiguration('ferretLanguageServer');
+  const desiredPort = config.get<number>('port', 0); // 0 = dynamic
+  console.log(`Launching Ferret LSP with port=${desiredPort === 0 ? 'dynamic' : desiredPort}`);
+
+  serverProcess = spawn(serverExec, ['--port', desiredPort.toString()]); // pass port to server
   
   serverProcess.stdout?.on('data', (data: Buffer) => {
     handleServerData(data, resolve, reject);

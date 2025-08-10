@@ -1,9 +1,9 @@
 package main
 
 import (
-	// standard library imports
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -12,15 +12,11 @@ import (
 	"strconv"
 	"strings"
 
-	// own modules
-	"lsp/wio"
-
-	// ferret modules
 	"ferret/cmd"
 	"ferret/report"
+	"lsp/wio"
 )
 
-// LSP structures remain the same
 type Request struct {
 	Jsonrpc string          `json:"jsonrpc"`
 	Id      int             `json:"id"`
@@ -42,31 +38,33 @@ type LspError struct {
 
 func main() {
 	log.SetOutput(os.Stderr)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds) // Add microseconds to log timestamps
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	// CLI flag for port
+	portFlag := flag.Int("port", 0, "Port to listen on (0 = choose a free port dynamically)")
+	flag.Parse()
+
+	listenAddr := fmt.Sprintf("127.0.0.1:%d", *portFlag)
+	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Failed to start server on %s: %v", listenAddr, err)
 	}
 	defer listener.Close()
 
+	// Get actual port (dynamic or fixed)
 	port := listener.Addr().(*net.TCPAddr).Port
-	fmt.Printf("PORT:%d\n", port)
-	os.Stdout.Sync() // Force flush the port number
+	fmt.Printf("PORT:%d\n", port) // For VS Code extension auto-connect
+	os.Stdout.Sync()
 
-	log.Printf("LSP Server listening on port %d", port)
+	log.Printf("LSP Server listening on %s", listener.Addr())
 
-	// Accept multiple connections in a loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("Failed to accept connection: %v", err)
 			continue
 		}
-
-		log.Printf("Client connected from: %s", conn.RemoteAddr())
-
-		// Handle each connection in a separate goroutine
+		log.Printf("Client connected: %s", conn.RemoteAddr())
 		go func(c net.Conn) {
 			defer c.Close()
 			handleConnection(c)
