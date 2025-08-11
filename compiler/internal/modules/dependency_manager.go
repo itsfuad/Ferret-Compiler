@@ -26,7 +26,7 @@ type DependencyManager struct {
 func NewDependencyManager(projectRoot string) (*DependencyManager, error) {
 	lockfile, err := LoadLockfile(projectRoot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load lockfile: %w", err)
+		return nil, fmt.Errorf("❌ failed to load lockfile: %w", err)
 	}
 
 	return &DependencyManager{
@@ -37,14 +37,14 @@ func NewDependencyManager(projectRoot string) (*DependencyManager, error) {
 
 // InstallDirectDependency installs a direct dependency and its transitive dependencies
 // Returns true if anything was actually installed/updated, false if everything was already up to date
-func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description string) (bool, error) {
+func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description string) error {
 	// Parse the module specification
 	_, requestedVersion, repoName, err := SplitRemotePath(moduleSpec)
 	if err != nil {
-		return false, fmt.Errorf("invalid module specification: %w", err)
+		return fmt.Errorf("❌ invalid module specification: %w", err)
 	}
 
-	colors.BLUE.Printf("Installing direct dependency: %s", moduleSpec)
+	colors.BLUE.Printf("🔄 installing direct dependency: %s", moduleSpec)
 	if requestedVersion != "latest" {
 		colors.BLUE.Printf(" (version: %s)", requestedVersion)
 	}
@@ -53,52 +53,50 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	// Check if the module exists on GitHub and get the actual version
 	actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
 	if err != nil {
-		return false, fmt.Errorf("module not found: %w", err)
+		return fmt.Errorf("❌ module not found: %w", err)
 	}
 
-	colors.GREEN.Printf("Found version: %s\n", actualVersion)
+	colors.GREEN.Printf("✅ found version: %s\n", actualVersion)
 
 	// Set up cache path
 	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules")
 	err = os.MkdirAll(cachePath, 0755)
 	if err != nil {
-		return false, fmt.Errorf("failed to create cache directory: %w", err)
+		return fmt.Errorf("❌ failed to create cache directory: %w", err)
 	}
 
-	downloadedNewModule := false
 	// Check if already cached
 	if IsModuleCached(cachePath, repoName, actualVersion) {
-		colors.YELLOW.Printf("Module %s@%s is already cached\n", repoName, actualVersion)
+		colors.YELLOW.Printf("⚠️ module %s@%s is already cached\n", repoName, actualVersion)
 	} else {
 		// Download and cache the module
 		err = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
 		if err != nil {
-			return false, fmt.Errorf("failed to download module: %w", err)
+			return fmt.Errorf("❌ failed to download module: %w", err)
 		}
-		downloadedNewModule = true
 	}
 
 	// Check if already exists in fer.ret with the same version
 	fullRepoPath := REMOTE_HOST + repoName
 	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
 	if err != nil {
-		return false, fmt.Errorf("failed to read fer.ret dependencies: %w", err)
+		return fmt.Errorf("❌ failed to read fer.ret dependencies: %w", err)
 	}
 
 	if existingDep, exists := dependencies[fullRepoPath]; exists && existingDep.Version == actualVersion {
-		colors.GREEN.Printf("Module %s@%s is already installed and up to date\n", repoName, actualVersion)
-		return downloadedNewModule, nil // Return true only if we downloaded something new
+		colors.GREEN.Printf("✅ module %s@%s is already installed and up to date\n", repoName, actualVersion)
+		return nil // Return true only if we downloaded something new
 	}
 
 	// Add to fer.ret as direct dependency
 	err = WriteFerRetDependency(dm.projectRoot, fullRepoPath, actualVersion, description)
 	if err != nil {
-		return false, fmt.Errorf("failed to update fer.ret: %w", err)
+		return fmt.Errorf("❌ failed to update fer.ret: %w", err)
 	}
 
 	// After updating fer.ret, regenerate the lockfile
 	err = dm.InstallAllDependencies()
-	return true, err // Return true because we updated fer.ret
+	return err // Return true because we updated fer.ret
 }
 
 // CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
@@ -112,10 +110,10 @@ func (dm *DependencyManager) CleanupUnusedDependencies() error {
 		}
 	}
 	if removed == 0 {
-		colors.GREEN.Println("No unused dependencies found")
+		colors.GREEN.Println("✨ No unused dependencies found")
 		return nil
 	}
-	colors.BLUE.Printf("Cleaned up %d unused dependencies...\n", removed)
+	colors.BLUE.Printf("🧹 Cleaned up %d unused dependencies...\n", removed)
 	return dm.saveLockfile()
 }
 
@@ -125,7 +123,7 @@ func (dm *DependencyManager) ListDependencies() error {
 	colors.BLUE.Println("============")
 
 	// Show direct dependencies
-	colors.GREEN.Println("Direct dependencies:")
+	colors.GREEN.Println("📂 Direct dependencies:")
 	directCount := 0
 	for dep, info := range dm.lockfile.Dependencies {
 		if info.Direct {
@@ -142,7 +140,7 @@ func (dm *DependencyManager) ListDependencies() error {
 	}
 
 	// Show indirect dependencies
-	colors.YELLOW.Println("\nIndirect dependencies:")
+	colors.YELLOW.Println("\n🔗 Indirect dependencies:")
 	indirectCount := 0
 	for dep, info := range dm.lockfile.Dependencies {
 		if !info.Direct {
@@ -188,7 +186,7 @@ func (dm *DependencyManager) InstallAllDependencies() error {
 		return dm.handleNoDependencies()
 	}
 
-	colors.BLUE.Printf("Installing %d dependencies from fer.ret...\n", len(dependencies))
+	colors.BLUE.Printf("📦 Installing %d dependencies from fer.ret...\n", len(dependencies))
 
 	lockfile := NewLockfile()
 	seen := make(map[string]struct{}) // repo@version keys
@@ -535,31 +533,31 @@ func (dm *DependencyManager) UpdateDependency(moduleSpec string) error {
 	// Parse the module specification
 	_, _, repoName, err := SplitRemotePath(moduleSpec)
 	if err != nil {
-		return fmt.Errorf("invalid module specification: %w", err)
+		return fmt.Errorf("❌ invalid module specification: %w", err)
 	}
 
-	colors.BLUE.Printf("Updating dependency: %s to latest version\n", moduleSpec)
+	colors.BLUE.Printf("🔄 Updating dependency: %s to latest version\n", moduleSpec)
 
 	// Get the actual latest version number instead of using "latest" tag
 	latestVersion, err := CheckRemoteModuleExists(repoName, "latest")
 	if err != nil {
-		return fmt.Errorf("failed to get latest version for %s: %w", moduleSpec, err)
+		return fmt.Errorf("❌ failed to get latest version for %s: %w", moduleSpec, err)
 	}
 
 	// For updates, we'll update fer.ret directly instead of removing/adding
 	// This avoids unnecessary deletion of transitive dependencies that might be reused
 	err = dm.updateFerRetDependency(moduleSpec, latestVersion)
 	if err != nil {
-		return fmt.Errorf("failed to update fer.ret: %w", err)
+		return fmt.Errorf("❌ failed to update fer.ret: %w", err)
 	}
 
 	// Reinstall all dependencies to update the lockfile
 	err = dm.InstallAllDependencies()
 	if err != nil {
-		return fmt.Errorf("failed to install updated dependencies: %w", err)
+		return fmt.Errorf("❌ failed to install updated dependencies: %w", err)
 	}
 
-	colors.GREEN.Printf("Successfully updated %s to latest version\n", moduleSpec)
+	colors.GREEN.Printf("✅ Successfully updated %s to latest version\n", moduleSpec)
 	return nil
 }
 
@@ -586,7 +584,7 @@ func (dm *DependencyManager) UpdateAllDependencies() error {
 	}
 
 	if len(modulesToUpdate) == 0 {
-		colors.YELLOW.Println("All dependencies are already up to date.")
+		colors.YELLOW.Println("✨ All dependencies are already up to date.")
 		return nil
 	}
 
@@ -611,12 +609,12 @@ func (dm *DependencyManager) UpdateAllDependencies() error {
 	}
 
 	if len(failed) > 0 {
-		colors.YELLOW.Printf("Successfully updated %d dependencies\n", updated)
-		colors.RED.Printf("Failed to update %d dependencies: %v\n", len(failed), failed)
+		colors.YELLOW.Printf("⚠️ Successfully updated %d dependencies\n", updated)
+		colors.RED.Printf("❌ Failed to update %d dependencies: %v\n", len(failed), failed)
 		return fmt.Errorf("some dependencies failed to update")
 	}
 
-	colors.GREEN.Printf("Successfully updated all %d dependencies to latest versions!\n", updated)
+	colors.GREEN.Printf("✨ Successfully updated all %d dependencies to latest versions!\n", updated)
 	return nil
 }
 
@@ -669,7 +667,7 @@ func getTransitive(dm *DependencyManager) ([]ModuleUpdateInfo, error) {
 			continue
 		}
 
-		colors.BLUE.Printf("Checking for updates for %s (%s)...\n", moduleName,
+		colors.BLUE.Printf("🔍 Checking for updates for %s (%s)...\n", moduleName,
 			map[bool]string{true: "direct", false: "transitive"}[entry.Direct])
 
 		updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, entry.Direct)
@@ -698,7 +696,7 @@ func getNonTransitive(dm *DependencyManager) ([]ModuleUpdateInfo, error) {
 	updates := []ModuleUpdateInfo{}
 
 	for moduleName, currentVersion := range projectConfig.Dependencies.Modules {
-		colors.BLUE.Printf("Checking for updates for %s (direct)...\n", moduleName)
+		colors.BLUE.Printf("🔍 Checking for updates for %s (direct)...\n", moduleName)
 
 		updateInfo, err := dm.checkSingleModuleUpdate(moduleName, currentVersion, true)
 		if err != nil {

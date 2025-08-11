@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"ferret/colors"
 	"ferret/toml"
 )
 
@@ -46,22 +47,23 @@ type DependencyConfig struct {
 }
 
 // CreateDefaultProjectConfig creates a default fer.ret configuration file
-func CreateDefaultProjectConfig(projectRoot string) error {
-	configPath := filepath.Join(projectRoot, CONFIG_FILE)
-
-	//create the directory if it doesn't exist
-	if err := os.MkdirAll(projectRoot, 0755); err != nil {
-		return fmt.Errorf("failed to create project directory: %w", err)
+func CreateDefaultProjectConfig(projectName string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
 	}
 
+	configPath := filepath.Join(cwd, CONFIG_FILE)
+
 	// Generate config using TOML data structure for consistency
-	configData := generateDefaultConfigData()
+	configData := generateDefaultConfigData(projectName)
 
 	if err := toml.WriteTOMLFile(configPath, configData, nil); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
-	fmt.Printf("✓ Created %s successfully!\n", CONFIG_FILE)
+	colors.GREEN.Printf("📁 Created %s successfully!\n", CONFIG_FILE)
 	return nil
 }
 
@@ -107,31 +109,34 @@ func ReadBoolFromPrompt(prompt string, defaultValue bool) (bool, error) {
 }
 
 // generateDefaultConfigData creates the default configuration data structure using TOML
-func generateDefaultConfigData() toml.TOMLData {
-	// Get project name
-	projectName, err := ReadFromPrompt("Enter project name (press enter for default: app): ", "app")
-	if err != nil {
-		fmt.Printf("Error reading project name: %v\n", err)
-		os.Exit(1)
+func generateDefaultConfigData(projectName string) toml.TOMLData {
+	if projectName == "" {
+		// Get project name
+		name, err := ReadFromPrompt("Enter project name (press enter for default: app): ", "app")
+		if err != nil {
+			fmt.Printf("❌ Error reading project name: %v\n", err)
+			os.Exit(1)
+		}
+		projectName = name
 	}
 
 	//must not contain spaces or special characters in the middle
 	if strings.ContainsAny(projectName, " \t\n\r") || strings.ContainsAny(projectName, "!@#$%^&*()+=[]{}|;:'\",.<>?/\\") {
-		fmt.Println("Project name must not contain spaces or special characters.")
+		fmt.Println("⚠️ Project name must not contain spaces or special characters.")
 		os.Exit(1)
 	}
 
 	// Get remote enabled setting
 	remoteEnabled, err := ReadBoolFromPrompt("Do you want to allow remote module import ([Yes|No|Y|N] default: no)? ", false)
 	if err != nil {
-		fmt.Printf("Error reading remote setting: %v\n", err)
+		fmt.Printf("❌ Error reading remote setting: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Get share enabled setting
 	shareEnabled, err := ReadBoolFromPrompt("Do you want to allow sharing your modules to others as remote modules ([Yes|No|Y|N] default: no)? ", false)
 	if err != nil {
-		fmt.Printf("Error reading share setting: %v\n", err)
+		fmt.Printf("❌ Error reading share setting: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -159,27 +164,27 @@ func generateDefaultConfigData() toml.TOMLData {
 
 func ValidateProjectConfig(config *ProjectConfig) error {
 	if config == nil {
-		return fmt.Errorf("project configuration is nil")
+		return fmt.Errorf("⚠️ project configuration is nil")
 	}
 
 	if config.Name == "" {
-		return fmt.Errorf("project name is required in the configuration file")
+		return fmt.Errorf("⚠️ project name is required in the configuration file")
 	}
 
 	if config.Version == "" {
-		return fmt.Errorf("project version is required in the configuration file")
+		return fmt.Errorf("⚠️ project version is required in the configuration file")
 	}
 
 	if config.Compiler.Version == "" {
-		return fmt.Errorf("compiler version is required in the configuration file")
+		return fmt.Errorf("⚠️ compiler version is required in the configuration file")
 	}
 
 	if config.Cache.Path == "" {
-		return fmt.Errorf("cache path is required in the configuration file")
+		return fmt.Errorf("⚠️ cache path is required in the configuration file")
 	}
 
 	if config.ProjectRoot == "" {
-		return fmt.Errorf("project root is required in the configuration file")
+		return fmt.Errorf("⚠️ project root is required in the configuration file")
 	}
 
 	return nil
@@ -198,7 +203,7 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	// Use our custom TOML parser
 	tomlData, err := toml.ParseTOMLFile(filepath.FromSlash(configPath))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
+		return nil, fmt.Errorf("❌ failed to parse config file: %w", err)
 	}
 
 	config := &ProjectConfig{
@@ -269,7 +274,7 @@ func FindProjectRoot(entryFile string) (string, error) {
 	// Get the absolute path of the entry file
 	absEntryFile, err := filepath.Abs(entryFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to get absolute path of entry file: %w", err)
+		return "", fmt.Errorf("❌ failed to get absolute path of entry file: %w", err)
 	}
 
 	// Start from the directory containing the entry file
@@ -297,5 +302,5 @@ func FindProjectRoot(entryFile string) (string, error) {
 		dir = parent
 	}
 
-	return "", fmt.Errorf("%s not found (searched from: %s up to filesystem root)", CONFIG_FILE, originalDir)
+	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", CONFIG_FILE, originalDir)
 }
