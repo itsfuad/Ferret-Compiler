@@ -2,14 +2,10 @@ package cli
 
 import (
 	"ferret/cmd"
-	"ferret/cmd/flags"
 	"ferret/colors"
 	"ferret/internal/modules"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	//"ferret/internal/backend"
 	"ferret/config"
@@ -324,31 +320,16 @@ func getRoot() string {
 }
 
 // HandleRunCommand handles the "ferret run" command
-func HandleRunCommand(debug bool) {
+func HandleRunCommand(target string, debug bool) {
 
-	projectRoot := getRoot()
+	colors.GREEN.Printf("🚀 Running project in directory: %s\n", target)
 
 	// Load and validate project configuration
-	projectConfig, err := config.LoadProjectConfig(projectRoot)
+	projectConfig, err := config.LoadProjectConfig(target)
 	if err != nil {
 		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)
 	}
-
-	// Check if entry point file exists
-	entryPath := filepath.Join(projectConfig.ProjectRoot, projectConfig.Build.Entry)
-	if _, err := os.Stat(entryPath); err != nil {
-		colors.RED.Printf("❌ Entry point file not found: %s\n", projectConfig.Build.Entry)
-		os.Exit(1)
-	}
-
-	// Check compiler version compatibility
-	if err := checkCompilerVersion(projectConfig.Compiler.Version); err != nil {
-		colors.RED.Printf("❌ Compiler version incompatibility: %s\n", err)
-		os.Exit(1)
-	}
-
-	colors.BLUE.Printf("🚀 Running project with entry point: %s\n", projectConfig.Build.Entry)
 
 	// Use the existing compile function from cmd package
 	context := cmd.Compile(projectConfig, debug)
@@ -360,53 +341,6 @@ func HandleRunCommand(debug bool) {
 		}
 		context.Destroy()
 	}
-}
-
-// checkCompilerVersion checks if the current compiler version is compatible
-func checkCompilerVersion(requiredVersion string) error {
-	currentVersion := flags.FERRET_VERSION
-
-	// Parse versions (simple semantic version comparison)
-	current := parseVersion(currentVersion)
-	required := parseVersion(requiredVersion)
-
-	// Check if current version is less than required
-	if compareVersions(current, required) < 0 {
-		return fmt.Errorf("compiler version %s is less than required version %s", currentVersion, requiredVersion)
-	}
-
-	return nil
-}
-
-// parseVersion parses a semantic version string into comparable parts
-func parseVersion(version string) []int {
-	parts := strings.Split(version, ".")
-	nums := make([]int, 3) // major.minor.patch
-
-	for i, part := range parts {
-		if i >= 3 {
-			break
-		}
-		if num, err := strconv.Atoi(part); err == nil {
-			nums[i] = num
-		}
-	}
-
-	return nums
-}
-
-// compareVersions compares two version arrays
-// Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
-func compareVersions(v1, v2 []int) int {
-	for i := 0; i < 3; i++ {
-		if v1[i] < v2[i] {
-			return -1
-		}
-		if v1[i] > v2[i] {
-			return 1
-		}
-	}
-	return 0
 }
 
 // isInProjectRoot returns true if the current working directory contains fer.ret

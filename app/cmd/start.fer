@@ -1,6 +1,6 @@
-// import "github.com/itsfuad/ferret-mod/data/bigint"; // unused import;
-// import "github.com/itsfuad/ferret-mod/arrays/array"; // unused import;
-// import "github.com/itsfuad/ferret-mod/external/importer"; // unused import;
+import "github.com/itsfuad/ferret-mod/data/bigint"; // unused import;
+import "github.com/itsfuad/ferret-mod/arrays/array"; // unused import;
+import "github.com/itsfuad/ferret-mod/external/importer"; // unused import;
 
 import "std/io";
 import "math/constants" as cc;
@@ -9,10 +9,10 @@ import "math/geometry";
 import "myapp/cmd/expr"; // unused import
 import "myapp/cmd/arrays"; // unused import
 
-let valueOfPi = cc::PI;
+let valueOfPi = cc::PI; 
 
 fn voidfn() {
-    
+
 }
 
 fn nonVoidfn() -> i32 {

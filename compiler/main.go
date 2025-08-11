@@ -61,7 +61,7 @@ func main() {
 
 	// Handle run command
 	if args.RunCommand {
-		cli.HandleRunCommand(args.Debug)
+		cli.HandleRunCommand(args.RunTarget, args.Debug)
 		return
 	}
 

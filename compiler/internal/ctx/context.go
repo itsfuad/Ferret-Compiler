@@ -353,7 +353,6 @@ func (c *CompilerContext) PrintModules() {
 		module, exists := c.Modules[name]
 		if exists {
 			colors.PURPLE.Printf("- %s ", name)
-
 			// Color-code by module type
 			switch module.Type {
 			case modules.LOCAL:
