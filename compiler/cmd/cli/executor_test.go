@@ -28,20 +28,32 @@ func TestInitFunctionality(t *testing.T) {
 	if args.ProjectName != tempDir {
 		t.Errorf("Expected initPath to be %s, got %s", tempDir, args.ProjectName)
 	}
-	if args.Filename != "" {
-		t.Errorf("Expected filename to be empty, got %s", args.Filename)
-	}
 	if args.Debug {
 		t.Error("Expected debug to be false")
-	}
-	if args.OutputPath != "" {
-		t.Errorf("Expected outputPath to be empty, got %s", args.OutputPath)
 	}
 
 	// Verify the config file path would be correct
 	expectedConfigPath := filepath.Join(tempDir, "fer.ret")
 	if _, err := os.Stat(filepath.FromSlash(expectedConfigPath)); err == nil {
 		t.Error("Config file should not exist yet (we only parsed args)")
+	}
+}
+
+// Test for run command functionality
+func TestRunCommandParsing(t *testing.T) {
+	originalArgs := os.Args
+	defer func() { os.Args = originalArgs }()
+
+	// Test run command with debug flag
+	os.Args = []string{"ferret", "run", "--debug"}
+
+	args := flags.ParseArgs()
+
+	if !args.RunCommand {
+		t.Fatal("Expected RunCommand to be true")
+	}
+	if !args.Debug {
+		t.Error("Expected debug to be true")
 	}
 }
 

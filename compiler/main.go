@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
-	"ferret/cmd"
 	"ferret/cmd/cli"
 	"ferret/cmd/flags"
 	"ferret/colors"
@@ -59,21 +59,21 @@ func main() {
 		return
 	}
 
-	// Check for filename argument
-	if args.Filename == "" {
+	// Handle run command
+	if args.RunCommand {
+		cli.HandleRunCommand(args.Debug)
+		return
+	}
+
+	// Handle invalid commands
+	if args.InvalidCommand != "" {
+		colors.RED.Printf("❌ Invalid command: '%s'\n", args.InvalidCommand)
+		fmt.Println()
 		flags.Usage()
 		os.Exit(1)
 	}
 
-	if args.Debug {
-		colors.BLUE.Println("Debug mode enabled")
-	}
-
-	context := cmd.Compile(args.Filename, args.Debug, args.OutputPath)
-
-	// Only destroy and print modules if context is not nil
-	if context != nil {
-		defer context.Destroy()
-		context.PrintModules()
-	}
+	// If no command was specified, show usage
+	flags.Usage()
+	os.Exit(1)
 }

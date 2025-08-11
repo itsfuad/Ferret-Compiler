@@ -67,7 +67,7 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 
 	// Check if already cached
 	if IsModuleCached(cachePath, repoName, actualVersion) {
-		colors.YELLOW.Printf("⚠️ module %s@%s is already cached\n", repoName, actualVersion)
+		colors.YELLOW.Printf("ℹ️ module %s@%s is already cached\n", repoName, actualVersion)
 	} else {
 		// Download and cache the module
 		err = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
@@ -609,7 +609,7 @@ func (dm *DependencyManager) UpdateAllDependencies() error {
 	}
 
 	if len(failed) > 0 {
-		colors.YELLOW.Printf("⚠️ Successfully updated %d dependencies\n", updated)
+		colors.YELLOW.Printf("ℹ️ Successfully updated %d dependencies\n", updated)
 		colors.RED.Printf("❌ Failed to update %d dependencies: %v\n", len(failed), failed)
 		return fmt.Errorf("some dependencies failed to update")
 	}

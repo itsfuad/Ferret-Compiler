@@ -175,7 +175,7 @@ func WriteTOMLFile(filename string, data TOMLData, inlineComments map[string]map
 
 // writeTOMLSections writes all TOML sections to the file in the specified order
 func writeTOMLSections(file *os.File, data TOMLData, inlineComments map[string]map[string]string) error {
-	sectionOrder := []string{"default", "compiler", "cache", "remote", "dependencies"}
+	sectionOrder := []string{"default", "compiler", "build", "cache", "remote", "dependencies"}
 
 	for _, sectionName := range sectionOrder {
 		if sectionData, exists := data[sectionName]; exists {

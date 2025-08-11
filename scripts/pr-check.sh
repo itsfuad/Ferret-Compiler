@@ -100,7 +100,7 @@ echo "🔒 Step 8: Security scan (gosec)..."
 
 # Check if gosec is installed
 if ! command -v gosec &> /dev/null; then
-    echo "⚠️  gosec not installed. Installing..."
+    echo "ℹ️  gosec not installed. Installing..."
     if ! go install github.com/securego/gosec/v2/cmd/gosec@latest; then
         echo "❌ Failed to install gosec, skipping security scan"
         echo "ℹ️  You can install gosec manually: go install github.com/securego/gosec/v2/cmd/gosec@latest"

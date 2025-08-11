@@ -32,7 +32,6 @@ func TestValidateProjectConfig(t *testing.T) {
 		{
 			name: "missing name",
 			config: &ProjectConfig{
-				Version:     testProjectVersion,
 				Compiler:    CompilerConfig{Version: testCompilerVersion},
 				Cache:       CacheConfig{Path: testCachePath},
 				ProjectRoot: "/test",
@@ -55,7 +54,6 @@ func TestValidateProjectConfig(t *testing.T) {
 			name: "missing compiler version",
 			config: &ProjectConfig{
 				Name:        "test",
-				Version:     testProjectVersion,
 				Cache:       CacheConfig{Path: testCachePath},
 				ProjectRoot: "/test",
 			},
@@ -66,7 +64,6 @@ func TestValidateProjectConfig(t *testing.T) {
 			name: "missing cache path",
 			config: &ProjectConfig{
 				Name:        "test",
-				Version:     testProjectVersion,
 				Compiler:    CompilerConfig{Version: testCompilerVersion},
 				ProjectRoot: "/test",
 			},
@@ -77,7 +74,6 @@ func TestValidateProjectConfig(t *testing.T) {
 			name: "missing project root",
 			config: &ProjectConfig{
 				Name:     "test",
-				Version:  testProjectVersion,
 				Compiler: CompilerConfig{Version: testCompilerVersion},
 				Cache:    CacheConfig{Path: testCachePath},
 			},
@@ -88,7 +84,6 @@ func TestValidateProjectConfig(t *testing.T) {
 			name: "valid config",
 			config: &ProjectConfig{
 				Name:        "test",
-				Version:     testProjectVersion,
 				Compiler:    CompilerConfig{Version: testCompilerVersion},
 				Cache:       CacheConfig{Path: testCachePath},
 				ProjectRoot: "/test",
@@ -271,7 +266,6 @@ func TestParseDefaultSection(t *testing.T) {
 			},
 			want: ProjectConfig{
 				Name:    testProjectName,
-				Version: "2.0.0",
 			},
 		},
 		{
@@ -299,9 +293,6 @@ func TestParseDefaultSection(t *testing.T) {
 			parseDefaultSection(tt.tomlData, config)
 			if config.Name != tt.want.Name {
 				t.Errorf("parseDefaultSection() Name = %v, want %v", config.Name, tt.want.Name)
-			}
-			if config.Version != tt.want.Version {
-				t.Errorf("parseDefaultSection() Version = %v, want %v", config.Version, tt.want.Version)
 			}
 		})
 	}

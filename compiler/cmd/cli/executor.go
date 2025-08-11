@@ -1,10 +1,15 @@
 package cli
 
 import (
+	"ferret/cmd"
+	"ferret/cmd/flags"
 	"ferret/colors"
 	"ferret/internal/modules"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	//"ferret/internal/backend"
 	"ferret/internal/config"
@@ -14,7 +19,7 @@ const (
 	CONFIG_FILE                = "fer.ret"
 	INVALID_LOCATION_ERROR     = "📍 You must run this command from the directory containing fer.ret (the project root)."
 	DEPENDENCY_ERROR           = "❌ Failed to create dependency manager: %s\n"
-	CONFIG_LOAD_ERROR          = "⚠️ Error loading project configuration: %v\n"
+	CONFIG_LOAD_ERROR          = "ℹ️ Error loading project configuration: %v\n"
 	REMOTE_IMPORTS_DISABLED    = "🔒 Remote module imports are disabled in this project."
 	REMOTE_IMPORTS_ENABLE_HELP = "💡 To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret"
 )
@@ -330,6 +335,105 @@ func HandleInitCommand(projectName string) {
 		colors.RED.Println("❌ Failed to initialize project configuration:", err)
 		os.Exit(1)
 	}
+}
+
+// HandleRunCommand handles the "ferret run" command
+func HandleRunCommand(debug bool) {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		colors.RED.Println("❌ Error getting current directory:", err)
+		os.Exit(1)
+	}
+
+	// Enforce: must be run from project root (directory containing fer.ret)
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Println(INVALID_LOCATION_ERROR)
+		os.Exit(1)
+	}
+
+	projectRoot := cwd
+
+	// Load and validate project configuration
+	projectConfig, err := config.LoadProjectConfig(projectRoot)
+	if err != nil {
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
+		os.Exit(1)
+	}
+
+	// Check if entry point file exists
+	entryPath := filepath.Join(projectRoot, projectConfig.Build.Entry)
+	if _, err := os.Stat(entryPath); err != nil {
+		colors.RED.Printf("❌ Entry point file not found: %s\n", projectConfig.Build.Entry)
+		os.Exit(1)
+	}
+
+	// Check compiler version compatibility
+	if err := checkCompilerVersion(projectConfig.Compiler.Version); err != nil {
+		colors.RED.Printf("❌ Compiler version incompatibility: %s\n", err)
+		os.Exit(1)
+	}
+
+	colors.BLUE.Printf("🚀 Running project with entry point: %s\n", projectConfig.Build.Entry)
+
+	// Use the existing compile function from cmd package
+	context := cmd.Compile(entryPath, debug, projectConfig.Build.Output)
+
+	// Only destroy and print modules if context is not nil
+	if context != nil {
+		defer context.Destroy()
+		if debug {
+			context.PrintModules()
+		}
+	}
+}
+
+// checkCompilerVersion checks if the current compiler version is compatible
+func checkCompilerVersion(requiredVersion string) error {
+	currentVersion := flags.FERRET_VERSION
+
+	// Parse versions (simple semantic version comparison)
+	current := parseVersion(currentVersion)
+	required := parseVersion(requiredVersion)
+
+	// Check if current version is less than required
+	if compareVersions(current, required) < 0 {
+		return fmt.Errorf("compiler version %s is less than required version %s", currentVersion, requiredVersion)
+	}
+
+	return nil
+}
+
+// parseVersion parses a semantic version string into comparable parts
+func parseVersion(version string) []int {
+	parts := strings.Split(version, ".")
+	nums := make([]int, 3) // major.minor.patch
+
+	for i, part := range parts {
+		if i >= 3 {
+			break
+		}
+		if num, err := strconv.Atoi(part); err == nil {
+			nums[i] = num
+		}
+	}
+
+	return nums
+}
+
+// compareVersions compares two version arrays
+// Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+func compareVersions(v1, v2 []int) int {
+	for i := 0; i < 3; i++ {
+		if v1[i] < v2[i] {
+			return -1
+		}
+		if v1[i] > v2[i] {
+			return 1
+		}
+	}
+	return 0
 }
 
 // isInProjectRoot returns true if the current working directory contains fer.ret
