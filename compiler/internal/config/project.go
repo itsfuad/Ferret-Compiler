@@ -18,12 +18,12 @@ type ProjectConfig struct {
 	Compiler     CompilerConfig   `toml:"compiler"`
 	Cache        CacheConfig      `toml:"cache"`
 	Remote       RemoteConfig     `toml:"remote"`
+	Build        BuildConfig      `toml:"build"`
 	Dependencies DependencyConfig `toml:"dependencies"`
 	ProjectRoot  string
 
 	// Top-level project metadata
-	Name    string `toml:"name"`
-	Version string `toml:"version"`
+	Name string `toml:"name"`
 }
 
 // CompilerConfig contains compiler-specific settings
@@ -40,6 +40,12 @@ type CacheConfig struct {
 type RemoteConfig struct {
 	Enabled bool `toml:"enabled"`
 	Share   bool `toml:"share"`
+}
+
+// BuildConfig defines build settings
+type BuildConfig struct {
+	Entry  string `toml:"entry"`  // entrypoint file
+	Output string `toml:"output"` // optional explicit output path
 }
 
 type DependencyConfig struct {
@@ -122,7 +128,7 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 
 	//must not contain spaces or special characters in the middle
 	if strings.ContainsAny(projectName, " \t\n\r") || strings.ContainsAny(projectName, "!@#$%^&*()+=[]{}|;:'\",.<>?/\\") {
-		fmt.Println("⚠️ Project name must not contain spaces or special characters.")
+		fmt.Println("ℹ️ Project name must not contain spaces or special characters.")
 		os.Exit(1)
 	}
 
@@ -143,11 +149,14 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 	// Build configuration data structure
 	configData := toml.TOMLData{
 		"default": toml.TOMLTable{
-			"name":    projectName,
-			"version": "1.0.0",
+			"name": projectName,
 		},
 		"compiler": toml.TOMLTable{
 			"version": "0.1.0",
+		},
+		"build": toml.TOMLTable{
+			"entry":  "src/main.fer",
+			"output": "bin/" + projectName,
 		},
 		"cache": toml.TOMLTable{
 			"path": ".ferret/cache",
@@ -164,27 +173,27 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 
 func ValidateProjectConfig(config *ProjectConfig) error {
 	if config == nil {
-		return fmt.Errorf("⚠️ project configuration is nil")
+		return fmt.Errorf("ℹ️ project configuration is nil")
 	}
 
 	if config.Name == "" {
-		return fmt.Errorf("⚠️ project name is required in the configuration file")
-	}
-
-	if config.Version == "" {
-		return fmt.Errorf("⚠️ project version is required in the configuration file")
+		return fmt.Errorf("ℹ️ project name is required in the configuration file")
 	}
 
 	if config.Compiler.Version == "" {
-		return fmt.Errorf("⚠️ compiler version is required in the configuration file")
+		return fmt.Errorf("ℹ️ compiler version is required in the configuration file")
+	}
+
+	if config.Build.Entry == "" {
+		return fmt.Errorf("ℹ️ build entry point is required in the configuration file")
 	}
 
 	if config.Cache.Path == "" {
-		return fmt.Errorf("⚠️ cache path is required in the configuration file")
+		return fmt.Errorf("ℹ️ cache path is required in the configuration file")
 	}
 
 	if config.ProjectRoot == "" {
-		return fmt.Errorf("⚠️ project root is required in the configuration file")
+		return fmt.Errorf("ℹ️ project root is required in the configuration file")
 	}
 
 	return nil
@@ -213,6 +222,7 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	// Parse each section
 	parseDefaultSection(tomlData, config)
 	parseCompilerSection(tomlData, config)
+	parseBuildSection(tomlData, config)
 	parseCacheSection(tomlData, config)
 	parseRemoteSection(tomlData, config)
 	parseDependenciesSection(tomlData, config)
@@ -225,9 +235,6 @@ func parseDefaultSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if defaultSection, exists := tomlData["default"]; exists {
 		if name, ok := defaultSection["name"].(string); ok {
 			config.Name = name
-		}
-		if version, ok := defaultSection["version"].(string); ok {
-			config.Version = version
 		}
 	}
 }
@@ -255,6 +262,17 @@ func parseRemoteSection(tomlData toml.TOMLData, config *ProjectConfig) {
 		}
 		if share, ok := remoteSection["share"].(bool); ok {
 			config.Remote.Share = share
+		}
+	}
+}
+
+func parseBuildSection(tomlData toml.TOMLData, config *ProjectConfig) {
+	if buildSection, exists := tomlData["build"]; exists {
+		if entry, ok := buildSection["entry"].(string); ok {
+			config.Build.Entry = entry
+		}
+		if output, ok := buildSection["output"].(string); ok {
+			config.Build.Output = output
 		}
 	}
 }

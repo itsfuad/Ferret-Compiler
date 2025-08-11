@@ -8,7 +8,6 @@ import (
 
 // Test constants to avoid string literal duplication
 const (
-	testFilename   = "test.fer"
 	testInitPath   = "test-project"
 	testModule     = "github.com/user/repo"
 	testOutputPath = "output.bin"
@@ -34,43 +33,42 @@ func TestParseArgs(t *testing.T) {
 		args     []string
 		expected *Args
 	}{
-		// Basic Filename and Flag Tests
+		// Basic Command Tests
 		{
-			name:     "simple filename",
-			args:     []string{"program", testFilename},
-			expected: &Args{Filename: testFilename},
+			name:     "run command only",
+			args:     []string{"program", "run"},
+			expected: &Args{RunCommand: true},
 		},
 		{
-			name:     "filename with debug flag",
-			args:     []string{"program", testFilename, "-d"},
-			expected: &Args{Filename: testFilename, Debug: true},
+			name:     "run command with debug flag",
+			args:     []string{"program", "run", "-d"},
+			expected: &Args{RunCommand: true, Debug: true},
 		},
 		{
-			name:     "output flag with filename",
-			args:     []string{"program", testFilename, "-o", testOutputPath},
-			expected: &Args{Filename: testFilename, OutputPath: testOutputPath},
+			name:     "run command with debug flag (long form)",
+			args:     []string{"program", "run", "--debug"},
+			expected: &Args{RunCommand: true, Debug: true},
 		},
 		{
-			name:     "complex command with multiple flags",
-			args:     []string{"program", testFilename, "-debug", "-output", testOutputPath},
-			expected: &Args{Filename: testFilename, Debug: true, OutputPath: testOutputPath},
+			name:     "run command with debug flag (medium form)",
+			args:     []string{"program", "run", "-debug"},
+			expected: &Args{RunCommand: true, Debug: true},
 		},
-		{
-			name:     "only flags, no command or filename",
-			args:     []string{"program", "--debug", "-o", testOutputPath},
-			expected: &Args{Debug: true, OutputPath: testOutputPath},
-		},
-		{
-			name:     "multiple filenames - only first is used",
-			args:     []string{"program", "file1.fer", "file2.fer"},
-			expected: &Args{Filename: "file1.fer"},
-		},
-
-		// Command Tests
+		// Module Management Command Tests
 		{
 			name:     "init command with path",
 			args:     []string{"program", "init", testInitPath},
 			expected: &Args{InitProject: true, ProjectName: testInitPath},
+		},
+		{
+			name:     "init command without path",
+			args:     []string{"program", "init"},
+			expected: &Args{InitProject: true, ProjectName: ""},
+		},
+		{
+			name:     "init command with path and debug flag",
+			args:     []string{"program", "init", testInitPath, "-d"},
+			expected: &Args{InitProject: true, ProjectName: testInitPath, Debug: true},
 		},
 		{
 			name:     "get command with module",
@@ -78,19 +76,44 @@ func TestParseArgs(t *testing.T) {
 			expected: &Args{GetCommand: true, GetModule: testModule},
 		},
 		{
+			name:     "get command without module",
+			args:     []string{"program", "get"},
+			expected: &Args{GetCommand: true, GetModule: ""},
+		},
+		{
+			name:     "update command with module",
+			args:     []string{"program", "update", testModule},
+			expected: &Args{UpdateCommand: true, UpdateModule: testModule},
+		},
+		{
+			name:     "update command without module",
+			args:     []string{"program", "update"},
+			expected: &Args{UpdateCommand: true, UpdateModule: ""},
+		},
+		{
 			name:     "remove command with module",
 			args:     []string{"program", "remove", testModule},
 			expected: &Args{RemoveCommand: true, RemoveModule: testModule},
 		},
 		{
-			name:     "init with debug flag",
-			args:     []string{"program", "init", testInitPath, "-d"},
-			expected: &Args{InitProject: true, ProjectName: testInitPath, Debug: true},
+			name:     "remove command without module",
+			args:     []string{"program", "remove"},
+			expected: &Args{RemoveCommand: true, RemoveModule: ""},
 		},
 		{
-			name:     "get with output flag",
-			args:     []string{"program", "get", testModule, "-o", testOutputPath},
-			expected: &Args{GetCommand: true, GetModule: testModule, OutputPath: testOutputPath},
+			name:     "list command",
+			args:     []string{"program", "list"},
+			expected: &Args{ListCommand: true},
+		},
+		{
+			name:     "sniff command",
+			args:     []string{"program", "sniff"},
+			expected: &Args{SniffCommand: true},
+		},
+		{
+			name:     "cleanup command",
+			args:     []string{"program", "cleanup"},
+			expected: &Args{CleanupCommand: true},
 		},
 
 		// Edge Case Tests
@@ -100,34 +123,19 @@ func TestParseArgs(t *testing.T) {
 			expected: &Args{},
 		},
 		{
-			name:     "init without path",
-			args:     []string{"program", "init"},
-			expected: &Args{InitProject: true, ProjectName: ""},
+			name:     "invalid command",
+			args:     []string{"program", "invalid"},
+			expected: &Args{InvalidCommand: "invalid"},
 		},
 		{
-			name:     "get without module",
-			args:     []string{"program", "get"},
+			name:     "invalid command with flags (should be ignored)",
+			args:     []string{"program", "invalid", "-d"},
+			expected: &Args{InvalidCommand: "invalid"},
+		},
+		{
+			name:     "flag that looks like module name",
+			args:     []string{"program", "get", "-not-a-module"},
 			expected: &Args{GetCommand: true, GetModule: ""},
-		},
-		{
-			name:     "output flag without value",
-			args:     []string{"program", testFilename, "-o"},
-			expected: &Args{Filename: testFilename, OutputPath: ""},
-		},
-		{
-			name:     "filename after command is ignored",
-			args:     []string{"program", "init", testInitPath, "extra.fer"},
-			expected: &Args{InitProject: true, ProjectName: testInitPath},
-		},
-		{
-			name:     "argument starting with dash is not a filename",
-			args:     []string{"program", "-not-a-filename"},
-			expected: &Args{},
-		},
-		{
-			name:     "mixed valid and invalid arguments",
-			args:     []string{"program", "-d", "file.fer", "-invalid", "-o", "out.bin"},
-			expected: &Args{Debug: true, Filename: "file.fer", OutputPath: "out.bin"},
 		},
 	}
 

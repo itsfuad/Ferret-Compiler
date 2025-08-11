@@ -1,9 +1,9 @@
 package flags
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"ferret/colors"
 )
@@ -12,11 +12,9 @@ const FERRET_VERSION = "0.0.1"
 
 // Args holds the parsed command line arguments
 type Args struct {
-	Filename       string
 	Debug          bool
 	InitProject    bool
 	ProjectName    string
-	OutputPath     string
 	GetCommand     bool
 	GetModule      string
 	UpdateCommand  bool
@@ -26,78 +24,76 @@ type Args struct {
 	RemoveModule   string
 	ListCommand    bool
 	CleanupCommand bool
+	RunCommand     bool
+	InvalidCommand string
 }
 
-// parseCommandWithValue handles commands that expect a subsequent value (e.g., "init <path>").
-// It takes a pointer to 'i' so it can advance the loop in the calling function.
-func parseCommandWithValue(command string, args []string, i *int, result *Args) {
-	// Check if a value exists and it's not another flag
-	value := ""
-	if (*i)+1 < len(args) && args[(*i)+1][:1] != "-" {
-		(*i)++ // Consume the value argument
-		value = args[*i]
+// ParseArgs processes all command-line arguments using Go's flag package
+func ParseArgs() *Args {
+
+	result := &Args{}
+
+	// If no arguments provided, return empty Args
+	if len(os.Args) < 2 {
+		Usage()
+		os.Exit(0)
 	}
 
-	// trim whitespace
-	value = strings.TrimSpace(value)
+	// Parse the command (first argument)
+	command := os.Args[1]
+	commandArgs := os.Args[2:]
 
+	// Handle commands
 	switch command {
 	case "init":
 		result.InitProject = true
-		result.ProjectName = value
+		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
+			result.ProjectName = commandArgs[0]
+			commandArgs = commandArgs[1:]
+		}
 	case "get":
 		result.GetCommand = true
-		result.GetModule = value
+		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
+			result.GetModule = commandArgs[0]
+			commandArgs = commandArgs[1:]
+		}
 	case "update":
 		result.UpdateCommand = true
-		result.UpdateModule = value
+		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
+			result.UpdateModule = commandArgs[0]
+			commandArgs = commandArgs[1:]
+		}
 	case "remove":
 		result.RemoveCommand = true
-		result.RemoveModule = value
-	case "-o", "--output", "-output":
-		result.OutputPath = value
-	}
-}
-
-// ParseArgs processes all command-line arguments, dispatching to helpers.
-func ParseArgs() *Args {
-	args := os.Args[1:]
-	result := &Args{}
-	var commandSet bool
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		switch arg {
-		// Dispatch commands that take a value to the helper
-		case "init", "get", "update", "remove":
-			parseCommandWithValue(arg, args, &i, result)
-			commandSet = true
-
-		// Dispatch flags that take a value to the same helper
-		case "-o", "--output", "-output":
-			parseCommandWithValue(arg, args, &i, result)
-
-		// Handle simple boolean commands/flags directly
-		case "sniff":
-			result.SniffCommand = true
-			commandSet = true
-		case "list":
-			result.ListCommand = true
-			commandSet = true
-		case "cleanup":
-			result.CleanupCommand = true
-			commandSet = true
-		case "-d", "--debug", "-debug":
-			result.Debug = true
-
-		// Default case for the filename
-		default:
-			if arg[:1] != "-" && !commandSet && result.Filename == "" {
-				result.Filename = arg
-			}
+		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
+			result.RemoveModule = commandArgs[0]
+			commandArgs = commandArgs[1:]
 		}
+	case "run":
+		result.RunCommand = true
+	case "sniff":
+		result.SniffCommand = true
+	case "list":
+		result.ListCommand = true
+	case "cleanup":
+		result.CleanupCommand = true
+	default:
+		// Invalid command
+		result.InvalidCommand = command
+		return result
 	}
+
+	// Create a FlagSet for this command
+	fs := flag.NewFlagSet(command, flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+
+	// Define flags - Go's flag package supports multiple formats automatically
+	fs.BoolVar(&result.Debug, "d", false, "Enable debug mode")
+	fs.BoolVar(&result.Debug, "debug", false, "Enable debug mode")
+
+	// Parse the remaining arguments
+	fs.Parse(commandArgs)
+
 	return result
 }
 
@@ -108,7 +104,7 @@ func Usage() {
 	fmt.Println()
 
 	colors.YELLOW.Println("USAGE:")
-	fmt.Println("  ferret <filename> [options]          Compile a Ferret source file")
+	fmt.Println("  ferret run [options]                 Run project using entry point from fer.ret")
 	fmt.Println()
 
 	colors.YELLOW.Println("MODULE MANAGEMENT:")
@@ -122,13 +118,20 @@ func Usage() {
 	fmt.Println()
 
 	colors.YELLOW.Println("OPTIONS:")
-	fmt.Println("  -debug, --debug, -d                  Enable debug mode")
-	fmt.Println("  -output, --output, -o <path>         Specify output file path")
+	fmt.Println("  -d, -debug                           Enable debug mode")
+	fmt.Println("  -o, -output <path>                   Specify output file path")
+	fmt.Println()
+
+	fmt.Print("NOTE: All flags support both single dash (-flag) and double dash (--flag) formats")
+	fmt.Println()
 	fmt.Println()
 
 	colors.CYAN.Println("EXAMPLES:")
-	fmt.Println("  ferret main.fer                      Compile main.fer")
-	fmt.Println("  ferret main.fer --debug              Compile with debug output")
+	fmt.Println("  ferret run                           Run project using fer.ret configuration")
+	fmt.Println("  ferret run -debug                    Run with debug output")
+	fmt.Println("  ferret run --debug                   Run with debug output (alternative)")
+	fmt.Println("  ferret run -o output.bin             Run and specify output file")
+	fmt.Println("  ferret run --output=output.bin       Run and specify output file (alternative)")
 	fmt.Println("  ferret init my-project               Create new project in my-project/")
 	fmt.Println("  ferret get github.com/user/module    Install a module from GitHub")
 	fmt.Println("  ferret update                        Update all modules")
