@@ -38,7 +38,7 @@ const (
 
 // var colorMap = make(map[PROBLEM_TYPE]utils.COLOR)
 var colorMap = map[PROBLEM_TYPE]colors.COLOR{
-	CRITICAL_ERROR: colors.BOLD_RED,
+	CRITICAL_ERROR: colors.BRIGHT_RED,
 	SYNTAX_ERROR:   colors.RED,
 	SEMANTIC_ERROR: colors.RED,
 	NORMAL_ERROR:   colors.RED,
@@ -146,7 +146,7 @@ func makeParts(r *Report) (snippet, underline string) {
 	fileData, err := os.ReadFile(filepath.FromSlash(r.FilePath))
 
 	if os.IsNotExist(err) {
-		panic(fmt.Sprintf("file '%s' not found", r.FilePath))
+		panic(fmt.Sprintf("file %q not found", r.FilePath))
 	}
 
 	lines := strings.Split(string(fileData), "\n")

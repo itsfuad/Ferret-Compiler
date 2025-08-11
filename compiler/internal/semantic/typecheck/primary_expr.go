@@ -217,7 +217,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 	r.Ctx.Reports.AddSemanticError(
 		r.Program.FullPath,
 		(*e.Indexable).Loc(),
-		fmt.Sprintf("type '%s' is not indexable", indexableType),
+		fmt.Sprintf("type %q is not indexable", indexableType),
 		report.TYPECHECK_PHASE,
 	)
 	return nil
@@ -243,7 +243,7 @@ func checkUnaryExprType(r *analyzer.AnalyzerNode, e *ast.UnaryExpr, cm *modules.
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			e.Loc(),
-			fmt.Sprintf("unsupported unary operator '%s' for type '%s'", e.Operator.Value, operandType),
+			fmt.Sprintf("unsupported unary operator %q for type %q", e.Operator.Value, operandType),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -267,14 +267,14 @@ func checkPrefixExprType(r *analyzer.AnalyzerNode, e *ast.PrefixExpr, cm *module
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			e.Loc(),
-			fmt.Sprintf("operator '%s' cannot be applied to type '%s'", e.Operator.Value, operandType),
+			fmt.Sprintf("operator %q cannot be applied to type %q", e.Operator.Value, operandType),
 			report.TYPECHECK_PHASE,
 		)
 	default:
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			e.Loc(),
-			fmt.Sprintf("unsupported prefix operator '%s'", e.Operator.Value),
+			fmt.Sprintf("unsupported prefix operator %q", e.Operator.Value),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -298,14 +298,14 @@ func checkPostfixExprType(r *analyzer.AnalyzerNode, e *ast.PostfixExpr, cm *modu
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			e.Loc(),
-			fmt.Sprintf("operator '%s' cannot be applied to type '%s'", e.Operator.Value, operandType),
+			fmt.Sprintf("operator %q cannot be applied to type %q", e.Operator.Value, operandType),
 			report.TYPECHECK_PHASE,
 		)
 	default:
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			e.Loc(),
-			fmt.Sprintf("unsupported postfix operator '%s'", e.Operator.Value),
+			fmt.Sprintf("unsupported postfix operator %q", e.Operator.Value),
 			report.TYPECHECK_PHASE,
 		)
 	}

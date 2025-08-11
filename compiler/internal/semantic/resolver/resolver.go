@@ -19,7 +19,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_RESOLVED {
 			// Already processed or in a later phase, skip
 			if r.Debug {
-				colors.TEAL.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase)
+				colors.TEAL.Printf("Skipping resolution for %q (already in phase: %s)\n", r.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -44,7 +44,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	r.Ctx.SetModulePhase(importPath, modules.PHASE_RESOLVED)
 
 	if r.Debug {
-		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)
+		colors.GREEN.Printf("Resolved %q\n", r.Program.FullPath)
 	}
 }
 
@@ -91,13 +91,13 @@ func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module)
 		if importStmt, ok := node.(*ast.ImportStmt); ok {
 			alias := importStmt.ModuleName
 			if r.Debug {
-				colors.YELLOW.Printf("Found import '%s' (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, currentModule.UsedImports[alias])
+				colors.YELLOW.Printf("Found import %q (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, currentModule.UsedImports[alias])
 			}
 			if !currentModule.UsedImports[alias] {
 				r.Ctx.Reports.AddWarning(
 					r.Program.FullPath,
 					importStmt.Loc(),
-					fmt.Sprintf("Unused import: '%s'", importStmt.ImportPath.Value),
+					fmt.Sprintf("Unused import: %q", importStmt.ImportPath.Value),
 					report.RESOLVER_PHASE,
 				).AddHint("Remove the import or use symbols from this module")
 			}

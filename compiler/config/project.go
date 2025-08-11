@@ -107,7 +107,7 @@ func ReadBoolFromPrompt(prompt string, defaultValue bool) (bool, error) {
 		case "false", "no", "n":
 			return false, nil
 		default:
-			fmt.Printf("Invalid input '%s'. Please enter true/false, yes/no, or y/n: ", value)
+			fmt.Printf("Invalid input %q. Please enter true/false, yes/no, or y/n: ", value)
 			continue
 		}
 	}

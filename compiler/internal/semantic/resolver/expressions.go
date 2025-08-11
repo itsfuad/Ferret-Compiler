@@ -84,7 +84,7 @@ func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *mod
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				id.Loc(),
-				fmt.Sprintf("Cannot use variable '%s' before it is declared",
+				fmt.Sprintf("Cannot use variable %q before it is declared",
 					id.Name),
 				report.RESOLVER_PHASE,
 			)

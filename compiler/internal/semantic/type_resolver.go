@@ -120,7 +120,7 @@ func derivePrimitiveTypeFromAst(astType ast.DataType) (*stype.PrimitiveType, err
 func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Module) (stype.Type, error) {
 	symbol, found := module.SymbolTable.Lookup(string(userType.TypeName))
 	if !found {
-		return nil, fmt.Errorf("type '%s' does not exist", userType.TypeName)
+		return nil, fmt.Errorf("type %q does not exist", userType.TypeName)
 	}
 	if symbol.Type == nil {
 		// Check if this is a forward reference (type declared later)
@@ -131,11 +131,11 @@ func resolveUserDefinedType(userType *ast.UserDefinedType, module *modules.Modul
 			// If type is used before it's declared, that's a forward reference error
 			if usagePos.Line < declarationPos.Line ||
 				(usagePos.Line == declarationPos.Line && usagePos.Column < declarationPos.Column) {
-				return nil, fmt.Errorf("cannot use type '%s' before it is declared",
+				return nil, fmt.Errorf("cannot use type %q before it is declared",
 					userType.TypeName)
 			}
 		}
-		return nil, fmt.Errorf("type '%s' has no associated type", userType.TypeName)
+		return nil, fmt.Errorf("type %q has no associated type", userType.TypeName)
 	}
 	return symbol.Type, nil
 }
@@ -165,7 +165,7 @@ func resolveTypeInImportedModule(res *ast.TypeScopeResolution, module *modules.M
 		return &stype.UserType{Name: symbol.Name, Definition: nil}, nil // No definition available
 	}
 
-	return nil, fmt.Errorf("type '%s' not found in imported module '%s'", typeName, moduleName)
+	return nil, fmt.Errorf("type %q not found in imported module %q", typeName, moduleName)
 }
 
 func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Module) (*stype.FunctionType, error) {
@@ -218,7 +218,7 @@ func deriveSemanticInterfaceType(interfaceType *ast.InterfaceType, module *modul
 		if functionType, ok := methodType.(*stype.FunctionType); ok {
 			methods[method.Name.Name] = functionType
 		} else {
-			return nil, fmt.Errorf("interface method '%s' is not a function type", method.Name.Name)
+			return nil, fmt.Errorf("interface method %q is not a function type", method.Name.Name)
 		}
 	}
 	return &stype.InterfaceType{

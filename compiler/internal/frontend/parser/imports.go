@@ -70,14 +70,14 @@ func parseImport(p *Parser) ast.Node {
 		// Convert full paths to module names for better readability
 		moduleNames := make([]string, len(cycle))
 		for i, path := range cycle {
-			moduleNames[i] = p.ctx.FullPathToImportPath(path)
+			moduleNames[i] = fmt.Sprintf("%q", p.ctx.FullPathToImportPath(path))
 		}
 
 		cycleStr := strings.Join(moduleNames, " → ")
 		currentModule := p.ctx.FullPathToImportPath(p.fullPath)
 		targetModule := p.ctx.FullPathToImportPath(moduleFullPath)
 
-		cycleMsg := fmt.Sprintf("Import cycle detected: %s\nProblem: %s cannot import %s (already in dependency path)",
+		cycleMsg := fmt.Sprintf("Import cycle detected: %s\n - %q cannot import %q (already in dependency path)",
 			cycleStr, currentModule, targetModule)
 		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, cycleMsg, report.PARSING_PHASE)
 		return stmt
