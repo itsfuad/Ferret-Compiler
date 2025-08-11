@@ -461,7 +461,7 @@ func ReadFerRetDependencies(projectRoot string) (map[string]FerRetDependency, er
 }
 
 // WriteFerRetDependency adds or updates a dependency in the fer.ret file
-func WriteFerRetDependency(projectRoot, repoName, version, comment string) error {
+func WriteFerRetDependency(projectRoot, repoName, version, comment string, isCached bool) error {
 	ferRetPath := filepath.Join(projectRoot, FerretConfigFile)
 
 	// Read existing content
@@ -486,6 +486,10 @@ func WriteFerRetDependency(projectRoot, repoName, version, comment string) error
 				repoName: comment,
 			},
 		}
+	}
+
+	if isCached {
+		colors.ORANGE.Printf("🔄️Reusing cached module: %s@%s\n", repoName, version)
 	}
 
 	// Write back to file using the TOML writer

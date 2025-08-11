@@ -84,10 +84,10 @@ rm -rf fer.ret
 
 echo -e "${YELLOW}🔒 Step 8: Security scan (gosec)...${NC}"
 if ! command -v gosec &> /dev/null; then
-    echo -e "${YELLOW}ℹ️  gosec not installed. Installing...${NC}"
+    echo -e "${YELLOW}⚠️   gosec not installed. Installing...${NC}"
     if ! go install github.com/securego/gosec/v2/cmd/gosec@latest; then
         echo -e "${RED}❌ Failed to install gosec, skipping security scan${NC}"
-        echo -e "${YELLOW}ℹ️  You can install gosec manually: go install github.com/securego/gosec/v2/cmd/gosec@latest${NC}"
+        echo -e "${YELLOW}⚠️   You can install gosec manually: go install github.com/securego/gosec/v2/cmd/gosec@latest${NC}"
         echo -e "${GREEN}✅ All other PR workflow checks passed!${NC}"
         exit 0
     fi

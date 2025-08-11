@@ -128,7 +128,7 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 
 	//must not contain spaces or special characters in the middle
 	if strings.ContainsAny(projectName, " \t\n\r") || strings.ContainsAny(projectName, "!@#$%^&*()+=[]{}|;:'\",.<>?/\\") {
-		fmt.Println("ℹ️ Project name must not contain spaces or special characters.")
+		fmt.Println("⚠️  Project name must not contain spaces or special characters.")
 		os.Exit(1)
 	}
 
@@ -173,27 +173,27 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 
 func ValidateProjectConfig(config *ProjectConfig) error {
 	if config == nil {
-		return fmt.Errorf("ℹ️ project configuration is nil")
+		return fmt.Errorf("⚠️  project configuration is nil")
 	}
 
 	if config.Name == "" {
-		return fmt.Errorf("ℹ️ project name is required in the configuration file")
+		return fmt.Errorf("⚠️  project name is required in the configuration file")
 	}
 
 	if config.Compiler.Version == "" {
-		return fmt.Errorf("ℹ️ compiler version is required in the configuration file")
+		return fmt.Errorf("⚠️  compiler version is required in the configuration file")
 	}
 
 	if config.Build.Entry == "" {
-		return fmt.Errorf("ℹ️ build entry point is required in the configuration file")
+		return fmt.Errorf("⚠️  build entry point is required in the configuration file")
 	}
 
 	if config.Cache.Path == "" {
-		return fmt.Errorf("ℹ️ cache path is required in the configuration file")
+		return fmt.Errorf("⚠️  cache path is required in the configuration file")
 	}
 
 	if config.ProjectRoot == "" {
-		return fmt.Errorf("ℹ️ project root is required in the configuration file")
+		return fmt.Errorf("⚠️  project root is required in the configuration file")
 	}
 
 	return nil
