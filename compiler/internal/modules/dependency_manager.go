@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"ferret/colors"
-	"ferret/internal/config"
+	"ferret/config"
 )
 
 const (

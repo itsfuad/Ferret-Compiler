@@ -29,17 +29,17 @@ func ResolveModuleLocation(importPath, currentFileFullPath string, ctxx *Compile
 
 	// Handle special case: if current file is in remote cache, imports should be in remote context
 	if modules.IsFilepathInCache(currentFileFullPath, ctxx.RemoteCachePath) {
-		return modules.ResolveModuleInRemoteContext(importPath, currentFileFullPath, ctxx.ProjectRoot, ctxx.RemoteCachePath)
+		return modules.ResolveModuleInRemoteContext(importPath, currentFileFullPath, ctxx.ProjectRootFullPath, ctxx.RemoteCachePath)
 	}
 
 	// Route to appropriate resolver based on module type
 	switch moduleType {
 	case modules.REMOTE:
-		return modules.ResolveRemoteModule(importPath, ctxx.ProjectRoot, ctxx.RemoteCachePath, currentFileFullPath)
+		return modules.ResolveRemoteModule(importPath, ctxx.ProjectRootFullPath, ctxx.RemoteCachePath, currentFileFullPath)
 	case modules.BUILTIN:
 		return modules.ResolveBuiltinModule(importPath, ctxx.ModulesPath)
 	case modules.LOCAL:
-		return modules.ResolveLocalModule(importPath, projectName, ctxx.ProjectRoot)
+		return modules.ResolveLocalModule(importPath, projectName, ctxx.ProjectRootFullPath)
 	default:
 		return "", fmt.Errorf("unknown module type for import: %s", importPath)
 	}

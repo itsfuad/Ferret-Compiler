@@ -21,7 +21,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.
 	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, c.Program.FullPath, c.Ctx.RemoteCachePath)
 
 	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := modules.CheckCanImportRemoteModules(c.Ctx.ProjectRoot, moduleKey); err != nil {
+	if err := modules.CheckCanImportRemoteModules(c.Ctx.ProjectRootFullPath, moduleKey); err != nil {
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), err.Error(), report.TYPECHECK_PHASE)
 		return
 	}

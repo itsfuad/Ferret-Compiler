@@ -130,7 +130,7 @@ fn main() {
 // This should fail - non-boolean condition
 fn testError() {
     let x: i32 = 10;
-    if x {
+    if x > 10 {
         x = 100;
     }
 }

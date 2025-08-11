@@ -22,7 +22,7 @@ func parseImport(p *Parser) ast.Node {
 
 	// ✅ SECURITY CHECK: Validate remote import permissions in parser phase
 	if strings.HasPrefix(importpath, "github.com/") {
-		if err := modules.CheckCanImportRemoteModules(p.ctx.ProjectRoot, importpath); err != nil {
+		if err := modules.CheckCanImportRemoteModules(p.ctx.ProjectRootFullPath, importpath); err != nil {
 			loc := *source.NewLocation(&start.Start, &importToken.End)
 			p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 			return nil

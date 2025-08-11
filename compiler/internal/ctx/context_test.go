@@ -1,14 +1,14 @@
 package ctx
 
 import (
-	"ferret/internal/config"
+	"ferret/config"
 	"testing"
 )
 
 func TestFullPathToImportPathLocal(t *testing.T) {
 	ctx := &CompilerContext{
-		ProjectRoot:   "/project",
-		ProjectConfig: &config.ProjectConfig{Name: "myapp"},
+		ProjectRootFullPath: "/project",
+		ProjectConfig:       &config.ProjectConfig{Name: "myapp"},
 	}
 	fullPath := "/project/foo/bar.fer"
 	importPath := ctx.FullPathToImportPath(fullPath)

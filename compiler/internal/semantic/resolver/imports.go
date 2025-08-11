@@ -33,7 +33,7 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *module
 	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, r.Program.FullPath, r.Ctx.RemoteCachePath)
 
 	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := modules.CheckCanImportRemoteModules(r.Ctx.ProjectRoot, moduleKey); err != nil {
+	if err := modules.CheckCanImportRemoteModules(r.Ctx.ProjectRootFullPath, moduleKey); err != nil {
 		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
 	}

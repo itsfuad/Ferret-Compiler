@@ -206,9 +206,10 @@ func IsProjectRoot(dir string) bool {
 	return err == nil
 }
 
-func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
-	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 
+func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
+
+	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 	// Use our custom TOML parser
 	tomlData, err := toml.ParseTOMLFile(filepath.FromSlash(configPath))
 	if err != nil {
