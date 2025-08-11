@@ -321,7 +321,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Arrays
     - [x] Array indexing
     - [x] Array assignment
-    - [ ] String indexing
+    - [x] String indexing
 - [x] Structs
     - [x] Anonymous structs
     - [x] Struct literals
@@ -481,3 +481,6 @@ The project uses GitHub Actions for continuous integration and deployment:
 
 ## License
 This project is licensed under the Mozilla Public License 2.0 - see the LICENSE file for details.
+
+## Join Discord
+[![Join the Ferret Discord Server](https://img.shields.io/discord/123456789012345678.svg?label=Join%20Discord&style=flat-square)](https://discord.com/invite/yQKcHhKzyn)
