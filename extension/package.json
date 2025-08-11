@@ -86,10 +86,22 @@
         "fer.lock": "ferret-lock"
       }
     },
+    "commands": [
+      {
+        "command": "ferret.toggleLSP",
+        "title": "Toggle LSP Server",
+        "category": "Ferret"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "ferret LSP",
       "properties": {
+        "ferretLanguageServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Ferret Language Server. When disabled, only syntax highlighting will work."
+        },
         "ferretLanguageServer.trace.server": {
           "type": "string",
           "enum": [

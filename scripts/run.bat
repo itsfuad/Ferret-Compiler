@@ -4,10 +4,10 @@ cls
 echo Building Ferret...
 
 cd ../compiler
-if not exist bin (
-    mkdir bin
+if not exist ../bin (
+    mkdir ../bin
 )
-go build -o bin\ferret.exe -ldflags "-s -w" -trimpath -v .
+go build -o ..\bin\ferret.exe -ldflags "-s -w" -trimpath -v .
 
 if %errorlevel% neq 0 (
     echo Build failed. Exiting...

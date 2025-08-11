@@ -37,3 +37,7 @@ fn add(a: i32, b: i32) -> i32 {
 }
 
 let value = 10;
+
+
+let myname = "Ferret";
+let byt = myname[0];

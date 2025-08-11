@@ -2,14 +2,12 @@ package modules
 
 import (
 	"archive/zip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"ferret/colors"
 )
@@ -18,22 +16,10 @@ const (
 	GitHubTagArchiveURL       = "https://github.com/%s/%s/archive/refs/tags/%s.zip"
 	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
 	FerretConfigFile          = "fer.ret"
-	GitHubReleasesURL         = "https://api.github.com/repos/%s/%s/releases"
 )
 
-// GitHubRelease represents a GitHub release from the API
-type GitHubRelease struct {
-	TagName     string `json:"tag_name"`
-	Name        string `json:"name"`
-	Draft       bool   `json:"draft"`
-	Prerelease  bool   `json:"prerelease"`
-	ZipballURL  string `json:"zipball_url"`
-	TarballURL  string `json:"tarball_url"`
-	CreatedAt   string `json:"created_at"`
-	PublishedAt string `json:"published_at"`
-}
-
 // CheckRemoteModuleExists checks if a remote module exists and returns available versions
+// Uses Git refs instead of GitHub API to avoid rate limiting
 func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) {
 	// Parse user/repo from repoName
 	user, repo, err := parseRepoName(repoName)
@@ -41,23 +27,24 @@ func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) 
 		return "", err
 	}
 
-	// Get releases from GitHub API
-	releases, err := getGitHubReleases(user, repo)
+	// Use Git refs approach instead of GitHub API
+	moduleSpec := fmt.Sprintf("github.com/%s/%s", user, repo)
+	if requestedVersion != "latest" && requestedVersion != "" {
+		moduleSpec += "@" + requestedVersion
+	}
+
+	version, err := GetModule(moduleSpec)
 	if err != nil {
-		return "", fmt.Errorf("failed to get releases for %s: %w", repoName, err)
+		return "", err
 	}
 
-	if len(releases) == 0 {
-		return "", fmt.Errorf("no releases found for repository: %s", repoName)
+	// Verify that the tag is actually downloadable
+	err = VerifyTagDownloadable(user, repo, version)
+	if err != nil {
+		return "", fmt.Errorf("tag %s found but not downloadable: %w", version, err)
 	}
 
-	// Handle specific version request
-	if requestedVersion != "latest" {
-		return findSpecificVersion(releases, requestedVersion, repoName)
-	}
-
-	// Find latest version
-	return findLatestVersion(releases, repoName)
+	return version, nil
 }
 
 // parseRepoName parses repository name into user and repo components
@@ -69,55 +56,8 @@ func parseRepoName(repoName string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-// findSpecificVersion finds a specific version in the releases
-func findSpecificVersion(releases []GitHubRelease, requestedVersion, repoName string) (string, error) {
-	for _, release := range releases {
-		if release.TagName == requestedVersion || release.TagName == "v"+requestedVersion {
-			return release.TagName, nil
-		}
-	}
-	return "", fmt.Errorf("version %s not found for repository %s", requestedVersion, repoName)
-}
-
-// findLatestVersion finds the latest stable version from releases
-func findLatestVersion(releases []GitHubRelease, repoName string) (string, error) {
-	// First, try to find latest stable release
-	latestVersion := findLatestStableRelease(releases)
-
-	// If no stable release, try any non-draft release
-	if latestVersion == "" {
-		latestVersion = findLatestNonDraftRelease(releases)
-	}
-
-	if latestVersion == "" {
-		return "", fmt.Errorf("no valid releases found for repository: %s", repoName)
-	}
-
-	return latestVersion, nil
-}
-
-// findLatestStableRelease finds the latest stable (non-prerelease, non-draft) release
-func findLatestStableRelease(releases []GitHubRelease) string {
-	var latestVersion string
-	for _, release := range releases {
-		if !release.Draft && !release.Prerelease {
-			if latestVersion == "" || CompareSemver(release.TagName, latestVersion) {
-				latestVersion = release.TagName
-			}
-		}
-	}
-	return latestVersion
-}
-
-// findLatestNonDraftRelease finds the latest non-draft release (including prereleases)
-func findLatestNonDraftRelease(releases []GitHubRelease) string {
-	for _, release := range releases {
-		if !release.Draft {
-			return release.TagName
-		}
-	}
-	return ""
-}
+// Note: The following functions were removed as they depended on GitHub API
+// which caused rate limiting issues. They have been replaced with Git refs-based approach.
 
 // DownloadRemoteModule downloads a remote module to the cache
 func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) error {
@@ -158,8 +98,18 @@ func downloadModuleArchive(user, repo, version, repoName string) (string, error)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download module: HTTP %d", resp.StatusCode)
+	// Handle different HTTP status codes with specific error messages
+	switch resp.StatusCode {
+	case http.StatusOK:
+		// Success, continue with download
+	case http.StatusNotFound:
+		return "", fmt.Errorf("tag %s not found for repository %s/%s. The tag may exist but the archive is not available", version, user, repo)
+	case http.StatusForbidden:
+		return "", fmt.Errorf("access denied when downloading %s@%s. Repository may be private or access restricted", repoName, version)
+	case http.StatusTooManyRequests:
+		return "", fmt.Errorf("rate limited when downloading %s@%s. Please try again later", repoName, version)
+	default:
+		return "", fmt.Errorf("failed to download module %s@%s: HTTP %d", repoName, version, resp.StatusCode)
 	}
 
 	// Create temporary file for download
@@ -179,7 +129,11 @@ func downloadModuleArchive(user, repo, version, repoName string) (string, error)
 	return tmpFile.Name(), nil
 }
 
-// getGitHubReleases fetches releases from GitHub API
+// Note: The following functions are deprecated in favor of Git refs-based approach
+// They are kept for potential fallback scenarios but are no longer used by default
+
+/*
+// getGitHubReleases fetches releases from GitHub API (DEPRECATED - causes rate limiting)
 func getGitHubReleases(user, repo string) ([]GitHubRelease, error) {
 	url := fmt.Sprintf(GitHubReleasesURL, user, repo)
 
@@ -206,6 +160,7 @@ func getGitHubReleases(user, repo string) ([]GitHubRelease, error) {
 
 	return releases, nil
 }
+*/
 
 // extractZipToCache extracts a zip file to the cache directory
 func extractZipToCache(zipPath, targetDir, expectedPrefix string) error {

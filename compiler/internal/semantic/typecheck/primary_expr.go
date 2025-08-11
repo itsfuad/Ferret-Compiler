@@ -189,24 +189,29 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 		return nil
 	}
 
+	indexType := evaluateExpressionType(r, *e.Index, cm)
+	if indexType == nil {
+		return nil
+	}
+
+	if !semantic.IsIntegerType(indexType) {
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			(*e.Index).Loc(),
+			"array index must be an integer type",
+			report.TYPECHECK_PHASE,
+		)
+		return nil
+	}
+
 	// Check if it's an array
 	if arrayType, ok := indexableType.(*stype.ArrayType); ok {
-		indexType := evaluateExpressionType(r, *e.Index, cm)
-		if indexType == nil {
-			return nil
-		}
-
-		if !semantic.IsIntegerType(indexType) {
-			r.Ctx.Reports.AddSemanticError(
-				r.Program.FullPath,
-				(*e.Index).Loc(),
-				"array index must be an integer type",
-				report.TYPECHECK_PHASE,
-			)
-			return nil
-		}
-
 		return arrayType.ElementType
+	}
+
+	// allow strings
+	if stringType, ok := indexableType.(*stype.PrimitiveType); ok && stringType.TypeName == types.STRING {
+		return &stype.PrimitiveType{TypeName: types.BYTE}
 	}
 
 	r.Ctx.Reports.AddSemanticError(

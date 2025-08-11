@@ -1,10 +1,15 @@
 package cli
 
 import (
+	"ferret/cmd"
+	"ferret/cmd/flags"
 	"ferret/colors"
 	"ferret/internal/modules"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	//"ferret/internal/backend"
 	"ferret/internal/config"
@@ -12,11 +17,11 @@ import (
 
 const (
 	CONFIG_FILE                = "fer.ret"
-	INVALID_LOCATION_ERROR     = "You must run this command from the directory containing fer.ret (the project root)."
-	DEPENDENCY_ERROR           = "Failed to create dependency manager: %s\n"
-	CONFIG_LOAD_ERROR          = "Error loading project configuration: %v\n"
-	REMOTE_IMPORTS_DISABLED    = "❌ Remote module imports are disabled in this project."
-	REMOTE_IMPORTS_ENABLE_HELP = "To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret"
+	INVALID_LOCATION_ERROR     = "📍 You must run this command from the directory containing fer.ret (the project root)."
+	DEPENDENCY_ERROR           = "❌ Failed to create dependency manager: %s\n"
+	CONFIG_LOAD_ERROR          = "⚠️  Error loading project configuration: %v\n"
+	REMOTE_IMPORTS_DISABLED    = "🔒 Remote module imports are disabled in this project."
+	REMOTE_IMPORTS_ENABLE_HELP = "💡 To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret"
 )
 
 // HandleGetCommand handles the "ferret get" command
@@ -60,24 +65,22 @@ func HandleGetCommand(module string) {
 
 	if module == "" {
 		// No module specified, install all dependencies from fer.ret
-		colors.BLUE.Println("No module specified. Installing all dependencies from fer.ret...")
+		colors.BLUE.Println("📦 No module specified. Installing all dependencies from fer.ret...")
 		err = dm.InstallAllDependencies()
 		if err != nil {
-			colors.RED.Printf("Failed to install dependencies: %s\n", err)
+			colors.RED.Printf("❌ Failed to install dependencies: %s\n", err)
 			os.Exit(1)
 		}
-		colors.GREEN.Println("All dependencies installed successfully!")
+		colors.GREEN.Println("✅ All dependencies installed successfully!")
 		return
 	}
 
 	// Install specific module
 	err = dm.InstallDirectDependency(module, "")
 	if err != nil {
-		colors.RED.Printf("Failed to install module: %s\n", err)
+		colors.RED.Printf("❌ Failed to install module: %s\n", err)
 		os.Exit(1)
 	}
-
-	colors.GREEN.Printf("Successfully installed %s\n", module)
 }
 
 // HandleRemoveCommand handles the "ferret remove" command
@@ -116,19 +119,19 @@ func HandleRemoveCommand(module string) {
 	}
 
 	if module == "" {
-		colors.RED.Println("No module specified. Usage: ferret remove <module>")
-		colors.YELLOW.Println("Example: ferret remove github.com/user/repo")
+		colors.RED.Println("❌ No module specified. Usage: ferret remove <module>")
+		colors.YELLOW.Println("💡 Example: ferret remove github.com/user/repo")
 		os.Exit(1)
 	}
 
 	// Remove the dependency
 	err = dm.RemoveDependency(module)
 	if err != nil {
-		colors.RED.Printf("Failed to remove module: %s\n", err)
+		colors.RED.Printf("❌ Failed to remove module: %s\n", err)
 		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("Successfully removed %s\n", module)
+	colors.GREEN.Printf("🗑️ Successfully removed %s\n", module)
 }
 
 // HandleListCommand handles the "ferret list" command
@@ -155,7 +158,7 @@ func HandleListCommand() {
 	// List dependencies
 	err = dm.ListDependencies()
 	if err != nil {
-		colors.RED.Printf("Failed to list dependencies: %s\n", err)
+		colors.RED.Printf("❌ Failed to list dependencies: %s\n", err)
 		os.Exit(1)
 	}
 }
@@ -184,11 +187,9 @@ func HandleCleanupCommand() {
 	// Cleanup unused dependencies
 	err = dm.CleanupUnusedDependencies()
 	if err != nil {
-		colors.RED.Printf("Failed to cleanup dependencies: %s\n", err)
+		colors.RED.Printf("❌ Failed to cleanup dependencies: %s\n", err)
 		os.Exit(1)
 	}
-
-	colors.GREEN.Println("Cleanup completed successfully!")
 }
 
 // HandleUpdateCommand handles the "ferret update" command
@@ -232,24 +233,23 @@ func HandleUpdateCommand(module string) {
 
 	if module == "" {
 		// No module specified, update all dependencies to latest versions
-		colors.BLUE.Println("No module specified. Updating all dependencies to latest versions...")
+		colors.BLUE.Println("📦 No module specified. Updating all dependencies to latest versions...")
 		err = dm.UpdateAllDependencies()
 		if err != nil {
-			colors.RED.Printf("Failed to update dependencies: %s\n", err)
+			colors.RED.Printf("❌ Failed to update dependencies: %s\n", err)
 			os.Exit(1)
 		}
-		colors.GREEN.Println("All dependencies updated successfully!")
 		return
 	}
 
 	// Update specific module
 	err = dm.UpdateDependency(module)
 	if err != nil {
-		colors.RED.Printf("Failed to update module: %s\n", err)
+		colors.RED.Printf("❌ Failed to update module: %s\n", err)
 		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("Successfully updated %s to latest version\n", module)
+	colors.GREEN.Printf("⬆️ Successfully updated %s to latest version\n", module)
 }
 
 // HandleSniffCommand handles the "ferret sniff" command
@@ -292,15 +292,15 @@ func HandleSniffCommand() {
 	}
 
 	// Check for available updates (direct dependencies only)
-	colors.BLUE.Println("Checking for available updates...")
+	colors.BLUE.Println("🔍 Checking for available updates...")
 	updates, err := dm.CheckAvailableUpdates()
 	if err != nil {
-		colors.RED.Printf("Failed to check for updates: %s\n", err)
+		colors.RED.Printf("❌ Failed to check for updates: %s\n", err)
 		os.Exit(1)
 	}
 
 	if len(updates) == 0 {
-		colors.YELLOW.Println("No dependencies found to check for updates.")
+		colors.YELLOW.Println("📂 No dependencies found to check for updates.")
 		return
 	}
 
@@ -318,10 +318,10 @@ func HandleSniffCommand() {
 	}
 
 	if hasUpdates {
-		colors.BLUE.Println("\nTo update dependencies, run:")
+		colors.BLUE.Println("\n💡 To update dependencies, run:")
 		colors.BLUE.Println("  ferret update          # Update all dependencies")
 		colors.BLUE.Println("  ferret update <module> # Update specific module")
-		colors.CYAN.Println("\nNote: Updating direct dependencies will automatically update their")
+		colors.CYAN.Println("\n📝 Note: Updating direct dependencies will automatically update their")
 		colors.CYAN.Println("transitive dependencies to compatible versions as specified by the")
 		colors.CYAN.Println("updated modules.")
 	} else {
@@ -329,22 +329,111 @@ func HandleSniffCommand() {
 	}
 }
 
-func HandleInitCommand(path string) {
-	if path == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			colors.RED.Println(err)
-			os.Exit(1)
-		}
-		path = cwd
-	}
-
+func HandleInitCommand(projectName string) {
 	// Create the configuration file
-	if err := config.CreateDefaultProjectConfig(path); err != nil {
-		colors.RED.Println("Failed to initialize project configuration:", err)
+	if err := config.CreateDefaultProjectConfig(projectName); err != nil {
+		colors.RED.Println("❌ Failed to initialize project configuration:", err)
 		os.Exit(1)
 	}
-	colors.GREEN.Printf("Project configuration initialized at: %s\n", path)
+}
+
+// HandleRunCommand handles the "ferret run" command
+func HandleRunCommand(debug bool) {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		colors.RED.Println("❌ Error getting current directory:", err)
+		os.Exit(1)
+	}
+
+	// Enforce: must be run from project root (directory containing fer.ret)
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Println(INVALID_LOCATION_ERROR)
+		os.Exit(1)
+	}
+
+	projectRoot := cwd
+
+	// Load and validate project configuration
+	projectConfig, err := config.LoadProjectConfig(projectRoot)
+	if err != nil {
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
+		os.Exit(1)
+	}
+
+	// Check if entry point file exists
+	entryPath := filepath.Join(projectRoot, projectConfig.Build.Entry)
+	if _, err := os.Stat(entryPath); err != nil {
+		colors.RED.Printf("❌ Entry point file not found: %s\n", projectConfig.Build.Entry)
+		os.Exit(1)
+	}
+
+	// Check compiler version compatibility
+	if err := checkCompilerVersion(projectConfig.Compiler.Version); err != nil {
+		colors.RED.Printf("❌ Compiler version incompatibility: %s\n", err)
+		os.Exit(1)
+	}
+
+	colors.BLUE.Printf("🚀 Running project with entry point: %s\n", projectConfig.Build.Entry)
+
+	// Use the existing compile function from cmd package
+	context := cmd.Compile(entryPath, debug, projectConfig.Build.Output)
+
+	// Only destroy and print modules if context is not nil
+	if context != nil {
+		defer context.Destroy()
+		if debug {
+			context.PrintModules()
+		}
+	}
+}
+
+// checkCompilerVersion checks if the current compiler version is compatible
+func checkCompilerVersion(requiredVersion string) error {
+	currentVersion := flags.FERRET_VERSION
+
+	// Parse versions (simple semantic version comparison)
+	current := parseVersion(currentVersion)
+	required := parseVersion(requiredVersion)
+
+	// Check if current version is less than required
+	if compareVersions(current, required) < 0 {
+		return fmt.Errorf("compiler version %s is less than required version %s", currentVersion, requiredVersion)
+	}
+
+	return nil
+}
+
+// parseVersion parses a semantic version string into comparable parts
+func parseVersion(version string) []int {
+	parts := strings.Split(version, ".")
+	nums := make([]int, 3) // major.minor.patch
+
+	for i, part := range parts {
+		if i >= 3 {
+			break
+		}
+		if num, err := strconv.Atoi(part); err == nil {
+			nums[i] = num
+		}
+	}
+
+	return nums
+}
+
+// compareVersions compares two version arrays
+// Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+func compareVersions(v1, v2 []int) int {
+	for i := 0; i < 3; i++ {
+		if v1[i] < v2[i] {
+			return -1
+		}
+		if v1[i] > v2[i] {
+			return 1
+		}
+	}
+	return 0
 }
 
 // isInProjectRoot returns true if the current working directory contains fer.ret

@@ -1,5 +1,6 @@
-# Ferret Programming Language
+# Ferret Programming Language (In Development)
 
+![Discord Shield](https://discord.com/api/guilds/1243622698551345153/widget.png?style=shield)
 [![CI](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/ci.yml)
 [![Release](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/release.yml/badge.svg)](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/release.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
@@ -321,7 +322,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Arrays
     - [x] Array indexing
     - [x] Array assignment
-    - [ ] String indexing
+    - [x] String indexing
 - [x] Structs
     - [x] Anonymous structs
     - [x] Struct literals
