@@ -5,10 +5,10 @@ clear
 echo Building Ferret...
 
 cd ../compiler
-if [ ! -d "bin" ]; then
-    mkdir bin
+if [ ! -d "../bin" ]; then
+    mkdir ../bin
 fi
-go build -o bin/ferret -ldflags "-s -w" -trimpath -v .
+go build -o ../bin/ferret -ldflags "-s -w" -trimpath -v .
 if [ $? -ne 0 ]; then
     echo "Build failed. Exiting..."
     exit 1
