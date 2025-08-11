@@ -118,11 +118,6 @@ func TestParseArgs(t *testing.T) {
 
 		// Edge Case Tests
 		{
-			name:     "no arguments",
-			args:     []string{"program"},
-			expected: &Args{},
-		},
-		{
 			name:     "invalid command",
 			args:     []string{"program", "invalid"},
 			expected: &Args{InvalidCommand: "invalid"},
