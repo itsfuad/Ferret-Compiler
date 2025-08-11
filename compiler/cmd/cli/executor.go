@@ -19,7 +19,7 @@ const (
 	CONFIG_FILE                = "fer.ret"
 	INVALID_LOCATION_ERROR     = "📍 You must run this command from the directory containing fer.ret (the project root)."
 	DEPENDENCY_ERROR           = "❌ Failed to create dependency manager: %s\n"
-	CONFIG_LOAD_ERROR          = "ℹ️ Error loading project configuration: %v\n"
+	CONFIG_LOAD_ERROR          = "⚠️  Error loading project configuration: %v\n"
 	REMOTE_IMPORTS_DISABLED    = "🔒 Remote module imports are disabled in this project."
 	REMOTE_IMPORTS_ENABLE_HELP = "💡 To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret"
 )

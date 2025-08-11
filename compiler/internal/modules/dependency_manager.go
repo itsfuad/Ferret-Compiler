@@ -65,9 +65,11 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 		return fmt.Errorf("❌ failed to create cache directory: %w", err)
 	}
 
+	isCached := IsModuleCached(cachePath, repoName, actualVersion)
+
 	// Check if already cached
-	if IsModuleCached(cachePath, repoName, actualVersion) {
-		colors.YELLOW.Printf("ℹ️ module %s@%s is already cached\n", repoName, actualVersion)
+	if isCached {
+		colors.YELLOW.Printf("⚠️  module %s@%s is already cached\n", repoName, actualVersion)
 	} else {
 		// Download and cache the module
 		err = DownloadRemoteModule(dm.projectRoot, repoName, actualVersion, cachePath)
@@ -89,14 +91,17 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	}
 
 	// Add to fer.ret as direct dependency
-	err = WriteFerRetDependency(dm.projectRoot, fullRepoPath, actualVersion, description)
+	err = WriteFerRetDependency(dm.projectRoot, fullRepoPath, actualVersion, description, isCached)
 	if err != nil {
 		return fmt.Errorf("❌ failed to update fer.ret: %w", err)
 	}
 
-	// After updating fer.ret, regenerate the lockfile
-	err = dm.InstallAllDependencies()
-	return err // Return true because we updated fer.ret
+	if !isCached {
+		// After updating fer.ret, regenerate the lockfile
+		return dm.InstallAllDependencies()
+	}
+
+	return nil
 }
 
 // CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
@@ -564,7 +569,7 @@ func (dm *DependencyManager) UpdateDependency(moduleSpec string) error {
 // updateFerRetDependency updates a dependency version in fer.ret file
 func (dm *DependencyManager) updateFerRetDependency(moduleSpec, newVersion string) error {
 	// Use the existing WriteFerRetDependency method to update the version
-	return WriteFerRetDependency(dm.projectRoot, moduleSpec, newVersion, "")
+	return WriteFerRetDependency(dm.projectRoot, moduleSpec, newVersion, "", false)
 }
 
 // UpdateAllDependencies updates all dependencies to their latest versions
@@ -609,7 +614,7 @@ func (dm *DependencyManager) UpdateAllDependencies() error {
 	}
 
 	if len(failed) > 0 {
-		colors.YELLOW.Printf("ℹ️ Successfully updated %d dependencies\n", updated)
+		colors.YELLOW.Printf("⚠️  Successfully updated %d dependencies\n", updated)
 		colors.RED.Printf("❌ Failed to update %d dependencies: %v\n", len(failed), failed)
 		return fmt.Errorf("some dependencies failed to update")
 	}
