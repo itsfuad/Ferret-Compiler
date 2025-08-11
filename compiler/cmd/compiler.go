@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 
 	"ferret/colors"
+	"ferret/config"
 	"ferret/internal/ctx"
 
 	"ferret/internal/frontend/parser"
@@ -16,15 +17,16 @@ import (
 	"ferret/internal/semantic/typecheck"
 )
 
-func Compile(filePath string, isDebugEnabled bool, outputPath string) (context *ctx.CompilerContext) {
-	fullPath, err := filepath.Abs(filePath)
+func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.CompilerContext) {
+
+	fullPath, err := filepath.Abs(config.Build.Entry)
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
 	}
 
 	fullPath = filepath.ToSlash(fullPath) // Ensure forward slashes for consistency
 
-	context = ctx.NewCompilerContext(fullPath)
+	context = ctx.NewCompilerContext(config)
 
 	defer func() {
 		context.Reports.DisplayAll()
@@ -58,10 +60,6 @@ func Compile(filePath string, isDebugEnabled bool, outputPath string) (context *
 	}
 
 	resolver.ResolveProgram(anz)
-
-	// if context.Reports.HasErrors() {
-	// 	panic("Compilation stopped due to resolver errors")
-	// }
 
 	if isDebugEnabled {
 		colors.GREEN.Println("---------- [Resolver done] ----------")

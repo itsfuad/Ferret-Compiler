@@ -32,7 +32,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	colors.BLUE.Sprintf("moduleKey: %s", moduleKey)
 
 	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := modules.CheckCanImportRemoteModules(collector.Ctx.ProjectRoot, moduleKey); err != nil {
+	if err := modules.CheckCanImportRemoteModules(collector.Ctx.ProjectRootFullPath, moduleKey); err != nil {
 		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), err.Error(), report.COLLECTOR_PHASE)
 		return
 	}

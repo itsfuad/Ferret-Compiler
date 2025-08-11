@@ -15,7 +15,7 @@ if [ $? -ne 0 ]; then
 fi
 echo "Running Ferret..."
 cd ../bin
-./ferret "./../app/cmd/start.fer" -debug
+./ferret run -debug
 if [ $? -ne 0 ]; then
     echo "Ferret execution failed. Exiting..."
     exit 1

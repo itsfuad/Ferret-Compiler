@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"ferret/cmd"
+	"ferret/config"
 	"ferret/report"
 	"lsp/wio"
 )
@@ -274,8 +275,22 @@ func processDiagnostics(writer *bufio.Writer, uri string) {
 		return
 	}
 
-	context := cmd.Compile(filePath, false, "")
+	projectRoot, err := config.FindProjectRoot(filePath)
+	if err != nil {
+		log.Println("Error finding project root:", err)
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		return
+	}
 
+	conf, err := config.LoadProjectConfig(projectRoot)
+	if err != nil {
+		log.Println("Error loading project configuration:", err)
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		return
+	}
+
+	context := cmd.Compile(conf, false)
+	
 	// Check if context or Reports is nil
 	if context == nil {
 		log.Println("Compilation context is nil")

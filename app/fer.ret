@@ -5,7 +5,7 @@ version = "0.0.1"
 
 [build]
 output = "bin/myapp"
-entry = "cmd/main.fer"
+entry = "cmd/start.fer"
 
 [cache]
 path = ".ferret/cache"

@@ -1,7 +1,4 @@
-[default]
 name = "std"
-version = "1.0.0"
-description = "Ferret Standard Library"
 
 [compiler]
 version = "0.1.0"

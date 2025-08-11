@@ -2,7 +2,7 @@ package modules
 
 import (
 	"ferret/colors"
-	"ferret/internal/config"
+	"ferret/config"
 	"ferret/internal/utils/fs"
 	"ferret/toml"
 	"os"

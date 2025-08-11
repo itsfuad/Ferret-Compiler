@@ -1,7 +1,4 @@
-[default]
 name = "math"
-version = "1.0.0"
-description = "Ferret Math Library"
 
 [compiler]
 version = "0.1.0"

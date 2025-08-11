@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	//"ferret/internal/backend"
-	"ferret/internal/config"
+	"ferret/config"
 )
 
 const (
@@ -26,21 +26,8 @@ const (
 
 // HandleGetCommand handles the "ferret get" command
 func HandleGetCommand(module string) {
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		colors.RED.Println(err)
-		os.Exit(1)
-	}
 
-	// Enforce: must be run from project root (directory containing fer.ret)
-	ferretPath := filepath.Join(cwd, CONFIG_FILE)
-	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println(INVALID_LOCATION_ERROR)
-		os.Exit(1)
-	}
-
-	projectRoot := cwd
+	projectRoot := getRoot()
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -85,17 +72,8 @@ func HandleGetCommand(module string) {
 
 // HandleRemoveCommand handles the "ferret remove" command
 func HandleRemoveCommand(module string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		colors.RED.Println(err)
-		os.Exit(1)
-	}
-	ferretPath := filepath.Join(cwd, CONFIG_FILE)
-	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println(INVALID_LOCATION_ERROR)
-		os.Exit(1)
-	}
-	projectRoot := cwd
+
+	projectRoot := getRoot()
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -194,21 +172,8 @@ func HandleCleanupCommand() {
 
 // HandleUpdateCommand handles the "ferret update" command
 func HandleUpdateCommand(module string) {
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		colors.RED.Println(err)
-		os.Exit(1)
-	}
 
-	// Enforce: must be run from project root (directory containing fer.ret)
-	ferretPath := filepath.Join(cwd, CONFIG_FILE)
-	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println(INVALID_LOCATION_ERROR)
-		os.Exit(1)
-	}
-
-	projectRoot := cwd
+	projectRoot := getRoot()
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -225,7 +190,7 @@ func HandleUpdateCommand(module string) {
 	}
 
 	// Create dependency manager
-	dm, err := modules.NewDependencyManager(projectRoot)
+	dm, err := modules.NewDependencyManager(projectConfig.ProjectRoot)
 	if err != nil {
 		colors.RED.Printf(DEPENDENCY_ERROR, err)
 		os.Exit(1)
@@ -254,21 +219,8 @@ func HandleUpdateCommand(module string) {
 
 // HandleSniffCommand handles the "ferret sniff" command
 func HandleSniffCommand() {
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		colors.RED.Println(err)
-		os.Exit(1)
-	}
 
-	// Enforce: must be run from project root (directory containing fer.ret)
-	ferretPath := filepath.Join(cwd, CONFIG_FILE)
-	if _, err := os.Stat(ferretPath); err != nil {
-		colors.RED.Println(INVALID_LOCATION_ERROR)
-		os.Exit(1)
-	}
-
-	projectRoot := cwd
+	projectRoot := getRoot()
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -285,7 +237,7 @@ func HandleSniffCommand() {
 	}
 
 	// Create dependency manager
-	dm, err := modules.NewDependencyManager(projectRoot)
+	dm, err := modules.NewDependencyManager(projectConfig.ProjectRoot)
 	if err != nil {
 		colors.RED.Printf(DEPENDENCY_ERROR, err)
 		os.Exit(1)
@@ -337,9 +289,7 @@ func HandleInitCommand(projectName string) {
 	}
 }
 
-// HandleRunCommand handles the "ferret run" command
-func HandleRunCommand(debug bool) {
-	// Get current working directory
+func GetRoot() string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		colors.RED.Println("❌ Error getting current directory:", err)
@@ -353,7 +303,30 @@ func HandleRunCommand(debug bool) {
 		os.Exit(1)
 	}
 
-	projectRoot := cwd
+	return cwd
+}
+
+func getRoot() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		colors.RED.Println("❌ Error getting current directory:", err)
+		os.Exit(1)
+	}
+
+	// Enforce: must be run from project root (directory containing fer.ret)
+	ferretPath := filepath.Join(cwd, CONFIG_FILE)
+	if _, err := os.Stat(ferretPath); err != nil {
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
+		os.Exit(1)
+	}
+	
+	return cwd
+}
+
+// HandleRunCommand handles the "ferret run" command
+func HandleRunCommand(debug bool) {
+
+	projectRoot := getRoot()
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -363,7 +336,7 @@ func HandleRunCommand(debug bool) {
 	}
 
 	// Check if entry point file exists
-	entryPath := filepath.Join(projectRoot, projectConfig.Build.Entry)
+	entryPath := filepath.Join(projectConfig.ProjectRoot, projectConfig.Build.Entry)
 	if _, err := os.Stat(entryPath); err != nil {
 		colors.RED.Printf("❌ Entry point file not found: %s\n", projectConfig.Build.Entry)
 		os.Exit(1)
@@ -378,14 +351,14 @@ func HandleRunCommand(debug bool) {
 	colors.BLUE.Printf("🚀 Running project with entry point: %s\n", projectConfig.Build.Entry)
 
 	// Use the existing compile function from cmd package
-	context := cmd.Compile(entryPath, debug, projectConfig.Build.Output)
+	context := cmd.Compile(projectConfig, debug)
 
 	// Only destroy and print modules if context is not nil
 	if context != nil {
-		defer context.Destroy()
 		if debug {
 			context.PrintModules()
 		}
+		context.Destroy()
 	}
 }
 

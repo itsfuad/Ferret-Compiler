@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"ferret/colors"
-	"ferret/internal/config"
+	"ferret/config"
 	"ferret/internal/frontend/ast"
 	"ferret/internal/modules"
 	"ferret/internal/symbol"
@@ -23,9 +23,9 @@ type CompilerContext struct {
 	Modules    map[string]*modules.Module // key: import path
 	Reports    report.Reports
 	// Project configuration
-	ProjectConfig *config.ProjectConfig
-	ProjectRoot   string
-	ModulesPath   string // Path to system built-in modules
+	ProjectConfig       *config.ProjectConfig
+	ProjectRootFullPath string
+	ModulesPath         string // Path to system built-in modules
 
 	// Remote module cache path (.ferret/modules)
 	RemoteCachePath string
@@ -50,7 +50,7 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 		return c.CachePathToImportPath(fullPath)
 	}
 
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
+	relPath, err := filepath.Rel(c.ProjectRootFullPath, fullPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
 		return ""
 	}
@@ -64,7 +64,7 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	}
 	if projectName == "" {
 		// Fallback to folder name if project name is not available
-		projectName = filepath.Base(c.ProjectRoot)
+		projectName = filepath.Base(c.ProjectRootFullPath)
 	}
 
 	return projectName + "/" + moduleName
@@ -279,7 +279,7 @@ func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) er
 	}
 
 	// Load lockfile to get dependency information
-	lockfile, err := modules.LoadLockfile(c.ProjectRoot)
+	lockfile, err := modules.LoadLockfile(c.ProjectRootFullPath)
 	if err != nil {
 		return fmt.Errorf("failed to load lockfile: %w", err)
 	}
@@ -576,60 +576,39 @@ func getModulesPath() string {
 	return filepath.ToSlash(absPath)
 }
 
-func NewCompilerContext(entrypointFullpath string) *CompilerContext {
+func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
 	}
 	contextCreated = true
 
-	// Load project configuration
-	root, err := config.FindProjectRoot(entrypointFullpath)
-	if err != nil {
-		panic(err)
-	}
-
-	projectConfig, err := config.LoadProjectConfig(root)
-	if err != nil {
-		colors.RED.Printf("Failed to load project config: %s\n", err)
-		os.Exit(1)
-	}
-
-	if err = config.ValidateProjectConfig(projectConfig); err != nil {
+	if err := config.ValidateProjectConfig(projectConfig); err != nil {
 		colors.RED.Printf("Invalid project configuration: %s\n", err)
 		os.Exit(1)
 	}
 
-	//get the entry point relative to the project root
-	entryPoint, err := filepath.Rel(root, entrypointFullpath)
-	if err != nil {
-		colors.RED.Printf("Failed to get relative path for entry point: %s\n", err)
-		os.Exit(1)
-	}
+	//join entry point with project root
+	entryPoint := filepath.Join(projectConfig.ProjectRoot, projectConfig.Build.Entry)
+
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
 	// Determine modules path relative to compiler binary
 	modulesPath := getModulesPath()
 
 	// Set up remote module cache path
-	remoteCachePath := filepath.Join(root, ".ferret", "modules")
+	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, ".ferret", "modules")
 	remoteCachePath = filepath.ToSlash(remoteCachePath)
 	os.MkdirAll(remoteCachePath, 0755)
 
-	// Debug: print modules path for troubleshooting
-	if len(os.Args) > 1 && strings.Contains(strings.Join(os.Args, " "), "--debug") {
-		colors.YELLOW.Printf("Modules path: %s\n", modulesPath)
-		colors.YELLOW.Printf("Remote cache path: %s\n", remoteCachePath)
-	}
-
 	return &CompilerContext{
-		EntryPoint:      entryPoint,
-		Builtins:        symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:         make(map[string]*modules.Module),
-		Reports:         report.Reports{},
-		ProjectConfig:   projectConfig,
-		ProjectRoot:     root,
-		ModulesPath:     modulesPath,
-		RemoteCachePath: remoteCachePath,
+		EntryPoint:          entryPoint,
+		Builtins:            symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:             make(map[string]*modules.Module),
+		Reports:             report.Reports{},
+		ProjectConfig:       projectConfig,
+		ModulesPath:         modulesPath,
+		RemoteCachePath:     remoteCachePath,
+		ProjectRootFullPath: projectConfig.ProjectRoot,
 	}
 }
 

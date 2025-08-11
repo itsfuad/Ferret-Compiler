@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"ferret/internal/config"
+	"ferret/config"
 	"ferret/internal/ctx"
 	"ferret/internal/frontend/ast"
 	"ferret/internal/modules"
@@ -46,12 +46,12 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 	entryPoint = filepath.ToSlash(entryPoint)
 
 	return &ctx.CompilerContext{
-		EntryPoint:    entryPoint,
-		Builtins:      symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)),
-		Modules:       make(map[string]*modules.Module),
-		Reports:       report.Reports{},
-		ProjectConfig: projectConfig,
-		ProjectRoot:   tempDir,
+		EntryPoint:          entryPoint,
+		Builtins:            symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)),
+		Modules:             make(map[string]*modules.Module),
+		Reports:             report.Reports{},
+		ProjectConfig:       projectConfig,
+		ProjectRootFullPath: tempDir,
 	}
 }
 
