@@ -205,7 +205,6 @@ func IsProjectRoot(dir string) bool {
 	return err == nil
 }
 
-
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 
 	projectRoot, err := filepath.Abs(projectRoot)

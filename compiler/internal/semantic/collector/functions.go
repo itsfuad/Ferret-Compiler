@@ -52,8 +52,6 @@ func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, pa
 
 	functionSymbol.SelfScope.ScopeName = symbol.SYMBOL_TABLE_FUNCTION
 
-	colors.GREEN.Printf("Declared function symbol '%s' (incomplete) at %s\n", fn.ID, fn.Loc())
-
 	return functionSymbol.SelfScope // Return the function's local scope for further collection
 }
 

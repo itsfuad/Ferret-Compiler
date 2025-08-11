@@ -315,7 +315,7 @@ func getRoot() string {
 		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)
 	}
-	
+
 	return cwd
 }
 

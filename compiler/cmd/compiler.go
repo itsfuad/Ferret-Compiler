@@ -101,7 +101,7 @@ func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.Co
 		}
 	}()
 
-	p := parser.NewParser(fullPath, context, true)
+	p := parser.NewParser(fullPath, context, isDebugEnabled)
 	program := p.Parse()
 
 	if program == nil {
