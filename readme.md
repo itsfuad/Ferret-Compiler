@@ -1,5 +1,6 @@
 # Ferret Programming Language (In Development)
 
+![Discord Shield](https://discord.com/api/guilds/1243622698551345153/widget.png?style=shield)
 [![CI](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/ci.yml)
 [![Release](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/release.yml/badge.svg)](https://github.com/itsfuad/Ferret-Compiler/actions/workflows/release.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
@@ -481,6 +482,3 @@ The project uses GitHub Actions for continuous integration and deployment:
 
 ## License
 This project is licensed under the Mozilla Public License 2.0 - see the LICENSE file for details.
-
-## Join Discord
-[![Join the Ferret Discord Server](https://img.shields.io/discord/1243622698551345153.svg?label=Join%20Discord&style=flat-square)](https://discord.com/invite/yQKcHhKzyn)
