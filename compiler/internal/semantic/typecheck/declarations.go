@@ -133,10 +133,6 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			continue
 		}
 	}
-
-	if r.Debug {
-		colors.TEAL.Printf("Type checked assignment statement at %s\n", assign.Loc())
-	}
 }
 
 func checkExprListType(r *analyzer.AnalyzerNode, exprs *ast.ExpressionList, cm *modules.Module) []stype.Type {

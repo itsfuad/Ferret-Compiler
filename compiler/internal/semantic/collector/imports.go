@@ -17,8 +17,6 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 		}
 	}()
 
-	colors.BLUE.Printf("Collecting symbols from import '%s' at %s\n", imp.ImportPath.Value, imp.Loc())
-
 	// Get the current module
 	currentModule, err := collector.Ctx.GetModule(collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
 	if err != nil {

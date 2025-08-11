@@ -47,8 +47,6 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 	if node == nil {
 		return
 	}
-
-	colors.BROWN.Printf("Collecting symbols from node <%T> at %s\n", node, node.Loc())
 	// collect functions for forward declarations
 	switch n := node.(type) {
 	case *ast.ImportStmt:

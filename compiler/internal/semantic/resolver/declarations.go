@@ -22,8 +22,6 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 		return
 	}
 
-	colors.PINK.Printf("Resolving function declaration '%s' on %s scope at %s\n", fn.Identifier.Name, functionSymbol.SelfScope.ScopeName, fn.Loc())
-
 	resolveFunctionLike(r, fn.Function, functionSymbol, cm)
 }
 
@@ -42,7 +40,6 @@ func resolveFunctionLike(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, func
 		return // Error occurred during return type resolution
 	}
 
-	fmt.Printf("Resolved function '%s' with parameters: %v and return type: %v\n", fn.ID, paramTypes, returnType)
 	// Resolve function body
 	originalTable := cm.SymbolTable
 	cm.SymbolTable = functionSymbol.SelfScope // Temporarily switch to function scope
@@ -189,8 +186,6 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
-
-	colors.ORANGE.Printf("Resolving variable declaration from %s\n", cm.SymbolTable.ScopeName)
 
 	for i, variable := range decl.Variables {
 

@@ -97,7 +97,6 @@ func findProjectConfigForModule(moduleFilePath string) (string, error) {
 func ResolveBuiltinModule(importPath string, modulePath string) (string, error) {
 
 	modulePath = filepath.Join(modulePath, importPath+".fer")
-	colors.AQUA.Printf("Searching for built-in module: %s -> %s\n", importPath, modulePath)
 
 	if fs.IsValidFile(modulePath) {
 		return modulePath, nil
