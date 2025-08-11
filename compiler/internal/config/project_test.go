@@ -265,7 +265,7 @@ func TestParseDefaultSection(t *testing.T) {
 				},
 			},
 			want: ProjectConfig{
-				Name:    testProjectName,
+				Name: testProjectName,
 			},
 		},
 		{
