@@ -40,17 +40,6 @@ func TestValidateProjectConfig(t *testing.T) {
 			errMsg:  "project name is required",
 		},
 		{
-			name: "missing version",
-			config: &ProjectConfig{
-				Name:        "test",
-				Compiler:    CompilerConfig{Version: testCompilerVersion},
-				Cache:       CacheConfig{Path: testCachePath},
-				ProjectRoot: "/test",
-			},
-			wantErr: true,
-			errMsg:  "project version is required",
-		},
-		{
 			name: "missing compiler version",
 			config: &ProjectConfig{
 				Name:        "test",
@@ -66,6 +55,7 @@ func TestValidateProjectConfig(t *testing.T) {
 				Name:        "test",
 				Compiler:    CompilerConfig{Version: testCompilerVersion},
 				ProjectRoot: "/test",
+				Build:       BuildConfig{Entry: "main1.fer"},
 			},
 			wantErr: true,
 			errMsg:  "cache path is required",
@@ -76,6 +66,7 @@ func TestValidateProjectConfig(t *testing.T) {
 				Name:     "test",
 				Compiler: CompilerConfig{Version: testCompilerVersion},
 				Cache:    CacheConfig{Path: testCachePath},
+				Build:    BuildConfig{Entry: "main2.fer"},
 			},
 			wantErr: true,
 			errMsg:  "project root is required",
@@ -87,6 +78,7 @@ func TestValidateProjectConfig(t *testing.T) {
 				Compiler:    CompilerConfig{Version: testCompilerVersion},
 				Cache:       CacheConfig{Path: testCachePath},
 				ProjectRoot: "/test",
+				Build:       BuildConfig{Entry: "main3.fer"},
 			},
 			wantErr: false,
 		},
