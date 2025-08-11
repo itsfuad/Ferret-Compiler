@@ -21,7 +21,6 @@ type ProjectConfig struct {
 	Build        BuildConfig      `toml:"build"`
 	Dependencies DependencyConfig `toml:"dependencies"`
 	ProjectRoot  string
-
 	// Top-level project metadata
 	Name string `toml:"name"`
 }
@@ -209,6 +208,12 @@ func IsProjectRoot(dir string) bool {
 
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 
+	projectRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		colors.RED.Printf("❌ Failed to get absolute path of project root: %s\n", err)
+		os.Exit(1)
+	}
+
 	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 	// Use our custom TOML parser
 	tomlData, err := toml.ParseTOMLFile(filepath.FromSlash(configPath))
@@ -289,21 +294,18 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	}
 }
 
-func FindProjectRoot(entryFile string) (string, error) {
-	// Get the absolute path of the entry file
-	absEntryFile, err := filepath.Abs(entryFile)
+func FindProjectRoot(filePath string) (string, error) {
+
+	filePath, err := filepath.Abs(filePath)
 	if err != nil {
-		return "", fmt.Errorf("❌ failed to get absolute path of entry file: %w", err)
+		return "", fmt.Errorf("❌ failed to get absolute path of entry: %w", err)
 	}
 
-	// Start from the directory containing the entry file
-	dir := filepath.Dir(absEntryFile)
-	originalDir := dir // Store original for better error message
+	dir := filepath.Dir(filePath)
 
 	// Walk up the directory tree until we find a fer.ret file
 	for {
 		configPath := filepath.Join(dir, CONFIG_FILE)
-
 		// Check if fer.ret exists in this directory
 		if _, err := os.Stat(configPath); err == nil {
 			// Found the project root
@@ -321,5 +323,5 @@ func FindProjectRoot(entryFile string) (string, error) {
 		dir = parent
 	}
 
-	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", CONFIG_FILE, originalDir)
+	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", CONFIG_FILE, dir)
 }

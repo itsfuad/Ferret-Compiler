@@ -15,7 +15,7 @@ if %errorlevel% neq 0 (
 )
 echo Running Ferret...
 cd ../bin
-ferret.exe run -debug
+ferret.exe run ../app -debug
 if %errorlevel% neq 0 (
     echo Execution failed. Exiting...
     exit /b %errorlevel%

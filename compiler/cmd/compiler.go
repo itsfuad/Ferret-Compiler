@@ -2,9 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
+	"strings"
 
+	"ferret/cmd/flags"
 	"ferret/colors"
 	"ferret/config"
 	"ferret/internal/ctx"
@@ -17,9 +21,69 @@ import (
 	"ferret/internal/semantic/typecheck"
 )
 
+// checkCompilerVersion checks if the current compiler version is compatible
+func checkCompilerVersion(requiredVersion string) error {
+	currentVersion := flags.FERRET_VERSION
+	// Parse versions (simple semantic version comparison)
+	current := parseVersion(currentVersion)
+	required := parseVersion(requiredVersion)
+
+	// Check if current version is less than required
+	if compareVersions(current, required) < 0 {
+		return fmt.Errorf("compiler version %s is less than required version %s", currentVersion, requiredVersion)
+	}
+
+	return nil
+}
+
+// parseVersion parses a semantic version string into comparable parts
+func parseVersion(version string) []int {
+	parts := strings.Split(version, ".")
+	nums := make([]int, 3) // major.minor.patch
+
+	for i, part := range parts {
+		if i >= 3 {
+			break
+		}
+		if num, err := strconv.Atoi(part); err == nil {
+			nums[i] = num
+		}
+	}
+
+	return nums
+}
+
+// compareVersions compares two version arrays
+// Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+func compareVersions(v1, v2 []int) int {
+	for i := 0; i < 3; i++ {
+		if v1[i] < v2[i] {
+			return -1
+		}
+		if v1[i] > v2[i] {
+			return 1
+		}
+	}
+	return 0
+}
+
 func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.CompilerContext) {
 
-	fullPath, err := filepath.Abs(config.Build.Entry)
+	// Check if entry point file exists
+	if _, err := os.Stat(config.ProjectRoot); err != nil {
+		colors.RED.Printf("❌ Entry point file not found: %s\n", config.ProjectRoot)
+		os.Exit(1)
+	}
+
+	// Check compiler version compatibility
+	if err := checkCompilerVersion(config.Compiler.Version); err != nil {
+		colors.RED.Printf("❌ Compiler version incompatibility: %s\n", err)
+		os.Exit(1)
+	}
+
+	colors.BLUE.Printf("🚀 Running project with entry point: %s\n", config.Build.Entry)
+
+	fullPath, err := filepath.Abs(filepath.Join(config.ProjectRoot, config.Build.Entry))
 	if err != nil {
 		panic(fmt.Errorf("failed to get absolute path: %w", err))
 	}

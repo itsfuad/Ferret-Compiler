@@ -25,7 +25,15 @@ type Args struct {
 	ListCommand    bool
 	CleanupCommand bool
 	RunCommand     bool
+	RunTarget      string // Target directory for the run command to execute in
 	InvalidCommand string
+}
+
+func getVal(commandArgs *[]string, target *string) {
+	if len(*commandArgs) > 0 && (*commandArgs)[0][0] != '-' {
+		*target = (*commandArgs)[0]
+		*commandArgs = (*commandArgs)[1:]
+	}
 }
 
 // ParseArgs processes all command-line arguments using Go's flag package
@@ -47,30 +55,19 @@ func ParseArgs() *Args {
 	switch command {
 	case "init":
 		result.InitProject = true
-		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
-			result.ProjectName = commandArgs[0]
-			commandArgs = commandArgs[1:]
-		}
+		getVal(&commandArgs, &result.ProjectName)
 	case "get":
 		result.GetCommand = true
-		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
-			result.GetModule = commandArgs[0]
-			commandArgs = commandArgs[1:]
-		}
+		getVal(&commandArgs, &result.GetModule)
 	case "update":
 		result.UpdateCommand = true
-		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
-			result.UpdateModule = commandArgs[0]
-			commandArgs = commandArgs[1:]
-		}
+		getVal(&commandArgs, &result.UpdateModule)
 	case "remove":
 		result.RemoveCommand = true
-		if len(commandArgs) > 0 && commandArgs[0][0] != '-' {
-			result.RemoveModule = commandArgs[0]
-			commandArgs = commandArgs[1:]
-		}
+		getVal(&commandArgs, &result.RemoveModule)
 	case "run":
 		result.RunCommand = true
+		getVal(&commandArgs, &result.RunTarget)
 	case "sniff":
 		result.SniffCommand = true
 	case "list":
