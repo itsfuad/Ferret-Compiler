@@ -140,7 +140,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 // checkFieldAccessType handles struct field access and method access
 func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccessExpr, cm *modules.Module) stype.Type {
 
-	colors.PINK.Printf("Checking field access on field '%s' at %s\n", fieldAccess.Field.Name, fieldAccess.Loc())
+	colors.PINK.Printf("Checking field access on field %q at %s\n", fieldAccess.Field.Name, fieldAccess.Loc())
 
 	if fieldAccess.Object == nil || fieldAccess.Field == nil {
 		r.Ctx.Reports.AddSemanticError(
@@ -178,7 +178,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
-			fmt.Sprintf("Struct has no field named '%s'", propName),
+			fmt.Sprintf("Struct has no field named %q", propName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil // Field not found
@@ -192,7 +192,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
-			fmt.Sprintf("Interface has no method named '%s'", propName),
+			fmt.Sprintf("Interface has no method named %q", propName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil // Method not found
@@ -206,7 +206,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				location,
-				fmt.Sprintf("Unknown user type '%s'", userType.Name),
+				fmt.Sprintf("Unknown user type %q", userType.Name),
 				report.TYPECHECK_PHASE,
 			)
 			return nil // User type not found
@@ -217,7 +217,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				location,
-				fmt.Sprintf("User type '%s' has no method or field named '%s'", userType.Name, propName),
+				fmt.Sprintf("User type %q has no method or field named %q", userType.Name, propName),
 				report.TYPECHECK_PHASE,
 			)
 			return nil // Method/field not found
@@ -296,7 +296,7 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			structLiteral.Loc(),
-			fmt.Sprintf("Unknown struct type '%s'", structTypeName),
+			fmt.Sprintf("Unknown struct type %q", structTypeName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
@@ -309,7 +309,7 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			structLiteral.Loc(),
-			fmt.Sprintf("type '%s' is not a user defined type", structTypeName),
+			fmt.Sprintf("type %q is not a user defined type", structTypeName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
@@ -321,7 +321,7 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			structLiteral.Loc(),
-			fmt.Sprintf("'%s' is not a struct type", structTypeName),
+			fmt.Sprintf("%q is not a struct type", structTypeName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
@@ -345,7 +345,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		expectedFieldType, exists := structType.Fields[fieldName]
 		if !exists {
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, &field.Location,
-				fmt.Sprintf("Struct '%s' has no field named '%s'", structTypeName, fieldName),
+				fmt.Sprintf("Struct %q has no field named %q", structTypeName, fieldName),
 				report.TYPECHECK_PHASE,
 			)
 			continue
@@ -382,7 +382,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				structLiteral.Loc(),
-				fmt.Sprintf("Missing required field '%s' in struct literal for '%s'", fieldName, structTypeName),
+				fmt.Sprintf("Missing required field %q in struct literal for %q", fieldName, structTypeName),
 				report.TYPECHECK_PHASE,
 			)
 		}

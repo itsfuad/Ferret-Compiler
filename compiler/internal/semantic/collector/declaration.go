@@ -24,7 +24,7 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 			continue
 		}
 		if c.Debug {
-			colors.GREEN.Printf("Declared variable symbol '%s' (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
+			colors.GREEN.Printf("Declared variable symbol %q (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
 		}
 	}
 	// Collect initializers if any
@@ -55,6 +55,6 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 		return
 	}
 	if c.Debug {
-		colors.GREEN.Printf("Declared type symbol '%s' (incomplete) at %s\n", aliasName, decl.Alias.Loc())
+		colors.GREEN.Printf("Declared type symbol %q (incomplete) at %s\n", aliasName, decl.Alias.Loc())
 	}
 }

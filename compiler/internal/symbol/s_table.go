@@ -44,7 +44,7 @@ func (st *SymbolTable) IsInFunctionScope() bool {
 
 func (st *SymbolTable) Declare(name string, sym *Symbol) error {
 	if _, exists := st.Symbols[name]; exists {
-		return fmt.Errorf("symbol '%s' already declared in this scope", name)
+		return fmt.Errorf("symbol %q already declared in this scope", name)
 	}
 	st.Symbols[name] = sym
 	st.Symbols[name].SelfScope = NewSymbolTable(st) // Set the scope for this symbol
@@ -69,9 +69,9 @@ func (st *SymbolTable) AddImport(alias, importPath string, moduleSymbolTable *Sy
 	for existingAlias, existingPath := range st.ImportPaths {
 		if existingPath == importPath {
 			if existingAlias == alias {
-				return fmt.Errorf("'%s' already imported", importPath)
+				return fmt.Errorf("%q already imported", importPath)
 			} else {
-				return fmt.Errorf("'%s' already imported with alias '%s'", importPath, existingAlias)
+				return fmt.Errorf("%q already imported with alias %q", importPath, existingAlias)
 			}
 		}
 	}
@@ -79,7 +79,7 @@ func (st *SymbolTable) AddImport(alias, importPath string, moduleSymbolTable *Sy
 	// Check if the alias is already used by a different module
 	if existingPath, exists := st.ImportPaths[alias]; exists {
 		if existingPath != importPath {
-			return fmt.Errorf("alias '%s' is already used by import '%s'. Use a different alias with 'as'", alias, existingPath)
+			return fmt.Errorf("alias %q is already used by import %q. Use a different alias with 'as'", alias, existingPath)
 		}
 	}
 
@@ -125,5 +125,5 @@ func (st *SymbolTable) GetImportedModule(alias string) (*SymbolTable, error) {
 	if st.Parent != nil {
 		return st.Parent.GetImportedModule(alias)
 	}
-	return nil, fmt.Errorf("imported module '%s' not found", alias)
+	return nil, fmt.Errorf("imported module %q not found", alias)
 }

@@ -17,7 +17,7 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_COLLECTED {
 			// Already processed or in a later phase, skip
 			if c.Debug {
-				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase)
+				colors.BLUE.Printf("Skipping collection for %q (already in phase: %s)\n", c.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -39,7 +39,7 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	c.Ctx.SetModulePhase(importPath, modules.PHASE_COLLECTED)
 
 	if c.Debug {
-		colors.BLUE.Printf("Collected symbols for '%s'\n", c.Program.FullPath)
+		colors.BLUE.Printf("Collected symbols for %q\n", c.Program.FullPath)
 	}
 }
 

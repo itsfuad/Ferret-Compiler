@@ -33,7 +33,7 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			initializer.Loc(),
-			fmt.Sprintf("cannot assign void expression to variable '%s'", variable.Identifier.Name),
+			fmt.Sprintf("cannot assign void expression to variable %q", variable.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		).AddHint("Void means no type. Not even null. So, a variable cannot be void. It must have a valid type.")
 		return
@@ -43,7 +43,7 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
 		if r.Debug {
-			colors.TEAL.Printf("Inferred type '%s' for variable '%s' at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
+			colors.TEAL.Printf("Inferred type %q for variable %q at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
 		}
 		return
 	}
@@ -69,7 +69,7 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			variable.ExplicitType.Loc(),
-			fmt.Sprintf("variable '%s' cannot be declared with void type", variable.Identifier.Name),
+			fmt.Sprintf("variable %q cannot be declared with void type", variable.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -79,7 +79,7 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			initializer.Loc(),
-			fmt.Sprintf("cannot assign value of type '%s' to variable '%s' of type '%s': %s",
+			fmt.Sprintf("cannot assign value of type %q to variable %q of type %q: %s",
 				inferredType, variable.Identifier.Name, explicitType, err.Error()),
 			report.TYPECHECK_PHASE,
 		)
@@ -126,7 +126,7 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 			continue
 		}
 		if ok, err := isImplicitCastable(lhsType, rhsType); !ok {
-			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type '%s' to assignee of type '%s': %s", rhsType, lhsType, err.Error()), report.TYPECHECK_PHASE)
+			rp := r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), fmt.Sprintf("cannot assign value of type %q to assignee of type %q: %s", rhsType, lhsType, err.Error()), report.TYPECHECK_PHASE)
 			if ok, _ := isExplicitCastable(rhsType, lhsType); ok {
 				rp.AddHint(msg.CastHint(lhsType))
 			}
@@ -167,7 +167,7 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			funcDecl.Loc(),
-			fmt.Sprintf("Function '%s' not found in symbol table", funcDecl.Identifier.Name),
+			fmt.Sprintf("Function %q not found in symbol table", funcDecl.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -185,7 +185,7 @@ func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *m
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			methodDecl.Receiver.Type.Loc(),
-			fmt.Sprintf("Receiver type '%s' not found in symbol table", methodDecl.Receiver.Type.Type().String()),
+			fmt.Sprintf("Receiver type %q not found in symbol table", methodDecl.Receiver.Type.Type().String()),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -197,7 +197,7 @@ func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *m
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			methodDecl.Loc(),
-			fmt.Sprintf("Method '%s' not found in symbol table", methodDecl.Method.Name),
+			fmt.Sprintf("Method %q not found in symbol table", methodDecl.Method.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return

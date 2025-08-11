@@ -24,7 +24,7 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 
 func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 
-	colors.AQUA.Printf("Collecting function literal '%s' at %s\n", fn.ID, fn.Loc())
+	colors.AQUA.Printf("Collecting function literal %q at %s\n", fn.ID, fn.Loc())
 
 	functionScope := declareFunctionSymbol(c, fn, cm.SymbolTable, symbol.SymbolFunc)
 	if functionScope == nil {
@@ -74,7 +74,7 @@ func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral
 		}
 
 		if c.Debug {
-			colors.GREEN.Printf("Declared parameter symbol '%s' (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc())
+			colors.GREEN.Printf("Declared parameter symbol %q (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc())
 		}
 	}
 }
@@ -110,12 +110,12 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 	// Check if the receiver type is already defined
 	receiverSymbol, found := cm.SymbolTable.Lookup(string(utype.TypeName))
 	if !found {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type '%s' not found in symbol table", utype.TypeName), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type %q not found in symbol table", utype.TypeName), report.COLLECTOR_PHASE)
 		return
 	}
 
 	if receiverSymbol.SelfScope == nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type '%s' does not have a valid symbol table", utype.TypeName), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type %q does not have a valid symbol table", utype.TypeName), report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -138,7 +138,7 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "Failed to declare receiver symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	} else {
-		colors.GREEN.Printf("Declared receiver symbol '%s' (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
+		colors.GREEN.Printf("Declared receiver symbol %q (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
 	}
 
 	collectFunctionParameters(c, method.Function, methodScope)

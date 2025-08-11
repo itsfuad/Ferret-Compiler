@@ -57,7 +57,7 @@ func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			cast.Loc(),
-			fmt.Sprintf("cannot cast from '%s' to '%s': %v", sourceType, targetType, err),
+			fmt.Sprintf("cannot cast from %q to %q: %v", sourceType, targetType, err),
 			report.TYPECHECK_PHASE,
 		)
 		return &stype.Invalid{}
@@ -103,7 +103,7 @@ func isImplicitCastable(target, source stype.Type) (bool, error) {
 		}
 	}
 
-	return false, fmt.Errorf("type '%s' and '%s' are not compatible", source, target)
+	return false, fmt.Errorf("type %q and %q are not compatible", source, target)
 }
 
 func isExplicitCastable(target, source stype.Type) (bool, error) {

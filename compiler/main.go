@@ -67,7 +67,7 @@ func main() {
 
 	// Handle invalid commands
 	if args.InvalidCommand != "" {
-		colors.RED.Printf("❌ Invalid command: '%s'\n", args.InvalidCommand)
+		colors.RED.Printf("❌ Invalid command: %q\n", args.InvalidCommand)
 		fmt.Println()
 		flags.Usage()
 		os.Exit(1)

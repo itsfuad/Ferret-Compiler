@@ -226,7 +226,7 @@ func (p *Parser) Parse() *ast.Program {
 	}
 
 	if p.debug {
-		colors.BLUE.Printf("Parsed '%s'\n", p.fullPath)
+		colors.BLUE.Printf("Parsed %q\n", p.fullPath)
 	}
 
 	if p.modulename == "" {

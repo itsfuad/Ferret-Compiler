@@ -252,11 +252,11 @@ func (c *CompilerContext) IsRemoteModuleCached(flatModuleName string) bool {
 
 func (c *CompilerContext) GetModule(importPath string) (*modules.Module, error) {
 	if c.Modules == nil {
-		return nil, fmt.Errorf("module '%s' not found in context", importPath)
+		return nil, fmt.Errorf("module %q not found in context", importPath)
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return nil, fmt.Errorf("module '%s' not found in context", importPath)
+		return nil, fmt.Errorf("module %q not found in context", importPath)
 	}
 
 	// ✅ SECURITY CHECK: For remote modules, verify share setting every time they're accessed
@@ -439,7 +439,7 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 		return
 	}
 	if module == nil {
-		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
+		panic(fmt.Sprintf("Cannot add nil module for %q\n", importPath))
 	}
 
 	c.Modules[importPath] = &modules.Module{

@@ -61,7 +61,7 @@ func checkIfCondition(r *analyzer.AnalyzerNode, condition *ast.Expression, cm *m
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			(*condition).Loc(),
-			fmt.Sprintf("If condition must be boolean, got '%s'", conditionType),
+			fmt.Sprintf("If condition must be boolean, got %q", conditionType),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -105,7 +105,7 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				returnStmt.Loc(),
-				fmt.Sprintf("Function must return a value of type '%s'", expectedReturnType),
+				fmt.Sprintf("Function must return a value of type %q", expectedReturnType),
 				report.TYPECHECK_PHASE,
 			)
 		}
@@ -140,7 +140,7 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			returnStmt.Loc(),
-			fmt.Sprintf("Cannot return '%s' in function expecting '%s': %s",
+			fmt.Sprintf("Cannot return %q in function expecting %q: %s",
 				returnValueType, expectedReturnType, err.Error()),
 			report.TYPECHECK_PHASE,
 		)

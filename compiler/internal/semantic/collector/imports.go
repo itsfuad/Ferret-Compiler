@@ -55,7 +55,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	}
 
 	if collector.Debug {
-		colors.GREEN.Printf("Added import '%s' with alias '%s' to module '%s'\n", moduleKey, alias, collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
+		colors.GREEN.Printf("Added import %q with alias %q to module %q\n", moduleKey, alias, collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
 	}
 
 	//if already analyzed don't analyze again
