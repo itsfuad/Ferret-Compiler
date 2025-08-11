@@ -483,4 +483,4 @@ The project uses GitHub Actions for continuous integration and deployment:
 This project is licensed under the Mozilla Public License 2.0 - see the LICENSE file for details.
 
 ## Join Discord
-[![Join the Ferret Discord Server](https://img.shields.io/discord/123456789012345678.svg?label=Join%20Discord&style=flat-square)](https://discord.com/invite/yQKcHhKzyn)
+[![Join the Ferret Discord Server](https://img.shields.io/discord/1243622698551345153.svg?label=Join%20Discord&style=flat-square)](https://discord.com/invite/yQKcHhKzyn)
