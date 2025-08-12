@@ -128,8 +128,8 @@ func (dm *DependencyManager) GetOrphans() map[string]bool {
 	return orphans
 }
 
-// CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
-func (dm *DependencyManager) CleanupUnusedDependencies() error {
+// CleanUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
+func (dm *DependencyManager) CleanUnusedDependencies() error {
 	removed := 0
 	for key, entry := range dm.lockfile.Dependencies {
 		if !entry.Direct && len(entry.UsedBy) == 0 {

@@ -94,7 +94,7 @@ func TestAddRemoveUsedBy(t *testing.T) {
 	}
 }
 
-func TestRecursiveRemovalAndCacheCleanup(t *testing.T) {
+func TestRecursiveRemovalAndCacheClean(t *testing.T) {
 	lockfile := NewLockfile()
 	// Simulate a cache dir
 	tempDir := t.TempDir()
@@ -109,7 +109,7 @@ func TestRecursiveRemovalAndCacheCleanup(t *testing.T) {
 	if len(depEntry.UsedBy) != 0 {
 		t.Errorf("UsedBy not removed correctly")
 	}
-	// Simulate recursive removal and cache cleanup
+	// Simulate recursive removal and cache clean
 	delete(lockfile.Dependencies, TEST_DEP+"@"+VER2)
 	os.RemoveAll(cacheDir)
 	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {

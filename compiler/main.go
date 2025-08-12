@@ -52,9 +52,9 @@ func main() {
 		return
 	}
 
-	// Handle cleanup command
-	if args.CleanupCommand {
-		cli.HandleCleanupCommand()
+	// Handle clean command
+	if args.CleanCommand {
+		cli.HandleCleanCommand()
 		return
 	}
 

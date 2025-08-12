@@ -71,7 +71,7 @@ func (st *SymbolTable) AddImport(alias, importPath string, moduleSymbolTable *Sy
 			if existingAlias == alias {
 				return fmt.Errorf("%q already imported", importPath)
 			}
-			
+
 			return fmt.Errorf("%q already imported with alias %q", importPath, existingAlias)
 		}
 	}

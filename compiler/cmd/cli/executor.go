@@ -137,8 +137,8 @@ func HandleListCommand() {
 	}
 }
 
-// HandleCleanupCommand handles the "ferret cleanup" command
-func HandleCleanupCommand() {
+// HandleCleanCommand handles the "ferret clean" command
+func HandleCleanCommand() {
 	cwd, err := os.Getwd()
 	if err != nil {
 		colors.RED.Println(err)
@@ -158,10 +158,10 @@ func HandleCleanupCommand() {
 		os.Exit(1)
 	}
 
-	// Cleanup unused dependencies
-	err = dm.CleanupUnusedDependencies()
+	// Clean unused dependencies
+	err = dm.CleanUnusedDependencies()
 	if err != nil {
-		colors.RED.Printf("❌ Failed to cleanup dependencies: %s\n", err)
+		colors.RED.Printf("❌ Failed to clean dependencies: %s\n", err)
 		os.Exit(1)
 	}
 }
@@ -182,7 +182,7 @@ func HandleListOrphanCommand() {
 		for module := range orphans {
 			colors.YELLOW.Println(" -", module)
 		}
-		colors.CYAN.Println("\n💡 To remove orphaned cached modules, run: ferret cleanup")
+		colors.CYAN.Println("\n💡 To remove orphaned cached modules, run: ferret clean")
 		colors.CYAN.Println("This will remove unused modules from the cache.")
 	}
 }
