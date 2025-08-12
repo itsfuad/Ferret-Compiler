@@ -3,7 +3,6 @@ package modules
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
