@@ -26,6 +26,64 @@ type ProjectConfig struct {
 	Name string `toml:"name"`
 }
 
+var defaultConfig = toml.TOMLData{
+	"default": toml.TOMLTable{
+		"name": "",
+	},
+	"compiler": toml.TOMLTable{
+		"version": "",
+	},
+	"build": toml.TOMLTable{
+		"entry":  "",
+		"output": "",
+	},
+	"cache": toml.TOMLTable{
+		"path": "",
+	},
+	"remote": toml.TOMLTable{
+		"enabled": "",
+		"share":   "",
+	},
+	"neighbour":    toml.TOMLTable{},
+	"dependencies": toml.TOMLTable{},
+}
+
+func (conf *ProjectConfig) Save() {
+
+	// Validate the configuration
+	tomData := defaultConfig
+	tomData["default"] = toml.TOMLTable{
+		"name": conf.Name,
+	}
+	tomData["compiler"] = toml.TOMLTable{
+		"version": conf.Compiler.Version,
+	}
+	tomData["build"] = toml.TOMLTable{
+		"entry":  conf.Build.Entry,
+		"output": conf.Build.Output,
+	}
+	tomData["cache"] = toml.TOMLTable{
+		"path": conf.Cache.Path,
+	}
+	tomData["remote"] = toml.TOMLTable{
+		"enabled": conf.Remote.Enabled,
+		"share":   conf.Remote.Share,
+	}
+
+	for key, value := range conf.Neighbour.Projects {
+		tomData["neighbour"][key] = value
+	}
+	for key, value := range conf.Dependencies.Modules {
+		tomData["dependencies"][key] = value
+	}
+
+	// Save the configuration to the fer.ret file
+	if err := toml.WriteTOMLFile(filepath.Join(conf.ProjectRoot, CONFIG_FILE), tomData, nil); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+}
+
 // CompilerConfig contains compiler-specific settings
 type CompilerConfig struct {
 	Version string `toml:"version"`
@@ -151,27 +209,33 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 		os.Exit(1)
 	}
 
-	// Build configuration data structure
-	configData := toml.TOMLData{
-		"default": toml.TOMLTable{
-			"name": projectName,
-		},
-		"compiler": toml.TOMLTable{
-			"version": "0.1.0",
-		},
-		"build": toml.TOMLTable{
-			"entry":  "src/main.fer",
-			"output": "bin/" + projectName,
-		},
-		"cache": toml.TOMLTable{
-			"path": ".ferret/cache",
-		},
-		"remote": toml.TOMLTable{
-			"enabled": remoteEnabled,
-			"share":   shareEnabled,
-		},
-		"dependencies": toml.TOMLTable{},
+	configData := defaultConfig
+
+	configData["default"] = toml.TOMLTable{
+		"name": projectName,
 	}
+
+	configData["compiler"] = toml.TOMLTable{
+		"version": "0.1.0",
+	}
+
+	configData["build"] = toml.TOMLTable{
+		"entry":  "src/main.fer",
+		"output": "bin/" + projectName,
+	}
+
+	configData["cache"] = toml.TOMLTable{
+		"path": ".ferret/cache",
+	}
+
+	configData["remote"] = toml.TOMLTable{
+		"enabled": remoteEnabled,
+		"share":   shareEnabled,
+	}
+
+	configData["neighbour"] = toml.TOMLTable{}
+
+	configData["dependencies"] = toml.TOMLTable{}
 
 	return configData
 }
