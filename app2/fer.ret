@@ -1,0 +1,15 @@
+name = "myapps2"
+
+[compiler]
+version = "0.0.1"
+
+[build]
+output = ""
+entry = ""
+
+[cache]
+path = ".ferret/cache"
+
+[remote]
+enabled = true
+share = false

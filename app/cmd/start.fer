@@ -2,12 +2,14 @@ import "github.com/itsfuad/ferret-mod/data/bigint"; // unused import;
 import "github.com/itsfuad/ferret-mod/arrays/array"; // unused import;
 import "github.com/itsfuad/ferret-mod/external/importer"; // unused import;
 
-import "ferret/std/io";
-import "ferret/math/constants" as cc;
-import "ferret/math/geometry";
+import "modules/std/io";
+import "modules/math/constants" as cc;
+import "modules/math/geometry";
 
-import "myapp/cmd/expr"; // unused import
-import "myapp/cmd/arrays"; // unused import
+import "app/cmd/expr"; // unused import
+import "app/cmd/arrays"; // unused import
+
+import "app2/file2/types";
 
 let valueOfPi = cc::PI; 
 

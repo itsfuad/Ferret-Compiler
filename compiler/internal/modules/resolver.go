@@ -95,6 +95,10 @@ func findProjectConfigForModule(moduleFilePath string) (string, error) {
 
 // ResolveBuiltinModule resolves built-in system modules
 func ResolveBuiltinModule(importPath string, modulePath string) (string, error) {
+	// Strip the "modules/" prefix for directory-based imports
+	if after, ok := strings.CutPrefix(importPath, "modules/"); ok {
+		importPath = after
+	}
 
 	modulePath = filepath.Join(modulePath, importPath+".fer")
 
@@ -106,19 +110,19 @@ func ResolveBuiltinModule(importPath string, modulePath string) (string, error) 
 }
 
 // ResolveLocalModule resolves local project modules
-func ResolveLocalModule(importPath, projectName string, projectRoot string) (string, error) {
-	if projectName == "" {
-		return "", fmt.Errorf("project name not defined in configuration")
+func ResolveLocalModule(importPath, projectDirName string, projectRoot string) (string, error) {
+	if projectDirName == "" {
+		return "", fmt.Errorf("project directory name not defined")
 	}
 
 	importRoot := fs.FirstPart(importPath)
-	if importRoot != projectName {
+	if importRoot != projectDirName {
 		return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
 	}
 
-	// Remove the project name from the import path and resolve relative to project root
-	// e.g., "myapp/maths/math" becomes "maths/math"
-	relativePath := strings.TrimPrefix(importPath, projectName+"/")
+	// Remove the project directory name from the import path and resolve relative to project root
+	// e.g., "app/maths/math" becomes "maths/math"
+	relativePath := strings.TrimPrefix(importPath, projectDirName+"/")
 	resolvedPath := filepath.Join(projectRoot, relativePath+".fer")
 
 	if fs.IsValidFile(resolvedPath) {
@@ -126,6 +130,84 @@ func ResolveLocalModule(importPath, projectName string, projectRoot string) (str
 	}
 
 	return "", fmt.Errorf("module `%s` does not exist in this project", importPath)
+}
+
+// ResolveLocalProjectModule resolves modules from external local projects (like Go's replace directive)
+func ResolveLocalProjectModule(importPath string, localsConfig map[string]string) (string, error) {
+	if localsConfig == nil {
+		return "", fmt.Errorf("no local projects configured")
+	}
+
+	importRoot := fs.FirstPart(importPath)
+	localProjectPath, exists := localsConfig[importRoot]
+	if !exists {
+		return "", fmt.Errorf("local project `%s` not found in locals configuration", importRoot)
+	}
+
+	// Convert relative path to absolute if needed
+	if !filepath.IsAbs(localProjectPath) {
+		// Make it relative to the current working directory or project root
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get current working directory: %w", err)
+		}
+		localProjectPath = filepath.Join(cwd, localProjectPath)
+	}
+
+	// Check if the local project path exists
+	if stat, err := os.Stat(localProjectPath); err != nil || !stat.IsDir() {
+		return "", fmt.Errorf("local project path `%s` does not exist or is not a directory", localProjectPath)
+	}
+
+	// Remove the project root from the import path and resolve relative to the local project path
+	// e.g., "app2/file2/types" becomes "file2/types"
+	relativePath := strings.TrimPrefix(importPath, importRoot+"/")
+	resolvedPath := filepath.Join(localProjectPath, relativePath+".fer")
+
+	if fs.IsValidFile(resolvedPath) {
+		return resolvedPath, nil
+	}
+
+	return "", fmt.Errorf("module `%s` does not exist in local project `%s`", relativePath, localProjectPath)
+}
+
+// ResolveNeighbourProjectModule resolves modules from external neighbouring projects (like Go's replace directive)
+func ResolveNeighbourProjectModule(importPath string, neighbourConfig map[string]string) (string, error) {
+	if neighbourConfig == nil {
+		return "", fmt.Errorf("no neighbouring projects configured")
+	}
+
+	importRoot := fs.FirstPart(importPath)
+	neighbourProjectPath, exists := neighbourConfig[importRoot]
+	if !exists {
+		return "", fmt.Errorf("neighbouring project `%s` not found in neighbour configuration", importRoot)
+	}
+
+	// Convert relative path to absolute if needed
+	if !filepath.IsAbs(neighbourProjectPath) {
+		// Make it relative to the current working directory or project root
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get current working directory: %w", err)
+		}
+		neighbourProjectPath = filepath.Join(cwd, neighbourProjectPath)
+	}
+
+	// Check if the neighbouring project path exists
+	if stat, err := os.Stat(neighbourProjectPath); err != nil || !stat.IsDir() {
+		return "", fmt.Errorf("neighbouring project path `%s` does not exist or is not a directory", neighbourProjectPath)
+	}
+
+	// Remove the project root from the import path and resolve relative to the neighbouring project path
+	// e.g., "app2/file2/types" becomes "file2/types"
+	relativePath := strings.TrimPrefix(importPath, importRoot+"/")
+	resolvedPath := filepath.Join(neighbourProjectPath, relativePath+".fer")
+
+	if fs.IsValidFile(resolvedPath) {
+		return resolvedPath, nil
+	}
+
+	return "", fmt.Errorf("module `%s` does not exist in neighbouring project `%s`", relativePath, neighbourProjectPath)
 }
 
 // IsFilepathInCache checks if the given file path is inside the remote cache directory
@@ -165,14 +247,38 @@ func ResolveModuleInRemoteContext(importPath, currentFileFullPath string, projec
 		return "", err
 	}
 
+	// For directory-based imports, we need to strip the remote module's directory name prefix
+	// Extract the repository name from the cached path to determine the expected prefix
+	remoteModulePrefix := getRemoteModuleDirName(remoteModuleRoot)
+
+	actualImportPath := importPath
+	if remoteModulePrefix != "" && strings.HasPrefix(importPath, remoteModulePrefix+"/") {
+		// Strip the remote module prefix for internal imports
+		actualImportPath = strings.TrimPrefix(importPath, remoteModulePrefix+"/")
+	}
+
 	// Resolve the import path relative to the remote module root
-	resolvedPath := filepath.Join(remoteModuleRoot, importPath+EXT)
+	resolvedPath := filepath.Join(remoteModuleRoot, actualImportPath+EXT)
 
 	if fs.IsValidFile(resolvedPath) {
 		return resolvedPath, nil
 	}
 
 	return "", fmt.Errorf("module `%s` does not exist in remote module at %s", importPath, resolvedPath)
+}
+
+// getRemoteModuleDirName extracts the repository directory name from a remote module root path
+// Example: github.com/itsfuad/ferret-mod@v1.0.1 -> ferret-mod
+func getRemoteModuleDirName(remoteModuleRoot string) string {
+	// Get the last part of the path which should be like "ferret-mod@v1.0.1"
+	dirName := filepath.Base(remoteModuleRoot)
+
+	// Strip version suffix if present
+	if strings.Contains(dirName, "@") {
+		dirName = strings.Split(dirName, "@")[0]
+	}
+
+	return dirName
 }
 
 // findRemoteModuleRoot finds the root directory of the remote module containing the given file
@@ -273,7 +379,7 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 		// Build full path to the specific module
 		moduleFullPath = filepath.Join(moduleDir, modulePath+".fer")
 		if _, err := os.Stat(moduleFullPath); os.IsNotExist(err) {
-			return "", fmt.Errorf("module %s not found in %s", importPath, repo)
+			return "", fmt.Errorf("no module %q found in %q", importPath, repo)
 		}
 	}
 
@@ -283,7 +389,7 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 		return "", fmt.Errorf("failed to check share settings for module %s: %w", repo, err)
 	}
 	if !canShare {
-		return "", fmt.Errorf("module %s has disabled sharing (share = false). Cannot import this module", repo)
+		return "", fmt.Errorf("module %q has disabled sharing (share = false). Cannot import this module", repo)
 	}
 
 	return moduleFullPath, nil
@@ -382,6 +488,18 @@ func ResolveImportPath(importPath, currentFilePath string, remoteCachePath strin
 		// Convert it to the full GitHub path
 		remotePrefix := GetRemoteModulePrefix(currentFilePath, remoteCachePath)
 		if remotePrefix != "" {
+			// For directory-based imports, strip the remote module directory name prefix
+			remoteModuleRoot, err := findRemoteModuleRoot(currentFilePath, remoteCachePath)
+			if err == nil {
+				remoteModuleDirName := getRemoteModuleDirName(remoteModuleRoot)
+				if remoteModuleDirName != "" && strings.HasPrefix(importPath, remoteModuleDirName+"/") {
+					// Strip the remote module prefix for internal imports
+					actualImportPath := strings.TrimPrefix(importPath, remoteModuleDirName+"/")
+					return remotePrefix + "/" + actualImportPath
+				}
+			}
+
+			// Fallback to original logic for non-directory-based imports
 			return remotePrefix + "/" + importPath
 		}
 	}
