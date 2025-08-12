@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,8 @@ import (
 )
 
 const (
-	CONFIG_DIR = ".ferret"
+	CONFIG_DIR  = ".ferret"
+	GITHUB_HOST = "github.com"
 )
 
 // DependencyManager handles dependency management using the lockfile system
@@ -104,6 +106,28 @@ func (dm *DependencyManager) InstallDirectDependency(moduleSpec, description str
 	return nil
 }
 
+func (dm *DependencyManager) GetOrphans() map[string]bool {
+
+	orphans := make(map[string]bool)
+
+	cached, err := dm.GetModulesInCache()
+	if err != nil {
+		colors.RED.Printf("❌ Failed to get cached modules: %s\n", err)
+		os.Exit(1)
+	}
+
+	dependencies := dm.GetLockfile().GetAllDependencies()
+
+	for _, module := range cached {
+		//if not in dependencies
+		if _, ok := dependencies[module]; !ok {
+			orphans[module] = true
+		}
+	}
+
+	return orphans
+}
+
 // CleanupUnusedDependencies removes indirect dependencies that are no longer used (UsedBy == 0)
 func (dm *DependencyManager) CleanupUnusedDependencies() error {
 	removed := 0
@@ -114,10 +138,21 @@ func (dm *DependencyManager) CleanupUnusedDependencies() error {
 			removed++
 		}
 	}
+
+	//check for orphans
+	orphans := dm.GetOrphans()
+	if len(orphans) > 0 {
+		for orphan := range orphans {
+			dm.deleteCacheForKey(orphan)
+			removed++
+		}
+	}
+
 	if removed == 0 {
 		colors.GREEN.Println("✨ No unused dependencies found")
 		return nil
 	}
+
 	colors.BLUE.Printf("🧹 Cleaned up %d unused dependencies...\n", removed)
 	return dm.saveLockfile()
 }
@@ -388,7 +423,7 @@ func (dm *DependencyManager) resolveTransitiveDependencies(parentRepo, parentVer
 
 // extractRemoteImportsFromModule extracts all remote imports from a module
 func (dm *DependencyManager) extractRemoteImportsFromModule(parentRepo, parentVersion, parentRepoName, cachePath string) map[string]struct{} {
-	moduleDir := filepath.Join(cachePath, "github.com", parentRepoName+"@"+parentVersion)
+	moduleDir := filepath.Join(cachePath, GITHUB_HOST, parentRepoName+"@"+parentVersion)
 	ferFiles, err := findFerretFiles(moduleDir)
 	if err != nil {
 		colors.YELLOW.Printf("Warning: Failed to scan module files for %s@%s: %s\n", parentRepo, parentVersion, err)
@@ -529,7 +564,7 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 		return
 	}
 	repoName := parts[1] + "/" + parts[2] // user/repo
-	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", "github.com", repoName+"@"+version)
+	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", GITHUB_HOST, repoName+"@"+version)
 	_ = os.RemoveAll(cachePath)
 }
 
@@ -630,6 +665,38 @@ type ModuleUpdateInfo struct {
 	LatestVersion  string
 	HasUpdate      bool
 	IsDirect       bool // Whether this is a direct dependency or transitive
+}
+
+func (dm *DependencyManager) GetModulesInCache() ([]string, error) {
+	modulesDir := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules")
+	if _, err := os.Stat(modulesDir); err != nil {
+		// No modules directory means no cached modules
+		return nil, nil
+	}
+
+	var cachedModules []string
+	err := filepath.WalkDir(modulesDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Expect: modules/host/owner/repo
+		rel, err := filepath.Rel(modulesDir, path)
+		if err != nil {
+			return err
+		}
+
+		parts := strings.Split(rel, string(os.PathSeparator))
+		if len(parts) == 3 && d.IsDir() {
+			cachedModules = append(cachedModules, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("❌ Failed to read modules directory: %w", err)
+	}
+
+	return cachedModules, nil
 }
 
 // CheckAvailableUpdates checks for available updates for all dependencies

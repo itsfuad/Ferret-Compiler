@@ -166,6 +166,27 @@ func HandleCleanupCommand() {
 	}
 }
 
+func HandleListOrphanCommand() {
+	projectRoot := getRoot()
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	orphans := dm.GetOrphans()
+	if len(orphans) == 0 {
+		colors.GREEN.Println("✨ No orphaned cached modules found")
+	} else {
+		colors.BLUE.Println("📦 Orphaned cached modules found:")
+		for module := range orphans {
+			colors.YELLOW.Println(" -", module)
+		}
+		colors.CYAN.Println("\n💡 To remove orphaned cached modules, run: ferret cleanup")
+		colors.CYAN.Println("This will remove unused modules from the cache.")
+	}
+}
+
 // HandleUpdateCommand handles the "ferret update" command
 func HandleUpdateCommand(module string) {
 
