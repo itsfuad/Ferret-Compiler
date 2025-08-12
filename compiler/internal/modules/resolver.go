@@ -231,7 +231,7 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 	// Get the version for the imported repo
 	repo := REMOTE_HOST + repoName
 
-	version, err := checkVersion(deps, repo, projectRoot)
+	version, err := checkVersion(deps, repo)
 	if err != nil {
 		return "", fmt.Errorf("failed to check version for module %s: %w", repo, err)
 	}
@@ -289,35 +289,12 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 	return moduleFullPath, nil
 }
 
-func checkVersion(deps map[string]FerRetDependency, repo string, projectRoot string) (string, error) {
+func checkVersion(deps map[string]FerRetDependency, repo string) (string, error) {
 	var version string
 	dep, ok := deps[repo]
 	if !ok || dep.Version == "" {
-		// Module not found in fer.ret - check lockfile for any installed version
-		lockfile, err := LoadLockfile(projectRoot)
-		if err != nil {
-			return "", fmt.Errorf("failed to load lockfile: %w", err)
-		}
-
-		// Search for any installed version of this repo
-		var foundVersions []string
-		for key, entry := range lockfile.Dependencies {
-			if strings.HasPrefix(key, repo+"@") {
-				foundVersions = append(foundVersions, entry.Version)
-			}
-		}
-
-		if len(foundVersions) == 0 {
-			return "", fmt.Errorf("module %s@%s is not installed\n%s %s %s", repo, version, colors.YELLOW.Sprintf("run"), colors.BLUE.Sprintf("ferret get %s", repo), colors.YELLOW.Sprintf("to install"))
-		}
-
-		if len(foundVersions) == 1 {
-			// Exactly one version found - use it
-			version = foundVersions[0]
-		} else {
-			// Multiple versions found - ask user to specify
-			return "", fmt.Errorf("multiple versions of %s are installed: %v. Please specify the version in your fer.ret file", repo, foundVersions)
-		}
+		// Module not found in fer.ret - this is now a strict requirement
+		return "", fmt.Errorf("module %s is not declared in fer.ret dependencies.\n%s %s %s", repo, colors.YELLOW.Sprintf("Add it to fer.ret or run"), colors.BLUE.Sprintf("ferret get %s", repo), colors.YELLOW.Sprintf("to install and declare the dependency"))
 	} else {
 		version = dep.Version
 	}
