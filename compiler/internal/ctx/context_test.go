@@ -12,8 +12,8 @@ func TestFullPathToImportPathLocal(t *testing.T) {
 	}
 	fullPath := "/project/foo/bar.fer"
 	importPath := ctx.FullPathToImportPath(fullPath)
-	if importPath != "myapp/foo/bar" {
-		t.Errorf("Expected import path 'myapp/foo/bar', got '%s'", importPath)
+	if importPath != "project/foo/bar" {
+		t.Errorf("Expected import path 'project/foo/bar', got '%s'", importPath)
 	}
 }
 
