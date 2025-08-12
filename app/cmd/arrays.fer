@@ -1,4 +1,4 @@
-import "myapp/cmd/types";
+import "app/cmd/types";
 
 //arrays
 let arrWithoutType = [1, 2, 3, 4]; // array without explicit type

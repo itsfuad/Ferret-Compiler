@@ -50,6 +50,11 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 		return c.CachePathToImportPath(fullPath)
 	}
 
+	// Check if this is a local project file (from locals config)
+	if localProjectImportPath := c.getNeighbourProjectImportPath(fullPath); localProjectImportPath != "" {
+		return localProjectImportPath
+	}
+
 	relPath, err := filepath.Rel(c.ProjectRootFullPath, fullPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
 		return ""
@@ -57,17 +62,10 @@ func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
 	relPath = filepath.ToSlash(relPath)
 	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
 
-	// Use project name from configuration instead of folder name
-	projectName := ""
-	if c.ProjectConfig != nil {
-		projectName = c.ProjectConfig.Name
-	}
-	if projectName == "" {
-		// Fallback to folder name if project name is not available
-		projectName = filepath.Base(c.ProjectRootFullPath)
-	}
+	// Use directory name instead of project name for consistency
+	dirName := filepath.Base(c.ProjectRootFullPath)
 
-	return projectName + "/" + moduleName
+	return dirName + "/" + moduleName
 }
 
 // IsBuiltinModuleFile checks if the given file path is within the built-in modules directory
@@ -101,7 +99,53 @@ func (c *CompilerContext) getBuiltinModuleImportPath(fullPath string) string {
 	relPath = filepath.ToSlash(relPath)
 	importPath := strings.TrimSuffix(relPath, filepath.Ext(relPath))
 
-	return importPath
+	// Add modules prefix for builtin modules for consistency
+	return "modules/" + importPath
+}
+
+// getNeighbourProjectImportPath generates the import path for local project files (from neighbour config)
+func (c *CompilerContext) getNeighbourProjectImportPath(fullPath string) string {
+	if c.ProjectConfig.Neighbour.Projects == nil {
+		return ""
+	}
+
+	// Try each neighbouring project to see if the file belongs to it
+	for projectName, projectPath := range c.ProjectConfig.Neighbour.Projects {
+		// Convert relative path to absolute if needed
+		absProjectPath := projectPath
+		if !filepath.IsAbs(projectPath) {
+			cwd, err := os.Getwd()
+			if err != nil {
+				continue
+			}
+			absProjectPath = filepath.Join(cwd, projectPath)
+		}
+
+		absProjectPath, err := filepath.Abs(absProjectPath)
+		if err != nil {
+			continue
+		}
+
+		absFilePath, err := filepath.Abs(fullPath)
+		if err != nil {
+			continue
+		}
+
+		// Check if the file is within this local project
+		relPath, err := filepath.Rel(absProjectPath, absFilePath)
+		if err != nil || strings.HasPrefix(relPath, "..") {
+			continue
+		}
+
+		// Convert to forward slashes and remove extension
+		relPath = filepath.ToSlash(relPath)
+		moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+
+		// Generate import path: projectName/relativePath
+		return projectName + "/" + moduleName
+	}
+
+	return ""
 }
 
 // IsRemoteModuleFile checks if the given file path is within the remote modules cache
@@ -356,10 +400,12 @@ func (c *CompilerContext) PrintModules() {
 			// Color-code by module type
 			switch module.Type {
 			case modules.LOCAL:
-				colors.LIGHT_BLUE.Printf("(%s)", module.Type)
-			case modules.REMOTE:
 				colors.GREEN.Printf("(%s)", module.Type)
+			case modules.REMOTE:
+				colors.CYAN.Printf("(%s)", module.Type)
 			case modules.BUILTIN:
+				colors.AQUA.Printf("(%s)", module.Type)
+			case modules.NEIGHBOUR:
 				colors.YELLOW.Printf("(%s)", module.Type)
 			default:
 				colors.WHITE.Printf("(%s)", module.Type)
@@ -370,6 +416,8 @@ func (c *CompilerContext) PrintModules() {
 			colors.PURPLE.Printf("- %s\n", name)
 		}
 	}
+	//show the project entrypoint
+	colors.CYAN.Printf("Project Entry Point: %s\n", c.EntryPoint)
 }
 
 func (c *CompilerContext) ModuleNames() []string {
@@ -447,7 +495,7 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 		SymbolTable: symbol.NewSymbolTable(c.Builtins),
 		Phase:       modules.PHASE_PARSED, // Module is parsed when added
 		IsBuiltin:   isBuiltin,
-		Type:        modules.GetModuleType(importPath, c.ProjectConfig.Name),
+		Type:        modules.GetModuleTypeWithConfig(importPath, filepath.Base(c.ProjectRootFullPath), c.ProjectConfig.Neighbour.Projects),
 	}
 }
 

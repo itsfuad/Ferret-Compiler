@@ -44,6 +44,7 @@ const (
 	LOCAL
 	BUILTIN
 	REMOTE
+	NEIGHBOUR // External neighbouring project (like Go's replace directive)
 )
 
 func (mt ModuleType) String() string {
@@ -54,6 +55,8 @@ func (mt ModuleType) String() string {
 		return "BUILTIN"
 	case REMOTE:
 		return "REMOTE"
+	case NEIGHBOUR:
+		return "NEIGHBOUR"
 	default:
 		return "UNKNOWN"
 	}
@@ -87,11 +90,12 @@ func IsRemote(importPath string) bool {
 }
 
 func IsBuiltinModule(importRoot string) bool {
-	return BUILTIN_MODULES[importRoot]
+	// With directory-based imports, builtin modules start with "modules/"
+	return importRoot == "modules"
 }
 
 // GetModuleType categorizes an import path
-func GetModuleType(importPath string, projectName string) ModuleType {
+func GetModuleType(importPath string, projectDirName string) ModuleType {
 	importRoot := fs.FirstPart(importPath)
 
 	if IsRemote(importPath) {
@@ -102,11 +106,57 @@ func GetModuleType(importPath string, projectName string) ModuleType {
 		return BUILTIN
 	}
 
-	if importRoot == projectName {
+	if importRoot == projectDirName {
 		return LOCAL
 	}
 
-	// Default to local for unrecognized paths
+	// Default to unknown for unrecognized paths
+	return UNKNOWN
+}
+
+// IsLocalProject checks if an import path refers to a local project defined in locals config
+func IsLocalProject(importPath string, localsConfig map[string]string) bool {
+	if localsConfig == nil {
+		return false
+	}
+
+	importRoot := fs.FirstPart(importPath)
+	_, exists := localsConfig[importRoot]
+	return exists
+}
+
+// IsNeighbourProject checks if an import path refers to a neighbouring project defined in neighbour config
+func IsNeighbourProject(importPath string, neighbourConfig map[string]string) bool {
+	if neighbourConfig == nil {
+		return false
+	}
+
+	importRoot := fs.FirstPart(importPath)
+	_, exists := neighbourConfig[importRoot]
+	return exists
+}
+
+// GetModuleTypeWithConfig categorizes an import path with access to neighbour configuration
+func GetModuleTypeWithConfig(importPath string, projectDirName string, neighbourConfig map[string]string) ModuleType {
+	importRoot := fs.FirstPart(importPath)
+
+	if IsRemote(importPath) {
+		return REMOTE
+	}
+
+	if IsBuiltinModule(importRoot) {
+		return BUILTIN
+	}
+
+	if importRoot == projectDirName {
+		return LOCAL
+	}
+
+	if IsNeighbourProject(importPath, neighbourConfig) {
+		return NEIGHBOUR
+	}
+
+	// Default to unknown for unrecognized paths
 	return UNKNOWN
 }
 

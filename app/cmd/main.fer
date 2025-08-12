@@ -1,4 +1,4 @@
-import "myapp/cmd/expr";
+import "app/cmd/expr";
 
 let outvar = 10;
 

@@ -20,6 +20,7 @@ type ProjectConfig struct {
 	Remote       RemoteConfig     `toml:"remote"`
 	Build        BuildConfig      `toml:"build"`
 	Dependencies DependencyConfig `toml:"dependencies"`
+	Neighbour    NeighbourConfig  `toml:"neighbour"`
 	ProjectRoot  string
 	// Top-level project metadata
 	Name string `toml:"name"`
@@ -49,6 +50,11 @@ type BuildConfig struct {
 
 type DependencyConfig struct {
 	Modules map[string]string `toml:"dependencies"` // module_name -> version
+}
+
+// NeighbourConfig defines neighbouring project mappings (like Go's replace directive)
+type NeighbourConfig struct {
+	Projects map[string]string `toml:"neighbour"` // project_name -> local_path
 }
 
 // CreateDefaultProjectConfig creates a default fer.ret configuration file
@@ -231,6 +237,7 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	parseCacheSection(tomlData, config)
 	parseRemoteSection(tomlData, config)
 	parseDependenciesSection(tomlData, config)
+	parseNeighbourSection(tomlData, config)
 
 	return config, nil
 }
@@ -288,6 +295,17 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 		for key, value := range dependenciesSection {
 			if strValue, ok := value.(string); ok {
 				config.Dependencies.Modules[key] = strValue
+			}
+		}
+	}
+}
+
+func parseNeighbourSection(tomlData toml.TOMLData, config *ProjectConfig) {
+	if neighbourSection, exists := tomlData["neighbour"]; exists {
+		config.Neighbour.Projects = make(map[string]string)
+		for key, value := range neighbourSection {
+			if strValue, ok := value.(string); ok {
+				config.Neighbour.Projects[key] = strValue
 			}
 		}
 	}

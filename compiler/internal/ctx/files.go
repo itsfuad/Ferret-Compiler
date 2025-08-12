@@ -3,6 +3,7 @@ package ctx
 import (
 	"ferret/internal/modules"
 	"fmt"
+	"path/filepath"
 )
 
 const EXT = ".fer"
@@ -18,14 +19,11 @@ func ResolveModuleLocation(importPath, currentFileFullPath string, ctxx *Compile
 		return "", fmt.Errorf("import path cannot be empty")
 	}
 
-	// Get project name for local module resolution
-	projectName := ""
-	if ctxx.ProjectConfig != nil {
-		projectName = ctxx.ProjectConfig.Name
-	}
+	// Get project directory name for local module resolution
+	projectDirName := filepath.Base(ctxx.ProjectRootFullPath)
 
 	// Determine module type
-	moduleType := modules.GetModuleType(importPath, projectName)
+	moduleType := modules.GetModuleTypeWithConfig(importPath, projectDirName, ctxx.ProjectConfig.Neighbour.Projects)
 
 	// Handle special case: if current file is in remote cache, imports should be in remote context
 	if modules.IsFilepathInCache(currentFileFullPath, ctxx.RemoteCachePath) {
@@ -39,7 +37,9 @@ func ResolveModuleLocation(importPath, currentFileFullPath string, ctxx *Compile
 	case modules.BUILTIN:
 		return modules.ResolveBuiltinModule(importPath, ctxx.ModulesPath)
 	case modules.LOCAL:
-		return modules.ResolveLocalModule(importPath, projectName, ctxx.ProjectRootFullPath)
+		return modules.ResolveLocalModule(importPath, projectDirName, ctxx.ProjectRootFullPath)
+	case modules.NEIGHBOUR:
+		return modules.ResolveNeighbourProjectModule(importPath, ctxx.ProjectConfig.Neighbour.Projects)
 	default:
 		return "", fmt.Errorf("unknown module type for import: %s", importPath)
 	}

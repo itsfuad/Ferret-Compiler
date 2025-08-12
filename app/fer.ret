@@ -16,3 +16,6 @@ share = false
 
 [dependencies]
 github.com/itsfuad/ferret-mod = "v1.0.1"
+
+[neighbour]
+app2 = "../app2"
