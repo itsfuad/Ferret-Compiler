@@ -219,13 +219,13 @@ func (dm *DependencyManager) installSingleDependency(moduleName string, dep FerR
 	_, requestedVersion, repoName, err := SplitRemotePath(moduleSpec)
 	if err != nil {
 		colors.RED.Printf("Invalid module specification: %s\n", moduleSpec)
-		return
+		os.Exit(1)
 	}
 
 	actualVersion, err := CheckRemoteModuleExists(repoName, requestedVersion)
 	if err != nil {
 		colors.RED.Printf("Module not found: %s\n", moduleSpec)
-		return
+		os.Exit(1)
 	}
 
 	if !dm.ensureModuleCached(repoName, actualVersion, moduleSpec) {
