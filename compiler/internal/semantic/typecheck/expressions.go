@@ -242,9 +242,8 @@ func checkStructLiteralType(r *analyzer.AnalyzerNode, structLiteral *ast.StructL
 	// Check if this is an anonymous struct or named struct
 	if structLiteral.IsAnonymous || structLiteral.StructName == nil {
 		return checkAnonymousStructLiteral(r, structLiteral, cm)
-	} else {
-		return checkNamedStructLiteral(r, structLiteral, cm)
 	}
+	return checkNamedStructLiteral(r, structLiteral, cm)
 }
 
 // checkAnonymousStructLiteral handles unnamed struct literals like @struct{x: 10, y: 20}

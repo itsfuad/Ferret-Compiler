@@ -47,12 +47,11 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 				TypeNode: typeNode,
 				Location: *source.NewLocation(iden.Start, typeNode.Loc().End),
 			}, true
-		} else {
-			return &ast.UserDefinedType{
-				TypeName: types.TYPE_NAME(iden.Name),
-				Location: iden.Location,
-			}, true
 		}
+		return &ast.UserDefinedType{
+			TypeName: types.TYPE_NAME(iden.Name),
+			Location: iden.Location,
+		}, true
 	}
 	return nil, false
 }
@@ -105,15 +104,16 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 
 	//parse the type
 
-	if elementType, ok := parseType(p); !ok {
+	elementType, ok := parseType(p)
+	if !ok {
 		return nil, false
-	} else {
-		return &ast.ArrayType{
-			ElementType: elementType,
-			TypeName:    types.ARRAY,
-			Location:    *source.NewLocation(&start, elementType.Loc().End),
-		}, true
 	}
+
+	return &ast.ArrayType{
+		ElementType: elementType,
+		TypeName:    types.ARRAY,
+		Location:    *source.NewLocation(&start, elementType.Loc().End),
+	}, true
 }
 
 // parseStructField parses a single struct field
@@ -126,17 +126,17 @@ func parseStructField(p *Parser) *ast.StructField {
 	p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
 
 	// Parse field type
-	if fieldType, ok := parseType(p); !ok {
+	fieldType, ok := parseType(p)
+	if !ok {
 		return nil
-	} else {
-		return &ast.StructField{
-			FieldIdentifier: &ast.IdentifierExpr{
-				Name:     fieldName,
-				Location: *source.NewLocation(&nameToken.Start, &nameToken.End),
-			},
-			FieldType: fieldType,
-			Location:  *source.NewLocation(&nameToken.Start, fieldType.Loc().End),
-		}
+	}
+	return &ast.StructField{
+		FieldIdentifier: &ast.IdentifierExpr{
+			Name:     fieldName,
+			Location: *source.NewLocation(&nameToken.Start, &nameToken.End),
+		},
+		FieldType: fieldType,
+		Location:  *source.NewLocation(&nameToken.Start, fieldType.Loc().End),
 	}
 }
 

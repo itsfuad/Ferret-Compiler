@@ -272,11 +272,11 @@ func (r *Reports) createNew(filePath string, location *source.Location, msg stri
 	return report
 }
 
-func (e *Report) setLevel(level PROBLEM_TYPE) {
+func (r *Report) setLevel(level PROBLEM_TYPE) {
 	if level == NULL {
 		panic("invalid Error level")
 	}
-	e.Level = level
+	r.Level = level
 	if level == CRITICAL_ERROR || level == SYNTAX_ERROR {
 		panic("critical or syntax error encountered, stopping compilation")
 	}

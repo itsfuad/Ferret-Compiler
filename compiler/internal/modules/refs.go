@@ -139,15 +139,13 @@ func GetModule(input string) (string, error) {
 	if version == "" {
 		// Return latest tag when no version specified
 		return tags[len(tags)-1], nil
-	} else {
-		found := slices.Contains(tags, version)
-		if found {
-			return version, nil
-		} else {
-			// Return error when specific version is not found
-			return "", fmt.Errorf("tag %s does not exist", version)
-		}
 	}
+	found := slices.Contains(tags, version)
+	if found {
+		return version, nil
+	}
+	// Return error when specific version is not found
+	return "", fmt.Errorf("tag %s does not exist", version)
 }
 
 // VerifyTagDownloadable checks if a tag can actually be downloaded
