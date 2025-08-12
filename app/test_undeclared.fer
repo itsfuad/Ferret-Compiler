@@ -1,0 +1,5 @@
+import "github.com/itsfuad/undeclared-module/test";
+
+func testUndeclared() {
+    print("This should fail");
+}
