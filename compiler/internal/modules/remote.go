@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"ferret/colors"
@@ -21,30 +22,79 @@ const (
 // CheckRemoteModuleExists checks if a remote module exists and returns available versions
 // Uses Git refs instead of GitHub API to avoid rate limiting
 func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) {
+	normalizedVersion, _, err := CheckAndGetActualVersion(repoName, requestedVersion)
+	return normalizedVersion, err
+}
+
+// CheckAndGetActualVersion checks if a version exists and returns both normalized and actual versions
+func CheckAndGetActualVersion(repoName, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
 	// Parse user/repo from repoName
 	user, repo, err := parseRepoName(repoName)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	// Use Git refs approach instead of GitHub API
-	moduleSpec := fmt.Sprintf("github.com/%s/%s", user, repo)
-	if requestedVersion != "latest" && requestedVersion != "" {
-		moduleSpec += "@" + requestedVersion
-	}
-
-	version, err := GetModule(moduleSpec)
+	// Fetch all available tags once
+	refs, err := FetchRefs(user, repo)
 	if err != nil {
-		return "", err
+		return "", "", fmt.Errorf("error fetching refs: %w", err)
+	}
+
+	tags := GetTagsFromRefs(refs)
+	if len(tags) == 0 {
+		return "", "", fmt.Errorf("no tags found")
+	}
+
+	if requestedVersion == "latest" || requestedVersion == "" {
+		// Return latest tag
+		sort.Strings(tags)
+		actualVersion = tags[len(tags)-1]
+		normalizedVersion = NormalizeVersion(actualVersion)
+		return normalizedVersion, actualVersion, nil
+	}
+
+	// Check if requested version exists in available tags
+	actualVersion = findMatchingTag(tags, requestedVersion)
+	if actualVersion == "" {
+		return "", "", fmt.Errorf("version %s not found in available tags: %v", requestedVersion, tags)
 	}
 
 	// Verify that the tag is actually downloadable
-	err = VerifyTagDownloadable(user, repo, version)
+	err = VerifyTagDownloadable(user, repo, actualVersion)
 	if err != nil {
-		return "", fmt.Errorf("tag %s found but not downloadable: %w", version, err)
+		return "", "", fmt.Errorf("tag %s found but not downloadable: %w", actualVersion, err)
 	}
 
-	return version, nil
+	normalizedVersion = NormalizeVersion(actualVersion)
+	return normalizedVersion, actualVersion, nil
+}
+
+// findMatchingTag finds a tag that matches the requested version (trying both with and without "v" prefix)
+func findMatchingTag(tags []string, requestedVersion string) string {
+	// First, try exact match
+	for _, tag := range tags {
+		if tag == requestedVersion {
+			return tag
+		}
+	}
+
+	// If no exact match, try alternative format
+	var alternativeVersion string
+	if strings.HasPrefix(requestedVersion, "v") {
+		// If requested version has "v", try without "v"
+		alternativeVersion = strings.TrimPrefix(requestedVersion, "v")
+	} else {
+		// If requested version doesn't have "v", try with "v"
+		alternativeVersion = "v" + requestedVersion
+	}
+
+	for _, tag := range tags {
+		if tag == alternativeVersion {
+			return tag
+		}
+	}
+
+	return "" // Not found
 }
 
 // parseRepoName parses repository name into user and repo components
@@ -67,21 +117,27 @@ func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) erro
 		return err
 	}
 
-	// Download the module archive
-	downloadPath, err := downloadModuleArchive(user, repo, version, repoName)
+	// Get both normalized and actual versions for proper downloading and caching
+	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(repoName, StripVersionPrefix(version))
+	if err != nil {
+		return fmt.Errorf("failed to resolve version: %w", err)
+	}
+
+	// Download the module archive using the actual GitHub version
+	downloadPath, err := downloadModuleArchive(user, repo, actualVersion, repoName)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(downloadPath)
 
-	// Extract to cache
-	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+version)
-	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(version, "v"))
+	// Extract to cache using normalized version for consistency
+	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+normalizedVersion)
+	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(actualVersion, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
 	}
 
-	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoName, version)
+	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoName, normalizedVersion)
 	return nil
 }
 
@@ -250,7 +306,8 @@ func extractFile(file *zip.File, targetPath string) error {
 
 // IsModuleCached checks if a module is already cached
 func IsModuleCached(cachePath, repoName, version string) bool {
-	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+version)
+	normalizedVersion := NormalizeVersion(version)
+	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+normalizedVersion)
 	_, err := os.Stat(moduleDir)
 	return err == nil
 }

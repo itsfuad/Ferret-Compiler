@@ -180,7 +180,7 @@ func HandleListOrphanCommand() {
 	} else {
 		colors.BLUE.Println("📦 Orphaned cached modules found:")
 		for module := range orphans {
-			colors.YELLOW.Println(" -", module)
+			colors.YELLOW.Printf(" - %q\n", module)
 		}
 		colors.CYAN.Println("\n💡 To remove orphaned cached modules, run: ferret clean")
 		colors.CYAN.Println("This will remove unused modules from the cache.")
