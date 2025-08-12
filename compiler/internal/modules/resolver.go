@@ -350,7 +350,7 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 	key := repo + "@" + version
 	entry, exists := lockfile.Dependencies[key]
 	if !exists {
-		return "", fmt.Errorf("module %s@%s is listed in fer.ret but not found in cache\n%s %s %s", repo, version, colors.YELLOW.Sprintf("run"), colors.BLUE.Sprintf("ferret get"), colors.YELLOW.Sprintf("to auto install"))
+		return "", fmt.Errorf("module %s@%s is listed in fer.ret but not found in lockfile\n%s %s %s", repo, version, colors.YELLOW.Sprintf("run"), colors.BLUE.Sprintf("ferret get"), colors.YELLOW.Sprintf("to auto install"))
 	}
 
 	// Check if module is cached with the installed version
@@ -443,7 +443,7 @@ func readDependenciesFromFerRetFile(ferretPath string) (map[string]FerRetDepende
 // stripVersionPrefix removes common version prefixes like ^, ~, >=, etc.
 func stripVersionPrefix(version string) string {
 	// Remove common prefixes
-	prefixes := []string{"^", "~", ">=", "<=", ">", "<", "="}
+	prefixes := []string{"^", "~", ">=", "<=", ">", "<", "=", "v"}
 	for _, prefix := range prefixes {
 		if after, ok := strings.CutPrefix(version, prefix); ok {
 			version = after
@@ -561,7 +561,7 @@ func WriteFerRetDependency(projectRoot, repoName, version, comment string, isCac
 		return fmt.Errorf("failed to load project config: %w", err)
 	}
 	// update the dependency
-	configData.Dependencies.Modules[repoName] = version
+	configData.Dependencies.Modules[repoName] = stripVersionPrefix(version)
 	//write back
 	configData.Save()
 	return nil

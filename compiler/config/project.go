@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"ferret/cmd/flags"
 	"ferret/colors"
 	"ferret/toml"
 )
@@ -216,7 +217,7 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 	}
 
 	configData["compiler"] = toml.TOMLTable{
-		"version": "0.1.0",
+		"version": flags.FERRET_VERSION,
 	}
 
 	configData["build"] = toml.TOMLTable{
