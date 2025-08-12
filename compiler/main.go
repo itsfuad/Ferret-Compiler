@@ -47,6 +47,11 @@ func main() {
 		return
 	}
 
+	if args.ListOrphan {
+		cli.HandleListOrphanCommand()
+		return
+	}
+
 	// Handle cleanup command
 	if args.CleanupCommand {
 		cli.HandleCleanupCommand()

@@ -24,6 +24,7 @@ type Args struct {
 	RemoveModule   string
 	ListCommand    bool
 	CleanupCommand bool
+	ListOrphan     bool
 	RunCommand     bool
 	RunTarget      string // Target directory for the run command to execute in
 	InvalidCommand string
@@ -72,6 +73,8 @@ func ParseArgs() *Args {
 		result.SniffCommand = true
 	case "list":
 		result.ListCommand = true
+	case "orphan":
+		result.ListOrphan = true
 	case "cleanup":
 		result.CleanupCommand = true
 	default:
