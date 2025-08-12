@@ -23,7 +23,7 @@ type Args struct {
 	RemoveCommand  bool
 	RemoveModule   string
 	ListCommand    bool
-	CleanupCommand bool
+	CleanCommand   bool
 	ListOrphan     bool
 	RunCommand     bool
 	RunTarget      string // Target directory for the run command to execute in
@@ -75,8 +75,8 @@ func ParseArgs() *Args {
 		result.ListCommand = true
 	case "orphan":
 		result.ListOrphan = true
-	case "cleanup":
-		result.CleanupCommand = true
+	case "clean":
+		result.CleanCommand = true
 	default:
 		// Invalid command
 		result.InvalidCommand = command
@@ -114,7 +114,8 @@ func Usage() {
 	fmt.Println("  ferret remove <module>               Remove a module dependency")
 	fmt.Println("  ferret list                          List all installed modules")
 	fmt.Println("  ferret sniff                         Check for available module updates")
-	fmt.Println("  ferret cleanup                       Remove unused module cache")
+	fmt.Println("  ferret orphan                        List orphaned cached modules")
+	fmt.Println("  ferret clean                         Remove unused module cache")
 	fmt.Println()
 
 	colors.YELLOW.Println("OPTIONS:")

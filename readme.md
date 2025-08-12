@@ -27,23 +27,8 @@ Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming l
 
 3. Add the `bin` directory to your PATH environment variable to use `ferret` commands globally.
 
-4. Start coding:
-   ```bash
-   # Initialize a new project
-   ferret init myproject
-   cd myproject
-   
-   # Install dependencies (if any)
-   ferret get
-   
-   # Compile and run
-   ferret main.fer
-   ```
-
 ## Language Support Extension
 Download the Ferret Language Support Extension for your IDE for Syntax Highlighting Errors.
-
-Visit [Ferret Language Support](https://github.com/itsfuad/Ferret-Language-Support) for installation instructions.
 
 ### Usage
 
@@ -57,46 +42,67 @@ ferret init /path/to/project
 ```
 
 This creates a `fer.ret` configuration file with default settings.
-
-#### Compile and run Ferret code
-```bash
-# Compile a Ferret file
-ferret filename.fer
-
-# Compile with debug output
-ferret filename.fer --debug
-
-# Debug flag can be placed anywhere
-ferret --debug filename.fer
-```
-
 #### Help
 ```bash
 ferret
-# Output: Usage: ferret <filename> [-debug] [-o <output>] | ferret init [project-name] | ferret get [module] | ferret update [module] | ferret sniff | ferret remove [module] | ferret list | ferret cleanup | version 0.0.1
+
+Ferret - A statically typed, beginner-friendly programming language
+
+USAGE:
+  ferret run [options]                 Run project using entry point from fer.ret
+
+MODULE MANAGEMENT:
+  ferret init [path]                   Initialize a new Ferret project
+  ferret get <module>                  Install a module dependency
+  ferret update [module]               Update module(s) to latest version
+  ferret remove <module>               Remove a module dependency
+  ferret list                          List all installed modules
+  ferret sniff                         Check for available module updates
+  ferret orphan                        List orphaned cached modules
+  ferret clean                         Remove unused module cache
+
+OPTIONS:
+  -d, -debug                           Enable debug mode
+  -o, -output <path>                   Specify output file path
+
+NOTE: All flags support both single dash (-flag) and double dash (--flag) formats
+
+EXAMPLES:
+  ferret run                           Run project using fer.ret configuration
+  ferret run -debug                    Run with debug output
+  ferret run --debug                   Run with debug output (alternative)
+  ferret run -o output.bin             Run and specify output file
+  ferret run --output=output.bin       Run and specify output file (alternative)
+  ferret init my-project               Create new project in my-project/
+  ferret get github.com/user/module    Install a module from GitHub
+  ferret update                        Update all modules
 ```
 
 ### Project Configuration
 The `fer.ret` file contains project-specific settings:
 
 ```toml
-[default]
-name = "myapp"
-version = "1.0.0"
+name = "your_project_name"
 
 [compiler]
-version = "0.1.0"
+version = "0.0.1"
+
+[build]
+entry = "path/to/your/entry.fer"
+output = "bin"
 
 [cache]
 path = ".ferret/cache"
 
 [remote]
-enabled = false
+enabled = true
 share = false
 
+[neighbour]
+modulename = "../path/to/your/module"
+
 [dependencies]
-# Add your dependencies here
-# example = "1.0.0"
+github.com/user/repo = "0.0.2"
 ```
 
 ## Module Management
@@ -152,6 +158,9 @@ ferret list
 
 # Remove a dependency
 ferret remove github.com/user/repo
+
+# See orphan modules
+ferret orphan
 
 # Clean up unused dependencies
 ferret cleanup

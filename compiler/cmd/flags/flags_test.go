@@ -111,9 +111,9 @@ func TestParseArgs(t *testing.T) {
 			expected: &Args{SniffCommand: true},
 		},
 		{
-			name:     "cleanup command",
-			args:     []string{"program", "cleanup"},
-			expected: &Args{CleanupCommand: true},
+			name:     "clean command",
+			args:     []string{"program", "clean"},
+			expected: &Args{CleanCommand: true},
 		},
 
 		// Edge Case Tests

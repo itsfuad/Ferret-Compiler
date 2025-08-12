@@ -138,7 +138,7 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "Failed to declare receiver symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
-	
+
 	colors.GREEN.Printf("Declared receiver symbol %q (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
 
 	collectFunctionParameters(c, method.Function, methodScope)
