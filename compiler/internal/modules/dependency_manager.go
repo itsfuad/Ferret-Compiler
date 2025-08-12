@@ -167,7 +167,9 @@ func (dm *DependencyManager) ListDependencies() error {
 	directCount := 0
 	for dep, info := range dm.lockfile.Dependencies {
 		if info.Direct {
-			colors.GREEN.Printf("  %s@%s", dep, info.Version)
+			// Extract module name (without version) from the key
+			moduleName, _ := depEntryKeyParts(dep)
+			colors.GREEN.Printf("  %s@%s", moduleName, info.Version)
 			if info.Description != "" {
 				colors.GREEN.Printf(" (%s)", info.Description)
 			}
@@ -184,7 +186,9 @@ func (dm *DependencyManager) ListDependencies() error {
 	indirectCount := 0
 	for dep, info := range dm.lockfile.Dependencies {
 		if !info.Direct {
-			colors.YELLOW.Printf("  %s@%s\n", dep, info.Version)
+			// Extract module name (without version) from the key
+			moduleName, _ := depEntryKeyParts(dep)
+			colors.YELLOW.Printf("  %s@%s\n", moduleName, info.Version)
 			indirectCount++
 		}
 	}
@@ -217,6 +221,19 @@ func findFerretFiles(dir string) ([]string, error) {
 
 // InstallAllDependencies installs all dependencies listed in fer.ret and generates the lockfile
 func (dm *DependencyManager) InstallAllDependencies() error {
+	return dm.installAllDependenciesWithMigration(true)
+}
+
+// installAllDependenciesWithMigration is the internal implementation with migration control
+func (dm *DependencyManager) installAllDependenciesWithMigration(runMigration bool) error {
+	// First, migrate fer.ret versions to normalized format if needed
+	if runMigration {
+		err := dm.migrateFerRetVersionsInternal()
+		if err != nil {
+			return fmt.Errorf("failed to migrate fer.ret versions: %w", err)
+		}
+	}
+
 	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to read dependencies from fer.ret: %w", err)
@@ -423,10 +440,11 @@ func (dm *DependencyManager) resolveTransitiveDependencies(parentRepo, parentVer
 
 // extractRemoteImportsFromModule extracts all remote imports from a module
 func (dm *DependencyManager) extractRemoteImportsFromModule(parentRepo, parentVersion, parentRepoName, cachePath string) map[string]struct{} {
-	moduleDir := filepath.Join(cachePath, GITHUB_HOST, parentRepoName+"@"+parentVersion)
+	normalizedVersion := NormalizeVersion(parentVersion)
+	moduleDir := filepath.Join(cachePath, GITHUB_HOST, parentRepoName+"@"+normalizedVersion)
 	ferFiles, err := findFerretFiles(moduleDir)
 	if err != nil {
-		colors.YELLOW.Printf("Warning: Failed to scan module files for %s@%s: %s\n", parentRepo, parentVersion, err)
+		colors.YELLOW.Printf("Warning: Failed to scan module files for %s@%s: %s\n", parentRepo, normalizedVersion, err)
 		return nil
 	}
 
@@ -564,8 +582,10 @@ func (dm *DependencyManager) deleteCacheForKey(depKey string) {
 		return
 	}
 	repoName := parts[1] + "/" + parts[2] // user/repo
-	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", GITHUB_HOST, repoName+"@"+version)
+	normalizedVersion := NormalizeVersion(version)
+	cachePath := filepath.Join(dm.projectRoot, CONFIG_DIR, "modules", GITHUB_HOST, repoName+"@"+normalizedVersion)
 	_ = os.RemoveAll(cachePath)
+	colors.YELLOW.Printf("🗑️  Removed module %q from cache\n", repoName+"@"+normalizedVersion)
 }
 
 // UpdateDependency updates a specific dependency to its latest version
@@ -680,15 +700,18 @@ func (dm *DependencyManager) GetModulesInCache() ([]string, error) {
 			return err
 		}
 
-		// Expect: modules/host/owner/repo
+		// Expect: modules/github.com/owner/repo@version
 		rel, err := filepath.Rel(modulesDir, path)
 		if err != nil {
 			return err
 		}
 
 		parts := strings.Split(rel, string(os.PathSeparator))
+		// We expect github.com/owner/repo@version structure (3 parts total)
 		if len(parts) == 3 && d.IsDir() {
-			cachedModules = append(cachedModules, filepath.ToSlash(rel))
+			// Convert back to slash format to match lockfile keys
+			moduleKey := filepath.ToSlash(rel)
+			cachedModules = append(cachedModules, moduleKey)
 		}
 		return nil
 	})
@@ -805,4 +828,54 @@ func (dm *DependencyManager) checkSingleModuleUpdate(moduleName, currentVersion 
 		HasUpdate:      hasUpdate,
 		IsDirect:       isDirect,
 	}, nil
+}
+
+// MigrateFerRetVersions migrates existing fer.ret files to use normalized "v" prefixed versions
+func (dm *DependencyManager) MigrateFerRetVersions() error {
+	return dm.migrateFerRetVersionsInternal()
+}
+
+// migrateFerRetVersionsInternal is the internal migration function that doesn't trigger reinstall
+func (dm *DependencyManager) migrateFerRetVersionsInternal() error {
+	colors.BLUE.Println("🔄 Checking fer.ret for version format migration...")
+
+	dependencies, err := ReadFerRetDependencies(dm.projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to read fer.ret dependencies: %w", err)
+	}
+
+	var updated bool
+
+	for moduleName, dep := range dependencies {
+		normalizedVersion := NormalizeVersion(dep.Version)
+		if normalizedVersion != dep.Version {
+			colors.BLUE.Printf("📝 Migrating %s: %s -> %s\n", moduleName, dep.Version, normalizedVersion)
+
+			// Update the dependency with normalized version
+			err = WriteFerRetDependency(dm.projectRoot, moduleName, normalizedVersion, dep.Comment, false)
+			if err != nil {
+				return fmt.Errorf("failed to update %s in fer.ret: %w", moduleName, err)
+			}
+			updated = true
+		}
+	}
+
+	if updated {
+		colors.GREEN.Println("✅ Successfully migrated fer.ret versions to use 'v' prefix")
+	} else {
+		colors.GREEN.Println("✅ fer.ret versions are already normalized")
+	}
+
+	return nil
+}
+
+// MigrateFerRetVersionsWithReinstall migrates fer.ret and reinstalls dependencies
+func (dm *DependencyManager) MigrateFerRetVersionsWithReinstall() error {
+	err := dm.migrateFerRetVersionsInternal()
+	if err != nil {
+		return err
+	}
+
+	// Regenerate lockfile to ensure consistency
+	return dm.installAllDependenciesWithMigration(false)
 }

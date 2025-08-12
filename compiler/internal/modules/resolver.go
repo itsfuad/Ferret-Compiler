@@ -425,8 +425,8 @@ func readDependenciesFromFerRetFile(ferretPath string) (map[string]FerRetDepende
 				version = fmt.Sprintf("%v", value)
 			}
 
-			// Strip common version prefixes for lockfile compatibility
-			version = stripVersionPrefix(version)
+			// Normalize version to always use "v" prefix for consistency
+			version = NormalizeVersion(version)
 
 			dependencies[key] = FerRetDependency{
 				Version: version,
@@ -435,19 +435,6 @@ func readDependenciesFromFerRetFile(ferretPath string) (map[string]FerRetDepende
 		}
 	}
 	return dependencies, nil
-}
-
-// stripVersionPrefix removes common version prefixes like ^, ~, >=, etc.
-func stripVersionPrefix(version string) string {
-	// Remove common prefixes
-	prefixes := []string{"^", "~", ">=", "<=", ">", "<", "=", "v"}
-	for _, prefix := range prefixes {
-		if after, ok := strings.CutPrefix(version, prefix); ok {
-			version = after
-			break
-		}
-	}
-	return version
 }
 
 // CheckCanImportRemoteModules validates if remote imports are allowed for the current project
@@ -557,8 +544,8 @@ func WriteFerRetDependency(projectRoot, repoName, version, comment string, isCac
 	if err != nil {
 		return fmt.Errorf("failed to load project config: %w", err)
 	}
-	// update the dependency
-	configData.Dependencies.Modules[repoName] = stripVersionPrefix(version)
+	// update the dependency with normalized version
+	configData.Dependencies.Modules[repoName] = NormalizeVersion(version)
 	//write back
 	configData.Save()
 	return nil
