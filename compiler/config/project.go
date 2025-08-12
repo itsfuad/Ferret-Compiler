@@ -221,7 +221,7 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 	}
 
 	configData["build"] = toml.TOMLTable{
-		"entry":  "src/main.fer",
+		"entry":  "# app.fer",
 		"output": "bin/" + projectName,
 	}
 
