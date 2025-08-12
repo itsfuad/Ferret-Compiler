@@ -120,7 +120,6 @@ func Usage() {
 
 	colors.YELLOW.Println("OPTIONS:")
 	fmt.Println("  -d, -debug                           Enable debug mode")
-	fmt.Println("  -o, -output <path>                   Specify output file path")
 	fmt.Println()
 
 	fmt.Print("NOTE: All flags support both single dash (-flag) and double dash (--flag) formats")
@@ -131,9 +130,7 @@ func Usage() {
 	fmt.Println("  ferret run                           Run project using fer.ret configuration")
 	fmt.Println("  ferret run -debug                    Run with debug output")
 	fmt.Println("  ferret run --debug                   Run with debug output (alternative)")
-	fmt.Println("  ferret run -o output.bin             Run and specify output file")
-	fmt.Println("  ferret run --output=output.bin       Run and specify output file (alternative)")
-	fmt.Println("  ferret init my-project               Create new project in my-project/")
+	fmt.Println("  ferret init my-project-name          Create new project named my-project-name")
 	fmt.Println("  ferret get github.com/user/module    Install a module from GitHub")
 	fmt.Println("  ferret update                        Update all modules")
 	fmt.Println()

@@ -63,7 +63,6 @@ MODULE MANAGEMENT:
 
 OPTIONS:
   -d, -debug                           Enable debug mode
-  -o, -output <path>                   Specify output file path
 
 NOTE: All flags support both single dash (-flag) and double dash (--flag) formats
 
@@ -71,9 +70,7 @@ EXAMPLES:
   ferret run                           Run project using fer.ret configuration
   ferret run -debug                    Run with debug output
   ferret run --debug                   Run with debug output (alternative)
-  ferret run -o output.bin             Run and specify output file
-  ferret run --output=output.bin       Run and specify output file (alternative)
-  ferret init my-project               Create new project in my-project/
+  ferret init my-project-name          Create new project named my-project-name
   ferret get github.com/user/module    Install a module from GitHub
   ferret update                        Update all modules
 ```
