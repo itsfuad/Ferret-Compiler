@@ -169,13 +169,11 @@ func WriteTOMLFile(filename string, data TOMLData, inlineComments map[string]map
 		return err
 	}
 
-	ensureDependenciesSection(file, data)
 	return nil
 }
 
-// writeTOMLSections writes all TOML sections to the file in the specified order
 func writeTOMLSections(file *os.File, data TOMLData, inlineComments map[string]map[string]string) error {
-	sectionOrder := []string{"default", "compiler", "build", "cache", "remote", "dependencies"}
+	sectionOrder := []string{"default", "compiler", "build", "cache", "remote", "neighbour", "dependencies"}
 
 	for _, sectionName := range sectionOrder {
 		if sectionData, exists := data[sectionName]; exists {
@@ -244,13 +242,6 @@ func getInlineComment(sectionName, key string, inlineComments map[string]map[str
 		}
 	}
 	return ""
-}
-
-// ensureDependenciesSection adds an empty dependencies section if it doesn't exist
-func ensureDependenciesSection(file *os.File, data TOMLData) {
-	if _, exists := data["dependencies"]; !exists {
-		fmt.Fprintf(file, "\n[dependencies]\n")
-	}
 }
 
 // needsQuoting determines if a string value needs to be quoted

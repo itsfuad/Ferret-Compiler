@@ -1,11 +1,11 @@
-name = "myapps"
+name = "app"
 
 [compiler]
-version = "0.0.1"
+version = "0.1.0"
 
 [build]
-output = "bin/myapp"
-entry = "cmd/start.fer"
+entry = "src/main.fer"
+output = "bin/app"
 
 [cache]
 path = ".ferret/cache"
@@ -14,8 +14,8 @@ path = ".ferret/cache"
 enabled = true
 share = false
 
-[dependencies]
-github.com/itsfuad/ferret-mod = "v1.0.1"
-
 [neighbour]
-app2 = "../app2"
+"app2" = "../app2"
+
+[dependencies]
+github.com/itsfuad/ferret-mod = "0.0.1"

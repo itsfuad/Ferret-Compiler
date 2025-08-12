@@ -445,8 +445,8 @@ func stripVersionPrefix(version string) string {
 	// Remove common prefixes
 	prefixes := []string{"^", "~", ">=", "<=", ">", "<", "="}
 	for _, prefix := range prefixes {
-		if strings.HasPrefix(version, prefix) {
-			version = strings.TrimPrefix(version, prefix)
+		if after, ok := strings.CutPrefix(version, prefix); ok {
+			version = after
 			break
 		}
 	}
@@ -556,57 +556,28 @@ func ReadFerRetDependencies(projectRoot string) (map[string]FerRetDependency, er
 
 // WriteFerRetDependency adds or updates a dependency in the fer.ret file
 func WriteFerRetDependency(projectRoot, repoName, version, comment string, isCached bool) error {
-	ferRetPath := filepath.Join(projectRoot, FerretConfigFile)
-
-	// Read existing content
-	data, err := toml.ParseTOMLFile(ferRetPath)
+	configData, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to parse fer.ret: %w", err)
+		return fmt.Errorf("failed to load project config: %w", err)
 	}
-
-	// Ensure dependencies section exists in the original data
-	if _, exists := data["dependencies"]; !exists {
-		data["dependencies"] = make(toml.TOMLTable)
-	}
-
-	// Add/update the dependency
-	data["dependencies"][repoName] = version
-
-	// Prepare inline comments if provided
-	var inlineComments map[string]map[string]string
-	if comment != "" {
-		inlineComments = map[string]map[string]string{
-			"dependencies": {
-				repoName: comment,
-			},
-		}
-	}
-
-	if isCached {
-		colors.ORANGE.Printf("🔄️Reusing cached module: %s@%s\n", repoName, version)
-	}
-
-	// Write back to file using the TOML writer
-	return toml.WriteTOMLFile(ferRetPath, data, inlineComments)
+	// update the dependency
+	configData.Dependencies.Modules[repoName] = version
+	//write back
+	configData.Save()
+	return nil
 }
 
 // RemoveFerRetDependency removes a dependency from the fer.ret file
 func RemoveFerRetDependency(projectRoot, repoName string) error {
-	ferRetPath := filepath.Join(projectRoot, FerretConfigFile)
-
-	// Read existing content
-	data, err := toml.ParseTOMLFile(ferRetPath)
+	configData, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to parse fer.ret: %w", err)
+		return fmt.Errorf("failed to load project config: %w", err)
 	}
-
-	// Remove from dependencies section
-	if depsSection, exists := data["dependencies"]; exists {
-		delete(depsSection, repoName)
-	}
-
-	// Write back to file
-	return toml.WriteTOMLFile(ferRetPath, data, nil)
+	// remove the dependency
+	delete(configData.Dependencies.Modules, repoName)
+	//write back
+	configData.Save()
+	return nil
 }
 
 // FindNearestFerRet walks up from a starting directory to find the nearest fer.ret file.
