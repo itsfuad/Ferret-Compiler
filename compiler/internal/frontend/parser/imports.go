@@ -110,9 +110,8 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 			Identifier: member,
 			Location:   *source.NewLocation(module.Loc().Start, member.Loc().End),
 		}, true
-	} else {
-		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE)
-		return nil, false
 	}
+	token := p.peek()
+	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE)
+	return nil, false
 }

@@ -56,7 +56,7 @@ func parseVersion(version string) []int {
 // compareVersions compares two version arrays
 // Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
 func compareVersions(v1, v2 []int) int {
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if v1[i] < v2[i] {
 			return -1
 		}
@@ -67,6 +67,7 @@ func compareVersions(v1, v2 []int) int {
 	return 0
 }
 
+// Compiler Does parse, analyze, and compile the source code.
 func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.CompilerContext) {
 
 	// Check if entry point file exists

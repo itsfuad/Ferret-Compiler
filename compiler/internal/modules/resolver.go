@@ -396,16 +396,13 @@ func ResolveRemoteModule(importPath string, projectRoot, remoteCachePath string,
 }
 
 func checkVersion(deps map[string]FerRetDependency, repo string) (string, error) {
-	var version string
 	dep, ok := deps[repo]
 	if !ok || dep.Version == "" {
 		// Module not found in fer.ret - this is now a strict requirement
 		return "", fmt.Errorf("module %s is not declared in fer.ret dependencies.\n%s %s %s", repo, colors.YELLOW.Sprintf("Add it to fer.ret or run"), colors.BLUE.Sprintf("ferret get %s", repo), colors.YELLOW.Sprintf("to install and declare the dependency"))
-	} else {
-		version = dep.Version
 	}
 
-	return version, nil
+	return dep.Version, nil
 }
 
 // Helper to read dependencies from a specific fer.ret file

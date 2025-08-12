@@ -40,10 +40,9 @@ func parseFunctionLike(p *Parser) ast.Node {
 		fmt.Printf("Parsing anonymous function\n")
 		// anonymous function
 		return parseFunctionLiteral(p, &start.Start, false, params...)
-	} else {
-		// named function
-		return parseFunctionDecl(p)
 	}
+	// named function
+	return parseFunctionDecl(p)
 }
 
 func parseParameters(p *Parser) []ast.Parameter {

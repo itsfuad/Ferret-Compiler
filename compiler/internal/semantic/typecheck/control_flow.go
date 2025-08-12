@@ -279,9 +279,8 @@ func analyzeIfStatement(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *module
 	// Handle if-else vs if-only cases
 	if ifStmt.Alternative != nil {
 		return analyzeIfElseBranches(r, ifStmt, cm, expectedReturnType, mainResult)
-	} else {
-		return analyzeIfOnlyBranch(mainResult)
 	}
+	return analyzeIfOnlyBranch(mainResult)
 }
 
 // analyzeIfElseBranches handles if-else and if-else-if cases
