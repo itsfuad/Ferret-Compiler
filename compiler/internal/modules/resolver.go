@@ -133,7 +133,7 @@ func ResolveLocalModule(importPath, projectDirName string, projectRoot string) (
 }
 
 // ResolveLocalProjectModule resolves modules from external local projects (like Go's replace directive)
-func ResolveLocalProjectModule(importPath string, localsConfig map[string]string) (string, error) {
+func ResolveLocalProjectModule(importPath string, localsConfig map[string]string, projectRoot string) (string, error) {
 	if localsConfig == nil {
 		return "", fmt.Errorf("no local projects configured")
 	}
@@ -146,12 +146,8 @@ func ResolveLocalProjectModule(importPath string, localsConfig map[string]string
 
 	// Convert relative path to absolute if needed
 	if !filepath.IsAbs(localProjectPath) {
-		// Make it relative to the current working directory or project root
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("failed to get current working directory: %w", err)
-		}
-		localProjectPath = filepath.Join(cwd, localProjectPath)
+		// Make it relative to the project root instead of current working directory
+		localProjectPath = filepath.Join(projectRoot, localProjectPath)
 	}
 
 	// Check if the local project path exists
@@ -172,7 +168,7 @@ func ResolveLocalProjectModule(importPath string, localsConfig map[string]string
 }
 
 // ResolveNeighbourProjectModule resolves modules from external neighbouring projects (like Go's replace directive)
-func ResolveNeighbourProjectModule(importPath string, neighbourConfig map[string]string) (string, error) {
+func ResolveNeighbourProjectModule(importPath string, neighbourConfig map[string]string, projectRoot string) (string, error) {
 	if neighbourConfig == nil {
 		return "", fmt.Errorf("no neighbouring projects configured")
 	}
@@ -185,17 +181,13 @@ func ResolveNeighbourProjectModule(importPath string, neighbourConfig map[string
 
 	// Convert relative path to absolute if needed
 	if !filepath.IsAbs(neighbourProjectPath) {
-		// Make it relative to the current working directory or project root
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("failed to get current working directory: %w", err)
-		}
-		neighbourProjectPath = filepath.Join(cwd, neighbourProjectPath)
+		// Make it relative to the project root instead of current working directory
+		neighbourProjectPath = filepath.Join(projectRoot, neighbourProjectPath)
 	}
 
 	// Check if the neighbouring project path exists
 	if stat, err := os.Stat(neighbourProjectPath); err != nil || !stat.IsDir() {
-		return "", fmt.Errorf("neighbouring project path `%s` does not exist or is not a directory", neighbourProjectPath)
+		return "", fmt.Errorf("neighbouring project path %q does not exist or is not a directory", neighbourProjectPath)
 	}
 
 	// Remove the project root from the import path and resolve relative to the neighbouring project path

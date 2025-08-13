@@ -30,3 +30,18 @@ func UriToFilePath(uri string) (string, error) {
 
 	return "", nil
 }
+
+// PathToURI converts a platform-specific file path to a file:// URI.
+func PathToURI(filePath string) string {
+	// Convert to forward slashes for URI
+	uriPath := filepath.ToSlash(filePath)
+
+	// Ensure absolute path starts with /
+	if !filepath.IsAbs(filePath) {
+		uriPath = "/" + uriPath
+	} else if len(uriPath) > 0 && uriPath[0] != '/' {
+		uriPath = "/" + uriPath
+	}
+
+	return "file://" + uriPath
+}

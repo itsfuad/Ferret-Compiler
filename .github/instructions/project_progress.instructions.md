@@ -232,6 +232,14 @@ Make sure you add the `bin` directory to your `PATH` environment variable to run
 ./scripts/run.sh          # Unix
 .\scripts\run.bat         # Windows
 
+# Build the LSP server
+./scripts/lsp.sh     # Unix
+.\scripts\lsp.bat    # Windows
+
+# Build the LSP server + package the vscode extension
+./scripts/pack.sh     # Unix
+.\scripts\pack.bat    # Windows
+
 # Full CI validation
 ./scripts/ci-check.sh     # Unix
 .\scripts\ci-check.bat    # Windows

@@ -1,4 +1,3 @@
-import * as path from "path";
 import { workspace, ExtensionContext, commands, window } from "vscode";
 import { spawn, ChildProcess } from "child_process";
 import * as net from "net";
@@ -8,15 +7,18 @@ import {
   LanguageClientOptions,
   ServerOptions,
   StreamInfo,
+  State,
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | null = null;
 let serverProcess: ChildProcess | null = null;
 let isLSPEnabled: boolean = true;
+let connectionSocket: net.Socket | null = null;
 
 function createSocketConnection(port: number): Promise<StreamInfo> {
   return new Promise<StreamInfo>((resolve, reject) => {
     const socket = net.createConnection(port, '127.0.0.1');
+    connectionSocket = socket;
     
     socket.on('connect', () => {
       console.log(`Connected to Ferret LSP server on port ${port}`);
@@ -28,7 +30,18 @@ function createSocketConnection(port: number): Promise<StreamInfo> {
     
     socket.on('error', (error) => {
       console.error(`Failed to connect to LSP server: ${error}`);
+      connectionSocket = null;
       reject(error);
+    });
+
+    socket.on('close', () => {
+      console.log('LSP server connection closed');
+      connectionSocket = null;
+    });
+
+    socket.on('end', () => {
+      console.log('LSP server connection ended');
+      connectionSocket = null;
     });
   });
 }
@@ -68,12 +81,26 @@ function setupServerProcess(serverExec: string, resolve: (value: StreamInfo) => 
   
   serverProcess.on('error', (error) => {
     console.error(`Failed to start LSP server: ${error}`);
+    cleanupServerProcess();
     reject(error);
   });
   
   serverProcess.on('exit', (code) => {
     console.log(`LSP server exited with code ${code}`);
+    cleanupServerProcess();
   });
+}
+
+function cleanupServerProcess(): void {
+  if (connectionSocket && !connectionSocket.destroyed) {
+    try {
+      connectionSocket.destroy();
+    } catch (error) {
+      console.error('Error destroying socket:', error);
+    }
+  }
+  connectionSocket = null;
+  serverProcess = null;
 }
 
 // Function to start the LSP client
@@ -85,9 +112,8 @@ function startLSPClient(context: ExtensionContext) {
 
   console.log("Starting Ferret LSP client...");
   
-  const serverExec = context.asAbsolutePath(
-    path.join("bin", "ferret-lsp.exe")
-  );
+  //use the "ferret-lsp" from PATH
+  const serverExec = "ferret-lsp";
 
   // Create server options that spawn the server and connect via TCP
   const serverOptions: ServerOptions = () => {
@@ -103,6 +129,20 @@ function startLSPClient(context: ExtensionContext) {
       // Notify the server about file changes to .fer files contained in the workspace
       fileEvents: workspace.createFileSystemWatcher("**/*.fer"),
     },
+    errorHandler: {
+      error: (error, message, count) => {
+        console.error(`LSP Client Error: ${error}, Message: ${typeof message === 'object' ? JSON.stringify(message) : String(message)}, Count: ${count}`);
+        if (count !== undefined && count <= 3) {
+          return { action: 1 }; // Continue
+        }
+        return { action: 2 }; // Shutdown
+      },
+      closed: () => {
+        console.log('LSP server connection closed');
+        cleanupServerProcess();
+        return { action: 1 }; // Restart
+      }
+    }
   };
 
   // Create the language client
@@ -112,6 +152,14 @@ function startLSPClient(context: ExtensionContext) {
     serverOptions,
     clientOptions
   );
+
+  // Add state change handler
+  client.onDidChangeState((event) => {
+    console.log(`LSP Client state changed: ${State[event.oldState]} -> ${State[event.newState]}`);
+    if (event.newState === State.Stopped) {
+      cleanupServerProcess();
+    }
+  });
 
   // Start the client (this will launch the server automatically)
   client.start();
@@ -124,6 +172,14 @@ async function stopLSPClient(): Promise<void> {
   
   if (client) {
     try {
+      // Check if client is already stopped
+      if (client.state === State.Stopped) {
+        console.log("LSP client already stopped");
+        client = null;
+        cleanupServerProcess();
+        return;
+      }
+      
       await client.stop();
       console.log("LSP client stopped successfully");
     } catch (error) {
@@ -132,8 +188,8 @@ async function stopLSPClient(): Promise<void> {
     client = null;
   }
   
-  // The server process will be cleaned up automatically by the client.stop()
-  serverProcess = null;
+  // Clean up the server process and socket
+  cleanupServerProcess();
 }
 
 // Function to toggle LSP server
@@ -186,8 +242,12 @@ export function activate(context: ExtensionContext) {
 }
 
 export function deactivate(): Thenable<void> | undefined {
+  console.log("Deactivating Ferret LSP extension...");
   if (client) {
     return stopLSPClient().then(() => undefined);
   }
+  
+  // Ensure cleanup even if no client
+  cleanupServerProcess();
   return undefined;
 }

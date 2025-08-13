@@ -114,11 +114,8 @@ func (c *CompilerContext) getNeighbourProjectImportPath(fullPath string) string 
 		// Convert relative path to absolute if needed
 		absProjectPath := projectPath
 		if !filepath.IsAbs(projectPath) {
-			cwd, err := os.Getwd()
-			if err != nil {
-				continue
-			}
-			absProjectPath = filepath.Join(cwd, projectPath)
+			// Use project root instead of current working directory
+			absProjectPath = filepath.Join(c.ProjectRootFullPath, projectPath)
 		}
 
 		absProjectPath, err := filepath.Abs(absProjectPath)

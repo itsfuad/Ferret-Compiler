@@ -18,6 +18,9 @@ import (
 	"lsp/wio"
 )
 
+// Track files that have had diagnostics published
+var filesWithDiagnostics = make(map[string]bool)
+
 type Request struct {
 	Jsonrpc string          `json:"jsonrpc"`
 	Id      int             `json:"id"`
@@ -228,8 +231,11 @@ func writeMessage(writer *bufio.Writer, resp Response) {
 	msg := fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(data), data)
 	if _, err := writer.WriteString(msg); err != nil {
 		log.Printf("Failed to write response: %v", err)
+		return
 	}
-	writer.Flush()
+	if err := writer.Flush(); err != nil {
+		log.Printf("Failed to flush response: %v", err)
+	}
 }
 
 func writeRawMessage(writer *bufio.Writer, msg interface{}) {
@@ -242,8 +248,11 @@ func writeRawMessage(writer *bufio.Writer, msg interface{}) {
 	fullMsg := fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(data), data)
 	if _, err := writer.WriteString(fullMsg); err != nil {
 		log.Printf("Failed to write message: %v", err)
+		return
 	}
-	writer.Flush()
+	if err := writer.Flush(); err != nil {
+		log.Printf("Failed to flush message: %v", err)
+	}
 }
 
 func processDiagnostics(writer *bufio.Writer, uri string) {
@@ -290,18 +299,18 @@ func processDiagnostics(writer *bufio.Writer, uri string) {
 	}
 
 	context := cmd.Compile(conf, false)
-	
+
 	// Check if context or Reports is nil
 	if context == nil {
 		log.Println("Compilation context is nil")
 		publishDiagnostics(writer, uri, []map[string]interface{}{})
 		return
 	}
-	
+
 	reports = context.Reports
 
 	makeDiagnostics(reports, writer, uri)
-	
+
 	context.Destroy()
 }
 
@@ -312,22 +321,46 @@ func makeDiagnostics(reports report.Reports, writer *bufio.Writer, uri string) {
 		return
 	}
 
-	diagnostics := make([]map[string]interface{}, 0)
+	// Group diagnostics by file URI
+	diagnosticsByFile := make(map[string][]map[string]interface{})
 
 	log.Printf("Found %d problems\n", len(reports))
 
 	for _, report := range reports {
-		diagnostics = append(diagnostics, map[string]interface{}{
+		// Convert file path to URI format
+		fileURI := wio.PathToURI(report.FilePath)
+
+		diagnostic := map[string]interface{}{
 			"range": map[string]interface{}{
 				"start": map[string]int{"line": report.Location.Start.Line - 1, "character": report.Location.Start.Column - 1},
 				"end":   map[string]int{"line": report.Location.End.Line - 1, "character": report.Location.End.Column - 1},
 			},
 			"message":  report.Message,
 			"severity": getSeverity(report.Level),
-		})
+		}
+
+		// Group diagnostics by file
+		if diagnosticsByFile[fileURI] == nil {
+			diagnosticsByFile[fileURI] = make([]map[string]interface{}, 0)
+		}
+		diagnosticsByFile[fileURI] = append(diagnosticsByFile[fileURI], diagnostic)
 	}
 
-	publishDiagnostics(writer, uri, diagnostics)
+	// Publish diagnostics for each file separately
+	for fileURI, fileDiagnostics := range diagnosticsByFile {
+		log.Printf("Publishing %d diagnostics for %s", len(fileDiagnostics), fileURI)
+		publishDiagnostics(writer, fileURI, fileDiagnostics)
+		filesWithDiagnostics[fileURI] = true
+	}
+
+	// Clear diagnostics for files that previously had problems but now don't
+	for previousFileURI := range filesWithDiagnostics {
+		if _, hasProblems := diagnosticsByFile[previousFileURI]; !hasProblems {
+			log.Printf("Clearing diagnostics for %s (no longer has problems)", previousFileURI)
+			publishDiagnostics(writer, previousFileURI, []map[string]interface{}{})
+			delete(filesWithDiagnostics, previousFileURI)
+		}
+	}
 }
 
 func getSeverity(level report.PROBLEM_TYPE) int {
