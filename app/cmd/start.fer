@@ -11,7 +11,7 @@ import "app/cmd/arrays"; // unused import
 
 import "app2/file2/types";
 
-let valueOfPi = cc::PI; 
+let valueOfPi = cc::PI;
 
 fn voidfn() {
 

@@ -39,7 +39,7 @@ func ResolveModuleLocation(importPath, currentFileFullPath string, ctxx *Compile
 	case modules.LOCAL:
 		return modules.ResolveLocalModule(importPath, projectDirName, ctxx.ProjectRootFullPath)
 	case modules.NEIGHBOUR:
-		return modules.ResolveNeighbourProjectModule(importPath, ctxx.ProjectConfig.Neighbour.Projects)
+		return modules.ResolveNeighbourProjectModule(importPath, ctxx.ProjectConfig.Neighbour.Projects, ctxx.ProjectRootFullPath)
 	default:
 		return "", fmt.Errorf("unknown module type for import: %s", importPath)
 	}
