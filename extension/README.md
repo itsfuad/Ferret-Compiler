@@ -1,4 +1,4 @@
-# Syntax highlighter for ferret# Ferret Language Support
+# Ferret Language Support
 
 VS Code extension providing syntax highlighting and basic language features for the [Ferret programming language](https://github.com/itsfuad/Ferret-Compiler).
 

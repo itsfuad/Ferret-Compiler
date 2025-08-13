@@ -90,13 +90,19 @@ function setupServerProcess(serverExec: string, resolve: (value: StreamInfo) => 
     cleanupServerProcess();
   });
 }
+//Client ferret Language Server: connection to server is erroring. Cannot call write after a stream was destroyed
 
 function cleanupServerProcess(): void {
-  if (connectionSocket && !connectionSocket.destroyed) {
+  if (connectionSocket) {
+    connectionSocket.removeAllListeners();
+    connectionSocket.unref(); // Unreference to allow process to exit
+    //connectionSocket.destroy();
+  }
+  if (serverProcess) {
     try {
-      connectionSocket.destroy();
+      serverProcess.kill();
     } catch (error) {
-      console.error('Error destroying socket:', error);
+      console.error('Error killing server process:', error);
     }
   }
   connectionSocket = null;
@@ -169,27 +175,16 @@ function startLSPClient(context: ExtensionContext) {
 // Function to stop the LSP client
 async function stopLSPClient(): Promise<void> {
   console.log("Stopping Ferret LSP client...");
-  
   if (client) {
     try {
-      // Check if client is already stopped
-      if (client.state === State.Stopped) {
-        console.log("LSP client already stopped");
-        client = null;
-        cleanupServerProcess();
-        return;
-      }
-      
       await client.stop();
+      client = null;
+      cleanupServerProcess();
       console.log("LSP client stopped successfully");
     } catch (error) {
       console.error("Error stopping LSP client:", error);
     }
-    client = null;
   }
-  
-  // Clean up the server process and socket
-  cleanupServerProcess();
 }
 
 // Function to toggle LSP server
