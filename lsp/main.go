@@ -117,7 +117,7 @@ func handleConnection(conn net.Conn) {
 		case "shutdown":
 			handleShutdown(writer, req)
 		case "exit":
-			handleExit(conn)
+			handleExit(writer,conn)
 		default:
 			handleUnknownMethod(req)
 		}
@@ -160,6 +160,23 @@ func handleTextDocumentChange(writer *bufio.Writer, req Request) {
 	processDiagnostics(writer, uri)
 }
 
+func handleExit(writer *bufio.Writer, conn net.Conn) {
+	log.Printf("Client requested exit")
+
+	// flush pending messages
+	if writer != nil {
+		writer.Flush()
+	}
+
+	// defer closing conn until after graceful shutdown
+	if conn != nil {
+		conn.Close()
+	}
+
+	// exit cleanly
+	os.Exit(0)
+}
+
 func handleShutdown(writer *bufio.Writer, req Request) {
 	resp := Response{
 		Jsonrpc: "2.0",
@@ -167,12 +184,10 @@ func handleShutdown(writer *bufio.Writer, req Request) {
 		Result:  nil,
 	}
 	writeMessage(writer, resp)
+
+	log.Println("Server received shutdown request")
 }
 
-func handleExit(conn net.Conn) {
-	log.Printf("Client requested exit")
-	conn.Close()
-}
 
 func handleUnknownMethod(req Request) {
 	log.Printf("Unknown method: %v", req.Method)
