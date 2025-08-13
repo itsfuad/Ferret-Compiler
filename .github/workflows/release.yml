@@ -106,10 +106,13 @@ jobs:
             ferret init
             
             # Compile a Ferret file
-            ferret filename.fer
+            ferret run
             
             # Compile with debug output
-            ferret filename.fer --debug
+            ferret run --debug
+
+            # Compile a target project
+            ferret run project/location --debug
             ```
           files: |
             releases/*
