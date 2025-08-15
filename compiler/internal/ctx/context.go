@@ -18,9 +18,7 @@ import (
 )
 
 var contextCreated = false
-
-type ProjectStack struct {
-}
+const BUILTIN_DIR = "../modules"
 
 type CompilerContext struct {
 	EntryPoint string                     // Entry point file
@@ -31,7 +29,7 @@ type CompilerContext struct {
 	ProjectConfig       *config.ProjectConfig
 	ProjectStack        []*config.ProjectConfig
 	ProjectRootFullPath string
-	StdLibsPath         string // Path to system built-in modules
+	BuiltinModules      map[string]string // key: projectname, value: path
 
 	// Remote module cache path (.ferret/modules)
 	RemoteCachePath string
@@ -49,33 +47,41 @@ type CompilerContext struct {
 func (c *CompilerContext) GetModuleConfig(importPath string) (*config.ProjectConfig, modules.ModuleType, error) {
 
 	if importPath == "" {
-		panic("")
+		return nil, modules.UNKNOWN, fmt.Errorf("empty import path")
 	}
 
 	packageName := fs.FirstPart(importPath)
-	currentProject := c.PeekProjectStack()
+	project := c.PeekProjectStack()
 
 	var modType modules.ModuleType
 
-	if packageName == currentProject.Name {
+	if packageName == project.Name {
 		modType = modules.LOCAL
-	} else if rel, found := currentProject.Neighbor.Projects[packageName]; found {
+	} else if rel, found := project.Neighbors.Projects[packageName]; found {
 		modType = modules.NEIGHBOR
-		current, err := config.LoadProjectConfig(filepath.Join(currentProject.ProjectRoot, rel))
+		neighborProject, err := config.LoadProjectConfig(filepath.Join(project.ProjectRoot, rel))
 		if err != nil {
 			return nil, modType, err
 		}
-		currentProject = current // Update to the neighbor project config
+		project = neighborProject // Update to the neighbor project config
+	} else if path, found := c.BuiltinModules[packageName]; found {
+		modType = modules.BUILTIN
+		builtinProject, err := config.LoadProjectConfig(path)
+		if err != nil {
+			return nil, modType, err
+		}
+		fmt.Printf("Using built-in module: %s (%s)\n", packageName, path)
+		project = builtinProject // Update to the builtin project config
 	} else {
 		modType = modules.UNKNOWN
 	}
 
-	colors.MAGENTA.Printf("Module type for import path %q is %s\n - Project name: %q\n", importPath, modType, currentProject)
+	fmt.Printf("Returning %q, package: %q for project: %q of type %q\n",  importPath, packageName, project.Name, modType)
 
-	return currentProject, modType, nil
+	return project, modType, nil
 }
 
-func (c *CompilerContext) ImportPathToFullPath(importPath string) (string, *config.ProjectConfig, modules.ModuleType, error) {
+func (c *CompilerContext) ResolveImportPath(importPath string) (string, *config.ProjectConfig, modules.ModuleType, error) {
 	// Check if the import path is already a full path
 	config, modType, err := c.GetModuleConfig(importPath)
 	if err != nil {
@@ -89,7 +95,11 @@ func (c *CompilerContext) ImportPathToFullPath(importPath string) (string, *conf
 	projectName := fs.FirstPart(importPath)
 	// remove the project name from the import path
 	cleanPath := strings.TrimPrefix(importPath, projectName+"/")
-	return filepath.Join(config.ProjectRoot, cleanPath+constants.EXT), config, modType, nil
+	resolvedPath := filepath.Join(config.ProjectRoot, cleanPath+constants.EXT)
+
+	colors.BRIGHT_YELLOW.Printf("Resolved import path: %q\n", resolvedPath)
+
+	return resolvedPath, config, modType, nil
 }
 
 func (c *CompilerContext) PeekProjectStack() *config.ProjectConfig {
@@ -354,7 +364,6 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 		panic(fmt.Sprintf("Cannot add nil module for %q\n", importPath))
 	}
 
-
 	c.Modules[importPath] = &modules.Module{
 		AST:         module,
 		SymbolTable: symbol.NewSymbolTable(c.Builtins),
@@ -448,23 +457,6 @@ func (c *CompilerContext) FinishParsing(importPath string) {
 	}
 }
 
-// getBuiltinModulesPath determines the path to the system built-in modules
-// It looks for a 'modules' directory relative to the compiler binary location
-func getBuiltinModulesPath() string {
-	// the lib's relative path is ../[path specified]
-	execPath, err := os.Executable()
-	if err != nil {
-		colors.ORANGE.Printf("Failed to get executable path: %s\nFallback to current working directory", err)
-		// Fallback to current working directory if we can't get executable path
-		cwd, _ := os.Getwd()
-		return filepath.Join(cwd, constants.STD_LIBS_PATH)
-	}
-
-	libPath := filepath.Join(filepath.Dir(execPath), "..", constants.STD_LIBS_PATH)
-
-	return filepath.ToSlash(libPath)
-}
-
 func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
@@ -481,13 +473,23 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
-	// Determine modules path relative to compiler binary
-	modulesPath := getBuiltinModulesPath()
-
 	// Set up remote module cache path
 	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, constants.CACHE_DIR)
 	remoteCachePath = filepath.ToSlash(remoteCachePath)
 	os.MkdirAll(remoteCachePath, 0755)
+
+	execPath, err := os.Executable()
+	if err != nil {
+		colors.RED.Printf("Error getting executable path: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize built-in modules
+	BuiltinModules, err := fs.DirectChilds(filepath.Join(filepath.Dir(execPath), BUILTIN_DIR))
+	if err != nil {
+		colors.RED.Printf("Error reading built-in modules: %s\n", err)
+		os.Exit(1)
+	}
 
 	return &CompilerContext{
 		EntryPoint:          entryPoint,
@@ -496,8 +498,8 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 		Reports:             report.Reports{},
 		ProjectConfig:       projectConfig,
 		ProjectStack:        []*config.ProjectConfig{projectConfig},
-		StdLibsPath:         modulesPath,
 		RemoteCachePath:     remoteCachePath,
+		BuiltinModules:      BuiltinModules,
 		ProjectRootFullPath: projectConfig.ProjectRoot,
 	}
 }
@@ -511,4 +513,10 @@ func (c *CompilerContext) Destroy() {
 	c.Modules = nil
 	c.Reports = nil
 	c.DepGraph = nil
+	c.BuiltinModules = nil
+	c.ProjectStack = nil
+	c._parsingModules = nil
+	c._parsingStack = nil
+
+	colors.RED.Println("Compiler context destroyed")
 }

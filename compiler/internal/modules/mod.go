@@ -71,18 +71,6 @@ type Module struct {
 	UsedImports map[string]bool // Track which imports are used in this file
 }
 
-// Built-in modules that are part of the standard library
-var BUILTIN_MODULES = map[string]bool{
-	"std":  true,
-	"math": true,
-	"io":   true,
-	"os":   true,
-	"net":  true,
-	"http": true,
-	"json": true,
-	"time": true,
-}
-
 func IsRemote(importPath string) bool {
 	return strings.HasPrefix(importPath, constants.GITHUB_HOST)
 }

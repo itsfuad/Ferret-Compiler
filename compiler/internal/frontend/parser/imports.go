@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"compiler/colors"
+	"compiler/config"
+
 	//"compiler/config"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
@@ -34,11 +36,9 @@ func parseImport(p *Parser) ast.Node {
 
 	loc := *source.NewLocation(&start.Start, &importToken.End)
 
-	moduleFullPath, config, modType, err := p.ctx.ImportPathToFullPath(importpath)
+	skip := false
 
-	colors.BOLD_PURPLE.Printf("Import module path %q from import path %q\n", moduleFullPath, importpath)
-
-	
+	moduleFullPath, config, modType, err := p.ctx.ResolveImportPath(importpath)
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
 			Value:    importpath,
@@ -49,16 +49,16 @@ func parseImport(p *Parser) ast.Node {
 		Location:       loc,
 	}
 
-	skip := false
-	
-	if (modType != modules.LOCAL && modType != modules.BUILTIN) && !p.ctx.PeekProjectStack().Remote.Enabled {
+	if err != nil {
+		p.ctx.Reports.AddError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 		skip = true
-		p.ctx.Reports.AddError(p.fullPath, &loc, fmt.Sprintf("Cannot import external module %q as your project disabled external project access", moduleFullPath), report.PARSING_PHASE).AddHint("Enable external project access to true in <project_root>/fer.ret")
-	} else if modType != modules.LOCAL && !config.Remote.Share {
-		skip = true
-		p.ctx.Reports.AddError(p.fullPath, &loc, fmt.Sprintf("Module %q is not enabled for sharing", moduleFullPath), report.PARSING_PHASE)
 	}
 
+	colors.BOLD_PURPLE.Printf("Import module path %q from import path %q\n", moduleFullPath, importpath)
+
+	if !skip {
+		skip = shouldSkip(p, &loc, config, moduleFullPath, modType)
+	}
 
 	if err != nil {
 		p.ctx.Reports.AddError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
@@ -93,6 +93,24 @@ func parseImport(p *Parser) ast.Node {
 	}
 
 	return stmt
+}
+
+func shouldSkip(p *Parser, loc *source.Location, config *config.ProjectConfig, moduleFullPath string, modType modules.ModuleType) bool {
+	if modType != modules.LOCAL && modType != modules.BUILTIN {
+		con := p.ctx.PeekProjectStack()
+		if modType == modules.NEIGHBOR && !con.External.AllowExternalImport {
+			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import neighbor module %q as your project disabled neighbor project access", moduleFullPath), report.PARSING_PHASE).AddHint("Enable allow-external-import=true in <project_root>/fer.ret")
+			return true
+		} else if modType == modules.REMOTE && !con.External.AllowRemoteImport {
+			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import remote module %q as your project disabled remote imports", moduleFullPath), report.PARSING_PHASE).AddHint("Enable allow-remote-import=true in <project_root>/fer.ret")
+			return true
+		}
+	}
+	if modType == modules.BUILTIN && !config.External.AllowSharing {
+		p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Module %q is not enabled for sharing", moduleFullPath), report.PARSING_PHASE)
+		return true
+	}
+	return false
 }
 
 func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool) {

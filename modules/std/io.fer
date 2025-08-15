@@ -1,5 +1,5 @@
 // Standard library IO module
-import "compiler/math/constants";
+import "math/constants";
 // import "github.com/itsfuad/ferret-mod/data/bigint"; // unused import;
 
 const doublepi = constants::PI * 2.0;

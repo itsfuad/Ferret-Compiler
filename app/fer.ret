@@ -8,13 +8,14 @@ entry = "cmd/main.fer"
 output = "bin"
 
 [cache]
-path = ".ferret/cache"
+path = ".ferret"
 
-[remote]
-enabled = true
-share = false
+[external]
+allow-sharing = false
+allow-remote-import = false
+allow-neighbor-import = true
 
-[neighbor]
+[neighbors]
 neighbor = "../app2"
 
 [dependencies]

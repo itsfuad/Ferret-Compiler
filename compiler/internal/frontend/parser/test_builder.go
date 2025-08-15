@@ -27,10 +27,6 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 		Cache: config.CacheConfig{
 			Path: ".ferret/modules",
 		},
-		Remote: config.RemoteConfig{
-			Enabled: false,
-			Share:   false,
-		},
 		Dependencies: config.DependencyConfig{
 			Modules: make(map[string]string),
 		},
