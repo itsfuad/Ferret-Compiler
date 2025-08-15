@@ -13,17 +13,20 @@ import (
 )
 
 const CONFIG_FILE = "fer.ret"
+const SHAREKEY = "allow-sharing"
+const REMOTEKEY = "allow-remote-import"
+const EXTERNALKEY = "allow-neighbor-import"
 
 // ProjectConfig represents the structure
 type ProjectConfig struct {
+	Name         string           `toml:"name"`
 	Compiler     CompilerConfig   `toml:"compiler"`
-	Cache        CacheConfig      `toml:"cache"`
-	Remote       RemoteConfig     `toml:"remote"`
 	Build        BuildConfig      `toml:"build"`
+	Cache        CacheConfig      `toml:"cache"`
+	External     ExternalConfig   `toml:"external"`
+	Neighbors    NeighborConfig   `toml:"neighbors"`
 	Dependencies DependencyConfig `toml:"dependencies"`
-	Neighbor     NeighborConfig   `toml:"neighbor"`
 	// Top-level project metadata
-	Name        string `toml:"name"`
 	ProjectRoot string
 }
 
@@ -41,11 +44,12 @@ var defaultConfig = toml.TOMLData{
 	"cache": toml.TOMLTable{
 		"path": "",
 	},
-	"remote": toml.TOMLTable{
-		"enabled": "",
-		"share":   "",
+	"external": toml.TOMLTable{
+		SHAREKEY:    "",
+		REMOTEKEY:   "",
+		EXTERNALKEY: "",
 	},
-	"neighbor":     toml.TOMLTable{},
+	"neighbors":    toml.TOMLTable{},
 	"dependencies": toml.TOMLTable{},
 }
 
@@ -66,13 +70,14 @@ func (conf *ProjectConfig) Save() {
 	tomData["cache"] = toml.TOMLTable{
 		"path": conf.Cache.Path,
 	}
-	tomData["remote"] = toml.TOMLTable{
-		"enabled": conf.Remote.Enabled,
-		"share":   conf.Remote.Share,
+	tomData["external"] = toml.TOMLTable{
+		SHAREKEY:    conf.External.AllowSharing,
+		REMOTEKEY:   conf.External.AllowRemoteImport,
+		EXTERNALKEY: conf.External.AllowExternalImport,
 	}
 
-	for key, value := range conf.Neighbor.Projects {
-		tomData["neighbor"][key] = value
+	for key, value := range conf.Neighbors.Projects {
+		tomData["neighbors"][key] = value
 	}
 	for key, value := range conf.Dependencies.Modules {
 		tomData["dependencies"][key] = value
@@ -95,10 +100,10 @@ type CacheConfig struct {
 	Path string `toml:"path"`
 }
 
-// RemoteConfig defines remote module import/export settings
-type RemoteConfig struct {
-	Enabled bool `toml:"enabled"`
-	Share   bool `toml:"share"`
+type ExternalConfig struct {
+	AllowSharing        bool `toml:"allow-sharing"`
+	AllowRemoteImport   bool `toml:"allow-remote-import"`
+	AllowExternalImport bool `toml:"allow-neighbor-import"`
 }
 
 // BuildConfig defines build settings
@@ -113,7 +118,7 @@ type DependencyConfig struct {
 
 // NeighborConfig defines neighboring project mappings (like Go's replace directive)
 type NeighborConfig struct {
-	Projects map[string]string `toml:"neighbor"` // project_name -> local_path
+	Projects map[string]string `toml:"neighbors"` // project_name -> local_path
 }
 
 // CreateDefaultProjectConfig creates a default fer.ret configuration file
@@ -196,17 +201,21 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 		os.Exit(1)
 	}
 
-	// Get remote enabled setting
-	remoteEnabled, err := ReadBoolFromPrompt("Do you want to allow remote module import ([Yes|No|Y|N] default: no)? ", false)
+	allowShare, err := ReadBoolFromPrompt("Allow sharing of this project with other projects? (true/false, default: false): ", false)
 	if err != nil {
-		fmt.Printf("❌ Error reading remote setting: %v\n", err)
+		fmt.Printf("❌ Error reading share setting: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get share enabled setting
-	shareEnabled, err := ReadBoolFromPrompt("Do you want to allow sharing your modules to others as remote modules ([Yes|No|Y|N] default: no)? ", false)
+	allowRemoteImport, err := ReadBoolFromPrompt("Allow remote imports? [e.g. github, gitlab] (true/false, default: false): ", false)
 	if err != nil {
-		fmt.Printf("❌ Error reading share setting: %v\n", err)
+		fmt.Printf("❌ Error reading remote import setting: %v\n", err)
+		os.Exit(1)
+	}
+
+	allowNeighborImport, err := ReadBoolFromPrompt("Allow neighbor imports from other projects? (true/false, default: false): ", false)
+	if err != nil {
+		fmt.Printf("❌ Error reading neighbor import setting: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -221,20 +230,21 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 	}
 
 	configData["build"] = toml.TOMLTable{
-		"entry":  "# app.fer",
+		"entry":  "yourproject.fer",
 		"output": "bin/" + projectName,
 	}
 
 	configData["cache"] = toml.TOMLTable{
-		"path": ".ferret/cache",
+		"path": ".ferret",
 	}
 
-	configData["remote"] = toml.TOMLTable{
-		"enabled": remoteEnabled,
-		"share":   shareEnabled,
+	configData["external"] = toml.TOMLTable{
+		SHAREKEY:    allowShare,
+		REMOTEKEY:   allowRemoteImport,
+		EXTERNALKEY: allowNeighborImport,
 	}
 
-	configData["neighbor"] = toml.TOMLTable{}
+	configData["neighbors"] = toml.TOMLTable{}
 
 	configData["dependencies"] = toml.TOMLTable{}
 
@@ -329,7 +339,7 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	parseCompilerSection(tomlData, config)
 	parseBuildSection(tomlData, config)
 	parseCacheSection(tomlData, config)
-	parseRemoteSection(tomlData, config)
+	parseExternalSection(tomlData, config)
 	parseDependenciesSection(tomlData, config)
 	parseNeighborSection(tomlData, config)
 
@@ -341,6 +351,20 @@ func parseDefaultSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if defaultSection, exists := tomlData["default"]; exists {
 		if name, ok := defaultSection["name"].(string); ok {
 			config.Name = name
+		}
+	}
+}
+
+func parseExternalSection(tomlData toml.TOMLData, config *ProjectConfig) {
+	if externalSection, exists := tomlData["external"]; exists {
+		if allowRemote, ok := externalSection[REMOTEKEY].(bool); ok {
+			config.External.AllowRemoteImport = allowRemote
+		}
+		if allowSharing, ok := externalSection[SHAREKEY].(bool); ok {
+			config.External.AllowSharing = allowSharing
+		}
+		if allowExternal, ok := externalSection[EXTERNALKEY].(bool); ok {
+			config.External.AllowExternalImport = allowExternal
 		}
 	}
 }
@@ -357,17 +381,6 @@ func parseCacheSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if cacheSection, exists := tomlData["cache"]; exists {
 		if path, ok := cacheSection["path"].(string); ok {
 			config.Cache.Path = path
-		}
-	}
-}
-
-func parseRemoteSection(tomlData toml.TOMLData, config *ProjectConfig) {
-	if remoteSection, exists := tomlData["remote"]; exists {
-		if enabled, ok := remoteSection["enabled"].(bool); ok {
-			config.Remote.Enabled = enabled
-		}
-		if share, ok := remoteSection["share"].(bool); ok {
-			config.Remote.Share = share
 		}
 	}
 }
@@ -395,11 +408,11 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 }
 
 func parseNeighborSection(tomlData toml.TOMLData, config *ProjectConfig) {
-	if neighborSection, exists := tomlData["neighbor"]; exists {
-		config.Neighbor.Projects = make(map[string]string)
+	if neighborSection, exists := tomlData["neighbors"]; exists {
+		config.Neighbors.Projects = make(map[string]string)
 		for key, value := range neighborSection {
 			if strValue, ok := value.(string); ok {
-				config.Neighbor.Projects[key] = strValue
+				config.Neighbors.Projects[key] = strValue
 			}
 		}
 	}

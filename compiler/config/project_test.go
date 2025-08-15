@@ -325,46 +325,6 @@ func TestParseCompilerSection(t *testing.T) {
 	}
 }
 
-func TestParseRemoteSection(t *testing.T) {
-	tests := []struct {
-		name     string
-		tomlData toml.TOMLData
-		want     RemoteConfig
-	}{
-		{
-			name: "with remote section",
-			tomlData: toml.TOMLData{
-				"remote": toml.TOMLTable{
-					"enabled": true,
-					"share":   false,
-				},
-			},
-			want: RemoteConfig{
-				Enabled: true,
-				Share:   false,
-			},
-		},
-		{
-			name:     "without remote section",
-			tomlData: toml.TOMLData{},
-			want:     RemoteConfig{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &ProjectConfig{}
-			parseRemoteSection(tt.tomlData, config)
-			if config.Remote.Enabled != tt.want.Enabled {
-				t.Errorf("parseRemoteSection() Enabled = %v, want %v", config.Remote.Enabled, tt.want.Enabled)
-			}
-			if config.Remote.Share != tt.want.Share {
-				t.Errorf("parseRemoteSection() Share = %v, want %v", config.Remote.Share, tt.want.Share)
-			}
-		})
-	}
-}
-
 func TestParseDependenciesSection(t *testing.T) {
 	tests := []struct {
 		name     string

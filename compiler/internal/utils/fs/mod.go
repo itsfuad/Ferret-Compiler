@@ -1,6 +1,8 @@
 package fs
 
 import (
+	"compiler/config"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,4 +48,32 @@ func LastPart(path string) string {
 	}
 
 	return ""
+}
+
+func DirectChilds(dirname string) (map[string]string, error) {
+	entries, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+
+	childs := make(map[string]string)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// must contain a fer.ret to be considered a valid module
+			rootLocation := filepath.Join(dirname, entry.Name())
+			projectConfig, err := config.LoadProjectConfig(rootLocation)
+			if err != nil {
+				continue
+			}
+			childs[projectConfig.Name] = rootLocation
+		}
+	}
+
+	fmt.Printf("Total child modules found: %d\n", len(childs))
+
+	for name, dir := range childs {
+		fmt.Printf(" - %q -> %q\n", name, dir)
+	}
+
+	return childs, nil
 }
