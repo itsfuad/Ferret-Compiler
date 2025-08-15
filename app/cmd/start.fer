@@ -2,9 +2,9 @@ import "github.com/itsfuad/ferret-mod/data/bigint"; // unused import;
 import "github.com/itsfuad/ferret-mod/arrays/array"; // unused import;
 import "github.com/itsfuad/ferret-mod/external/importer"; // unused import;
 
-import "modules/std/io";
-import "modules/math/constants" as cc;
-import "modules/math/geometry";
+import "compiler/std/io";
+import "compiler/math/constants" as cc;
+import "compiler/math/geometry";
 
 import "app/cmd/expr"; // unused import
 import "app/cmd/arrays"; // unused import

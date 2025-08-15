@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"ferret/internal/frontend/lexer"
-	"ferret/internal/source"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/source"
 )
 
 // Basic expression nodes

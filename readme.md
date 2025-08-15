@@ -95,7 +95,7 @@ path = ".ferret/cache"
 enabled = true
 share = false
 
-[neighbour]
+[neighbor]
 modulename = "../path/to/your/module"
 
 [dependencies]

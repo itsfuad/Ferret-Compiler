@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"ferret/config"
-	"ferret/internal/ctx"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/symbol"
-	"ferret/internal/testutil"
-	"ferret/report"
+	"compiler/config"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/symbol"
+	"compiler/internal/testutil"
+	"compiler/report"
 )
 
 // createTestCompilerContext creates a minimal compiler context for parser testing

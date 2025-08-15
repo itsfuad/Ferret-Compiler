@@ -7,15 +7,20 @@ import (
 	"sort"
 	"strings"
 
-	"ferret/colors"
-	"ferret/config"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/symbol"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/config"
+	"compiler/constants"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/symbol"
+	"compiler/internal/utils/fs"
+	"compiler/report"
 )
 
 var contextCreated = false
+
+type ProjectStack struct {
+}
 
 type CompilerContext struct {
 	EntryPoint string                     // Entry point file
@@ -24,8 +29,9 @@ type CompilerContext struct {
 	Reports    report.Reports
 	// Project configuration
 	ProjectConfig       *config.ProjectConfig
+	ProjectStack        []*config.ProjectConfig
 	ProjectRootFullPath string
-	ModulesPath         string // Path to system built-in modules
+	StdLibsPath         string // Path to system built-in modules
 
 	// Remote module cache path (.ferret/modules)
 	RemoteCachePath string
@@ -39,126 +45,84 @@ type CompilerContext struct {
 	_parsingStack []string
 }
 
-func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
-	// Check if this is a built-in module file
-	if c.IsBuiltinModuleFile(fullPath) {
-		return c.getBuiltinModuleImportPath(fullPath)
+// GetModuleConfig categorizes an import path with proper neighbor package name resolution
+func (c *CompilerContext) GetModuleConfig(importPath string) (*config.ProjectConfig, modules.ModuleType, error) {
+
+	if importPath == "" {
+		panic("")
 	}
 
-	// Check if this is a remote module file
-	if c.IsRemoteModuleFile(fullPath) {
-		return c.CachePathToImportPath(fullPath)
-	}
+	packageName := fs.FirstPart(importPath)
+	currentProject := c.PeekProjectStack()
 
-	// Check if this is a local project file (from locals config)
-	if localProjectImportPath := c.getNeighbourProjectImportPath(fullPath); localProjectImportPath != "" {
-		return localProjectImportPath
-	}
+	var modType modules.ModuleType
 
-	relPath, err := filepath.Rel(c.ProjectRootFullPath, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
-	relPath = filepath.ToSlash(relPath)
-	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-
-	// Use directory name instead of project name for consistency
-	dirName := filepath.Base(c.ProjectRootFullPath)
-
-	return dirName + "/" + moduleName
-}
-
-// IsBuiltinModuleFile checks if the given file path is within the built-in modules directory
-func (c *CompilerContext) IsBuiltinModuleFile(fullPath string) bool {
-	if c.ModulesPath == "" {
-		return false
-	}
-
-	absModulesPath, _ := filepath.Abs(c.ModulesPath)
-	absFilePath, _ := filepath.Abs(fullPath)
-
-	relPath, err := filepath.Rel(absModulesPath, absFilePath)
-	return err == nil && !strings.HasPrefix(relPath, "..")
-}
-
-// getBuiltinModuleImportPath generates the import path for built-in module files
-func (c *CompilerContext) getBuiltinModuleImportPath(fullPath string) string {
-	if c.ModulesPath == "" {
-		return ""
-	}
-
-	absModulesPath, _ := filepath.Abs(c.ModulesPath)
-	absFilePath, _ := filepath.Abs(fullPath)
-
-	relPath, err := filepath.Rel(absModulesPath, absFilePath)
-	if err != nil {
-		return ""
-	}
-
-	// Convert to forward slashes and remove extension
-	relPath = filepath.ToSlash(relPath)
-	importPath := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-
-	// Add modules prefix for builtin modules for consistency
-	return "modules/" + importPath
-}
-
-// getNeighbourProjectImportPath generates the import path for local project files (from neighbour config)
-func (c *CompilerContext) getNeighbourProjectImportPath(fullPath string) string {
-	if c.ProjectConfig.Neighbour.Projects == nil {
-		return ""
-	}
-
-	// Try each neighbouring project to see if the file belongs to it
-	for projectName, projectPath := range c.ProjectConfig.Neighbour.Projects {
-		// Convert relative path to absolute if needed
-		absProjectPath := projectPath
-		if !filepath.IsAbs(projectPath) {
-			// Use project root instead of current working directory
-			absProjectPath = filepath.Join(c.ProjectRootFullPath, projectPath)
-		}
-
-		absProjectPath, err := filepath.Abs(absProjectPath)
+	if packageName == currentProject.Name {
+		modType = modules.LOCAL
+	} else if rel, found := currentProject.Neighbor.Projects[packageName]; found {
+		modType = modules.NEIGHBOR
+		current, err := config.LoadProjectConfig(filepath.Join(currentProject.ProjectRoot, rel))
 		if err != nil {
-			continue
+			return nil, modType, err
 		}
-
-		absFilePath, err := filepath.Abs(fullPath)
-		if err != nil {
-			continue
-		}
-
-		// Check if the file is within this local project
-		relPath, err := filepath.Rel(absProjectPath, absFilePath)
-		if err != nil || strings.HasPrefix(relPath, "..") {
-			continue
-		}
-
-		// Convert to forward slashes and remove extension
-		relPath = filepath.ToSlash(relPath)
-		moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-
-		// Generate import path: projectName/relativePath
-		return projectName + "/" + moduleName
+		currentProject = current // Update to the neighbor project config
+	} else {
+		modType = modules.UNKNOWN
 	}
 
-	return ""
+	colors.MAGENTA.Printf("Module type for import path %q is %s\n - Project name: %q\n", importPath, modType, currentProject)
+
+	return currentProject, modType, nil
 }
 
-// IsRemoteModuleFile checks if the given file path is within the remote modules cache
-func (c *CompilerContext) IsRemoteModuleFile(fullPath string) bool {
-	if c.RemoteCachePath == "" {
-		return false
-	}
-	absRemotePath, err := filepath.Abs(c.RemoteCachePath)
+func (c *CompilerContext) ImportPathToFullPath(importPath string) (string, *config.ProjectConfig, modules.ModuleType, error) {
+	// Check if the import path is already a full path
+	config, modType, err := c.GetModuleConfig(importPath)
 	if err != nil {
-		return false
+		return "", nil, modType, err
 	}
-	absFullPath, err := filepath.Abs(fullPath)
-	if err != nil {
-		return false
+
+	if filepath.IsAbs(importPath) {
+		return importPath, config, modType, nil
 	}
-	return strings.HasPrefix(absFullPath, absRemotePath)
+
+	projectName := fs.FirstPart(importPath)
+	// remove the project name from the import path
+	cleanPath := strings.TrimPrefix(importPath, projectName+"/")
+	return filepath.Join(config.ProjectRoot, cleanPath+constants.EXT), config, modType, nil
+}
+
+func (c *CompilerContext) PeekProjectStack() *config.ProjectConfig {
+	if len(c.ProjectStack) == 0 {
+		return nil
+	}
+	return c.ProjectStack[len(c.ProjectStack)-1]
+}
+
+func (c *CompilerContext) PushProjectStack(projectConfig *config.ProjectConfig) {
+	if c.ProjectStack == nil {
+		c.ProjectStack = make([]*config.ProjectConfig, 0)
+	}
+
+	colors.BRIGHT_GREEN.Printf("Pushing project %q to stack\n", projectConfig.Name)
+
+	c.ProjectStack = append(c.ProjectStack, projectConfig)
+}
+
+func (c *CompilerContext) PopProjectStack() *config.ProjectConfig {
+	if len(c.ProjectStack) == 0 {
+		return nil
+	}
+	projectConfig := c.PeekProjectStack()
+	c.ProjectStack = c.ProjectStack[:len(c.ProjectStack)-1]
+
+	colors.BRIGHT_RED.Printf("Popping project %q from stack, remaining projects: %d\n", projectConfig.Name, len(c.ProjectStack))
+
+	return projectConfig
+}
+
+func (c *CompilerContext) IsStdLibFile(packageName string) bool {
+	return true // Implement Later
 }
 
 // CachePathToImportPath converts a remote module file path back to its import path
@@ -204,12 +168,7 @@ func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 	return strings.Join(result, "/")
 }
 
-func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
-	// Removed: For modules outside the project root, like built-in modules, it cannot match with the project root.
-	// relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	// if err != nil || strings.HasPrefix(relPath, "..") {
-	// 	return ""
-	// }
+func (c *CompilerContext) FullPathToAlias(fullPath string) string {
 	filename := filepath.Base(fullPath)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
@@ -278,94 +237,16 @@ func (c *CompilerContext) ParseRemoteImport(importPath string) (string, string, 
 	return repoPath, version, subPath
 }
 
-// IsRemoteModuleCached checks if a remote module is cached using flat structure
-// flatModuleName format: "github.com/user/repo@version"
-func (c *CompilerContext) IsRemoteModuleCached(flatModuleName string) bool {
-	// Return false for empty module names
-	if flatModuleName == "" {
-		return false
-	}
-
-	cachePath := filepath.Join(c.RemoteCachePath, flatModuleName)
-	_, err := os.Stat(cachePath)
-	return err == nil
-}
-
 func (c *CompilerContext) GetModule(importPath string) (*modules.Module, error) {
 	if c.Modules == nil {
-		return nil, fmt.Errorf("module %q not found in context", importPath)
+		return nil, fmt.Errorf("module context is empty")
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return nil, fmt.Errorf("module %q not found in context", importPath)
-	}
-
-	// ✅ SECURITY CHECK: For remote modules, verify share setting every time they're accessed
-	if strings.HasPrefix(importPath, "github.com/") {
-		if err := c.validateRemoteModuleShareSetting(importPath); err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("module %q not found in context: %#v", importPath, c.Modules)
 	}
 
 	return module, nil
-}
-
-// validateRemoteModuleShareSetting checks if a remote module allows sharing
-// This is called every time a remote module is accessed from cache
-func (c *CompilerContext) validateRemoteModuleShareSetting(importPath string) error {
-	// Extract repo name from import path
-	parts := strings.Split(importPath, "/")
-	if len(parts) < 3 {
-		return fmt.Errorf("invalid remote import path format: %s", importPath)
-	}
-
-	// Load lockfile to get dependency information
-	lockfile, err := modules.LoadLockfile(c.ProjectRootFullPath)
-	if err != nil {
-		return fmt.Errorf("failed to load lockfile: %w", err)
-	}
-
-	// Get repo path (github.com/user/repo)
-	repoPath := strings.Join(parts[:3], "/")
-	var version string
-	found := false
-	for key := range lockfile.Dependencies {
-		if strings.HasPrefix(key, repoPath+"@") {
-			version = lockfile.Dependencies[key].Version
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("remote module %s not found in lockfile", repoPath)
-	}
-
-	// Build cache directory path
-	repoName := strings.Join(parts[1:3], "/") // user/repo
-	moduleDir := filepath.Join(c.RemoteCachePath, "github.com", repoName+"@"+version)
-
-	// Get the specific module file path for project-level checking
-	var moduleFilePath string
-	if len(parts) > 3 {
-		// Has sub-path like github.com/user/repo/data/bigint
-		modulePath := strings.Join(parts[3:], "/")
-		moduleFilePath = filepath.Join(moduleDir, modulePath+".fer")
-	} else {
-		// Just the repo like github.com/user/repo
-		moduleFilePath = filepath.Join(moduleDir, "fer.ret")
-	}
-
-	// Use the modules package function for consistency
-	canShare, err := modules.CheckRemoteModuleShareSetting(moduleFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to check share settings for module %s: %w", repoPath, err)
-	}
-
-	if !canShare {
-		return fmt.Errorf("module %s has disabled sharing (share = false). Cannot use this module", repoPath)
-	}
-
-	return nil
 }
 
 func (c *CompilerContext) ModuleCount() int {
@@ -391,23 +272,9 @@ func (c *CompilerContext) PrintModules() {
 
 	colors.BLUE.Println("Modules in cache:")
 	for _, name := range modulesStr {
-		module, exists := c.Modules[name]
+		_, exists := c.Modules[name]
 		if exists {
 			colors.PURPLE.Printf("- %s ", name)
-			// Color-code by module type
-			switch module.Type {
-			case modules.LOCAL:
-				colors.GREEN.Printf("(%s)", module.Type)
-			case modules.REMOTE:
-				colors.CYAN.Printf("(%s)", module.Type)
-			case modules.BUILTIN:
-				colors.AQUA.Printf("(%s)", module.Type)
-			case modules.NEIGHBOUR:
-				colors.YELLOW.Printf("(%s)", module.Type)
-			default:
-				colors.WHITE.Printf("(%s)", module.Type)
-			}
-
 			fmt.Println() // New line
 		} else {
 			colors.PURPLE.Printf("- %s\n", name)
@@ -476,7 +343,7 @@ func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase modul
 	return currentPhase == requiredPhase-1
 }
 
-func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBuiltin bool) {
+func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	if c.Modules == nil {
 		c.Modules = make(map[string]*modules.Module)
 	}
@@ -487,12 +354,11 @@ func (c *CompilerContext) AddModule(importPath string, module *ast.Program, isBu
 		panic(fmt.Sprintf("Cannot add nil module for %q\n", importPath))
 	}
 
+
 	c.Modules[importPath] = &modules.Module{
 		AST:         module,
 		SymbolTable: symbol.NewSymbolTable(c.Builtins),
 		Phase:       modules.PHASE_PARSED, // Module is parsed when added
-		IsBuiltin:   isBuiltin,
-		Type:        modules.GetModuleTypeWithConfig(importPath, filepath.Base(c.ProjectRootFullPath), c.ProjectConfig.Neighbour.Projects),
 	}
 }
 
@@ -514,7 +380,6 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 
 	if cycle := c.findCyclePath(to, from, visited, path); cycle != nil {
 		// Found a cycle, return it WITHOUT adding the edge
-		colors.RED.Printf("CYCLE DETECTED: %v\n", cycle)
 		return cycle, true
 	}
 
@@ -583,41 +448,21 @@ func (c *CompilerContext) FinishParsing(importPath string) {
 	}
 }
 
-// getModulesPath determines the path to the system built-in modules
+// getBuiltinModulesPath determines the path to the system built-in modules
 // It looks for a 'modules' directory relative to the compiler binary location
-func getModulesPath() string {
-	// Get the executable path
+func getBuiltinModulesPath() string {
+	// the lib's relative path is ../[path specified]
 	execPath, err := os.Executable()
 	if err != nil {
+		colors.ORANGE.Printf("Failed to get executable path: %s\nFallback to current working directory", err)
 		// Fallback to current working directory if we can't get executable path
 		cwd, _ := os.Getwd()
-		return filepath.Join(cwd, "modules")
+		return filepath.Join(cwd, constants.STD_LIBS_PATH)
 	}
 
-	// Get the directory containing the executable
-	execDir := filepath.Dir(execPath)
+	libPath := filepath.Join(filepath.Dir(execPath), "..", constants.STD_LIBS_PATH)
 
-	// Look for modules directory relative to the executable
-	// This handles both development and production scenarios
-	modulesPath := filepath.Join(execDir, "..", "modules")
-
-	// Check if the modules directory exists
-	if _, err := os.Stat(modulesPath); err == nil {
-		absPath, _ := filepath.Abs(modulesPath)
-		return filepath.ToSlash(absPath)
-	}
-
-	// Fallback: look in the same directory as the executable
-	modulesPath = filepath.Join(execDir, "modules")
-	if _, err := os.Stat(modulesPath); err == nil {
-		absPath, _ := filepath.Abs(modulesPath)
-		return filepath.ToSlash(absPath)
-	}
-
-	// Last resort: return the expected path even if it doesn't exist
-	// This allows for future module installation
-	absPath, _ := filepath.Abs(filepath.Join(execDir, "..", "modules"))
-	return filepath.ToSlash(absPath)
+	return filepath.ToSlash(libPath)
 }
 
 func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
@@ -637,10 +482,10 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
 	// Determine modules path relative to compiler binary
-	modulesPath := getModulesPath()
+	modulesPath := getBuiltinModulesPath()
 
 	// Set up remote module cache path
-	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, ".ferret", "modules")
+	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, constants.CACHE_DIR)
 	remoteCachePath = filepath.ToSlash(remoteCachePath)
 	os.MkdirAll(remoteCachePath, 0755)
 
@@ -650,7 +495,8 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 		Modules:             make(map[string]*modules.Module),
 		Reports:             report.Reports{},
 		ProjectConfig:       projectConfig,
-		ModulesPath:         modulesPath,
+		ProjectStack:        []*config.ProjectConfig{projectConfig},
+		StdLibsPath:         modulesPath,
 		RemoteCachePath:     remoteCachePath,
 		ProjectRootFullPath: projectConfig.ProjectRoot,
 	}

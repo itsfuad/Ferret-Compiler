@@ -1,4 +1,4 @@
-name = "myapps2"
+name = "helper"
 
 [compiler]
 version = "0.0.1"
@@ -12,4 +12,4 @@ path = ".ferret/cache"
 
 [remote]
 enabled = true
-share = false
+share = true

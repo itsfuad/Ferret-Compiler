@@ -1,9 +1,9 @@
 package collector
 
 import (
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
 )
 
 // collectSymbolsFromBlock collects symbols from all nodes in a block

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"ferret/colors"
+	"compiler/colors"
 )
 
 const FERRET_VERSION = "0.0.1"

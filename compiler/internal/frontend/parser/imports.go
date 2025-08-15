@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"ferret/internal/ctx"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/frontend/lexer"
-	"ferret/internal/modules"
-	"ferret/internal/source"
-	"ferret/report"
+	"compiler/colors"
+	//"compiler/config"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/modules"
+	"compiler/internal/source"
+	"compiler/internal/utils/fs"
+	"compiler/report"
 )
 
 // parseImport parses an import statement
@@ -20,62 +22,60 @@ func parseImport(p *Parser) ast.Node {
 
 	importpath := importToken.Value
 
-	// ✅ SECURITY CHECK: Validate remote import permissions in parser phase
-	if strings.HasPrefix(importpath, "github.com/") {
-		if err := modules.CheckCanImportRemoteModules(p.ctx.ProjectRootFullPath, importpath); err != nil {
-			loc := *source.NewLocation(&start.Start, &importToken.End)
-			p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
-			return nil
-		}
-	}
-
 	// Support: import "path" as Alias;
-	var moduleName string
+	var alias string
 	if p.match(lexer.AS_TOKEN) {
 		p.advance() // consume 'as'
 		aliasToken := p.consume(lexer.IDENTIFIER_TOKEN, "Expected identifier after 'as' in import")
-		moduleName = aliasToken.Value
+		alias = aliasToken.Value
 	} else {
-		// Default: use last part of path (without extension)
-		parts := strings.Split(importpath, "/")
-		if len(parts) == 0 {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&start.Start, &importToken.End), report.INVALID_IMPORT_PATH, report.PARSING_PHASE)
-			return nil
-		}
-		sufs := strings.Split(parts[len(parts)-1], ".")
-		suf := "." + sufs[len(sufs)-1]
-		moduleName = strings.TrimSuffix(parts[len(parts)-1], suf)
+		alias = fs.LastPart(importpath)
 	}
 
 	loc := *source.NewLocation(&start.Start, &importToken.End)
 
-	moduleFullPath, err := ctx.ResolveModuleLocation(importpath, p.fullPath, p.ctx)
-	if err != nil {
-		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
-		return nil
-	}
+	moduleFullPath, config, modType, err := p.ctx.ImportPathToFullPath(importpath)
 
+	colors.BOLD_PURPLE.Printf("Import module path %q from import path %q\n", moduleFullPath, importpath)
+
+	
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
 			Value:    importpath,
 			Location: loc,
 		},
-		ModuleName:     moduleName,
+		Alias:          alias,
 		LocationOnDisk: moduleFullPath,
 		Location:       loc,
 	}
 
-	// Check for circular dependency before adding the import
-	if cycle, found := p.ctx.DetectCycle(p.fullPath, moduleFullPath); found {
-		// Convert full paths to module names for better readability
-		moduleNames := make([]string, len(cycle))
-		for i, path := range cycle {
-			moduleNames[i] = fmt.Sprintf("%q", p.ctx.FullPathToImportPath(path))
-		}
+	skip := false
+	
+	if (modType != modules.LOCAL && modType != modules.BUILTIN) && !p.ctx.PeekProjectStack().Remote.Enabled {
+		skip = true
+		p.ctx.Reports.AddError(p.fullPath, &loc, fmt.Sprintf("Cannot import external module %q as your project disabled external project access", moduleFullPath), report.PARSING_PHASE).AddHint("Enable external project access to true in <project_root>/fer.ret")
+	} else if modType != modules.LOCAL && !config.Remote.Share {
+		skip = true
+		p.ctx.Reports.AddError(p.fullPath, &loc, fmt.Sprintf("Module %q is not enabled for sharing", moduleFullPath), report.PARSING_PHASE)
+	}
 
-		cycleStr := strings.Join(moduleNames, " → ")
-		currentModule := p.ctx.FullPathToImportPath(p.fullPath)
-		targetModule := p.ctx.FullPathToImportPath(moduleFullPath)
+
+	if err != nil {
+		p.ctx.Reports.AddError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
+		skip = true
+	}
+
+	if skip {
+		stmt.ImportPath.Value = ""
+		return stmt
+	}
+
+	// Check for circular dependency before adding the import
+	if cycle, found := p.ctx.DetectCycle(p.importPath, importpath); found {
+		cycleStr := strings.Join(cycle, " → ")
+
+		currentModule := p.importPath
+		targetModule := importpath
 
 		cycleMsg := fmt.Sprintf("Import cycle detected: %s\n - %q cannot import %q (already in dependency path)",
 			cycleStr, currentModule, targetModule)
@@ -85,7 +85,7 @@ func parseImport(p *Parser) ast.Node {
 
 	// Check if the module is already parsed
 	if !p.ctx.IsModuleParsed(importpath) {
-		module := NewParser(moduleFullPath, p.ctx, p.debug).Parse()
+		module := NewParserWithImportPath(moduleFullPath, importpath, p.ctx, p.debug).Parse()
 		if module == nil {
 			p.ctx.Reports.AddSemanticError(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE)
 			return &ast.ImportStmt{Location: loc}

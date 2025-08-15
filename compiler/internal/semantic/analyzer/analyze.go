@@ -1,8 +1,8 @@
 package analyzer
 
 import (
-	"ferret/internal/ctx"
-	"ferret/internal/frontend/ast"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
 )
 
 type AnalyzerNode struct {

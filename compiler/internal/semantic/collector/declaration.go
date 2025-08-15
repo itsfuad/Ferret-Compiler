@@ -1,12 +1,12 @@
 package collector
 
 import (
-	"ferret/colors"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
-	"ferret/internal/symbol"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/symbol"
+	"compiler/report"
 )
 
 func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {

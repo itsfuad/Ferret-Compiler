@@ -1,13 +1,12 @@
 package parser
 
 import (
-	"ferret/internal/frontend/ast"
-	"ferret/internal/frontend/lexer"
-	"ferret/internal/source"
-	"ferret/internal/utils"
-	"ferret/internal/utils/lists"
-	"ferret/report"
-	"fmt"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/source"
+	"compiler/internal/utils"
+	"compiler/internal/utils/lists"
+	"compiler/report"
 )
 
 // detect if it's a function or a method
@@ -26,7 +25,6 @@ func parseFunctionLike(p *Parser) ast.Node {
 	var params []ast.Parameter
 
 	if p.next().Kind == lexer.OPEN_PAREN {
-		fmt.Printf("Parsing method or anonymous function\n")
 		p.advance() // consume the fn token
 		// either a method or anonymous function
 		// fn (PARAMS) {BODY} // anonymous
@@ -34,10 +32,8 @@ func parseFunctionLike(p *Parser) ast.Node {
 		params = parseParameters(p)
 		// if identifier, it's a method
 		if p.match(lexer.IDENTIFIER_TOKEN) {
-			fmt.Printf("Parsing method\n")
 			return parseMethodDeclaration(p, &start.Start, params)
 		}
-		fmt.Printf("Parsing anonymous function\n")
 		// anonymous function
 		return parseFunctionLiteral(p, &start.Start, false, params...)
 	}

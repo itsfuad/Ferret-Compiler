@@ -1,4 +1,5 @@
-import "app/cmd/expr";
+import "demo-app/cmd/expr";
+import "neighbor/file2/types";
 
 let outvar = 10;
 

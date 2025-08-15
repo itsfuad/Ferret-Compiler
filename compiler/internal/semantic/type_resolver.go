@@ -1,10 +1,10 @@
 package semantic
 
 import (
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/stype"
-	"ferret/internal/types"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/stype"
+	"compiler/internal/types"
 	"fmt"
 )
 

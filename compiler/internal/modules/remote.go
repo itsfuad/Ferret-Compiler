@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"ferret/colors"
+	"compiler/colors"
 )
 
 const (
@@ -22,17 +22,16 @@ const (
 // CheckRemoteModuleExists checks if a remote module exists and returns available versions
 // Uses Git refs instead of GitHub API to avoid rate limiting
 func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) {
-	normalizedVersion, _, err := CheckAndGetActualVersion(repoName, requestedVersion)
+	user, repo, _, err := ParseRepoInput(repoName)
+	if err != nil {
+		return "", err
+	}
+	normalizedVersion, _, err := CheckAndGetActualVersion(user, repo, requestedVersion)
 	return normalizedVersion, err
 }
 
 // CheckAndGetActualVersion checks if a version exists and returns both normalized and actual versions
-func CheckAndGetActualVersion(repoName, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
-	// Parse user/repo from repoName
-	user, repo, err := parseRepoName(repoName)
-	if err != nil {
-		return "", "", err
-	}
+func CheckAndGetActualVersion(user, repo, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
 
 	// Fetch all available tags once
 	refs, err := FetchRefs(user, repo)
@@ -97,13 +96,14 @@ func findMatchingTag(tags []string, requestedVersion string) string {
 	return "" // Not found
 }
 
-// parseRepoName parses repository name into user and repo components
-func parseRepoName(repoName string) (string, string, error) {
+// ParseRepoName parses repository name into user and repo components
+// "github.com/user/repo@version"
+func ParseRepoName(repoName string) (string, string, string, error) {
 	parts := strings.Split(repoName, "/")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid repository name: %s", repoName)
+	if len(parts) < 2 {
+		return "", "", "", fmt.Errorf("invalid repository name: %s", repoName)
 	}
-	return parts[0], parts[1], nil
+	return parts[0], parts[1], parts[0] + "/" + parts[1], nil
 }
 
 // Note: The following functions were removed as they depended on GitHub API
@@ -112,13 +112,13 @@ func parseRepoName(repoName string) (string, string, error) {
 // DownloadRemoteModule downloads a remote module to the cache
 func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) error {
 	// Parse user/repo from repoName
-	user, repo, err := parseRepoName(repoName)
+	user, repo, _, err := ParseRepoName(repoName)
 	if err != nil {
 		return err
 	}
 
 	// Get both normalized and actual versions for proper downloading and caching
-	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(repoName, StripVersionPrefix(version))
+	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(user, repo, StripVersionPrefix(version))
 	if err != nil {
 		return fmt.Errorf("failed to resolve version: %w", err)
 	}
@@ -184,39 +184,6 @@ func downloadModuleArchive(user, repo, version, repoName string) (string, error)
 
 	return tmpFile.Name(), nil
 }
-
-// Note: The following functions are deprecated in favor of Git refs-based approach
-// They are kept for potential fallback scenarios but are no longer used by default
-
-/*
-// getGitHubReleases fetches releases from GitHub API (DEPRECATED - causes rate limiting)
-func getGitHubReleases(user, repo string) ([]GitHubRelease, error) {
-	url := fmt.Sprintf(GitHubReleasesURL, user, repo)
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch releases: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("repository not found: %s/%s", user, repo)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API error: HTTP %d", resp.StatusCode)
-	}
-
-	var releases []GitHubRelease
-	err = json.NewDecoder(resp.Body).Decode(&releases)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse GitHub API response: %w", err)
-	}
-
-	return releases, nil
-}
-*/
 
 // extractZipToCache extracts a zip file to the cache directory
 func extractZipToCache(zipPath, targetDir, expectedPrefix string) error {

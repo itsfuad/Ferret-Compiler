@@ -1,9 +1,9 @@
 package resolver
 
 import (
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
 )
 
 // resolveBlock resolves all nodes in a block
