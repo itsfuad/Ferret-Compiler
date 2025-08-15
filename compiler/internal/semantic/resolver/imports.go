@@ -1,12 +1,12 @@
 package resolver
 
 import (
-	"ferret/colors"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
-	"ferret/internal/symbol"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/symbol"
+	"compiler/report"
 	"fmt"
 )
 
@@ -20,23 +20,16 @@ func getImportKeys(imports map[string]*symbol.SymbolTable) []string {
 
 func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.Module) {
 	if imp.ImportPath.Value == "" {
-		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.RESOLVER_PHASE)
 		return
 	}
 
 	if r.Debug {
-		colors.YELLOW.Printf("Resolving import %q as %q in module %q\n", imp.ImportPath.Value, imp.ModuleName, cm.AST.Modulename)
+		colors.YELLOW.Printf("Resolving import %q as %q in module %q\n", imp.ImportPath.Value, imp.Alias, cm.AST.Alias)
 	}
 
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
-	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, r.Program.FullPath, r.Ctx.RemoteCachePath)
-
-	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := modules.CheckCanImportRemoteModules(r.Ctx.ProjectRootFullPath, moduleKey); err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), err.Error(), report.RESOLVER_PHASE)
-		return
-	}
+	moduleKey := imp.ImportPath.Value
 
 	//module must be parses and stored already
 	module, err := r.Ctx.GetModule(moduleKey)
@@ -48,23 +41,23 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *module
 	// collect functions from the imported module
 	anz := analyzer.NewAnalyzerNode(module.AST, r.Ctx, r.Debug)
 	ResolveProgram(anz)
-	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
+	cm.SymbolTable.Imports[imp.Alias] = module.SymbolTable
 
 	if r.Debug {
-		colors.GREEN.Printf("Successfully stored import %q in module %q\n", imp.ModuleName, cm.AST.Modulename)
+		colors.GREEN.Printf("Successfully stored import %q in module %q\n", imp.Alias, cm.AST.Alias)
 	}
 }
 
 func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) {
 
 	if r.Debug {
-		colors.CYAN.Printf("Looking for module %q in imports of %q\n", res.Module.Name, cm.AST.Modulename)
+		colors.CYAN.Printf("Looking for module %q in imports of %q\n", res.Module.Name, cm.AST.Alias)
 	}
 
 	symbolTable, err := cm.SymbolTable.GetImportedModule(res.Module.Name)
 	if err != nil {
 		if r.Debug {
-			colors.RED.Printf("Available imports in %q: %v\n", cm.AST.Modulename, getImportKeys(cm.SymbolTable.Imports))
+			colors.RED.Printf("Available imports in %q: %v\n", cm.AST.Alias, getImportKeys(cm.SymbolTable.Imports))
 		}
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
@@ -84,6 +77,6 @@ func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution
 
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
-		colors.TEAL.Printf("Resolved imported symbol %q from module %q imported from %q\n", res.Identifier.Name, res.Module.Name, cm.AST.Modulename)
+		colors.TEAL.Printf("Resolved imported symbol %q from module %q imported from %q\n", res.Identifier.Name, res.Module.Name, cm.AST.Alias)
 	}
 }

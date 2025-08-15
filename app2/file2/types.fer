@@ -1,4 +1,4 @@
-//import "app/cmd/start";
+import "helper/file2/sys";
 
 type String str;
 type Int i32;

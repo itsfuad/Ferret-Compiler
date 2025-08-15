@@ -1,30 +1,23 @@
 package typecheck
 
 import (
-	"ferret/colors"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
-	"ferret/internal/semantic/stype"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/stype"
+	"compiler/report"
 	"fmt"
 )
 
 func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.Module) {
 	if imp.ImportPath.Value == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.TYPECHECK_PHASE)
 		return
 	}
 
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
-	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, c.Program.FullPath, c.Ctx.RemoteCachePath)
-
-	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := modules.CheckCanImportRemoteModules(c.Ctx.ProjectRootFullPath, moduleKey); err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), err.Error(), report.TYPECHECK_PHASE)
-		return
-	}
+	moduleKey := imp.ImportPath.Value
 
 	//module must be parses and stored already
 	module, err := c.Ctx.GetModule(moduleKey)
@@ -36,7 +29,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.
 	// process the imported module
 	anz := analyzer.NewAnalyzerNode(module.AST, c.Ctx, c.Debug)
 	CheckProgram(anz)
-	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
+	cm.SymbolTable.Imports[imp.Alias] = module.SymbolTable
 }
 
 func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) stype.Type {
@@ -58,7 +51,7 @@ func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResoluti
 	}
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
-		colors.AQUA.Printf("Type Checked imported symbol %q of type %q from module %q imported from %q\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, cm.AST.Modulename)
+		colors.AQUA.Printf("Type Checked imported symbol %q of type %q from module %q imported from %q\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, cm.AST.Alias)
 	}
 
 	return resIdentifier.Type

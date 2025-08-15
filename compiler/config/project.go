@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ferret/cmd/flags"
-	"ferret/colors"
-	"ferret/toml"
+	"compiler/cmd/flags"
+	"compiler/colors"
+	"compiler/toml"
 )
 
 const CONFIG_FILE = "fer.ret"
@@ -21,10 +21,10 @@ type ProjectConfig struct {
 	Remote       RemoteConfig     `toml:"remote"`
 	Build        BuildConfig      `toml:"build"`
 	Dependencies DependencyConfig `toml:"dependencies"`
-	Neighbour    NeighbourConfig  `toml:"neighbour"`
-	ProjectRoot  string
+	Neighbor     NeighborConfig   `toml:"neighbor"`
 	// Top-level project metadata
-	Name string `toml:"name"`
+	Name        string `toml:"name"`
+	ProjectRoot string
 }
 
 var defaultConfig = toml.TOMLData{
@@ -45,7 +45,7 @@ var defaultConfig = toml.TOMLData{
 		"enabled": "",
 		"share":   "",
 	},
-	"neighbour":    toml.TOMLTable{},
+	"neighbor":     toml.TOMLTable{},
 	"dependencies": toml.TOMLTable{},
 }
 
@@ -71,8 +71,8 @@ func (conf *ProjectConfig) Save() {
 		"share":   conf.Remote.Share,
 	}
 
-	for key, value := range conf.Neighbour.Projects {
-		tomData["neighbour"][key] = value
+	for key, value := range conf.Neighbor.Projects {
+		tomData["neighbor"][key] = value
 	}
 	for key, value := range conf.Dependencies.Modules {
 		tomData["dependencies"][key] = value
@@ -111,9 +111,9 @@ type DependencyConfig struct {
 	Modules map[string]string `toml:"dependencies"` // module_name -> version
 }
 
-// NeighbourConfig defines neighbouring project mappings (like Go's replace directive)
-type NeighbourConfig struct {
-	Projects map[string]string `toml:"neighbour"` // project_name -> local_path
+// NeighborConfig defines neighboring project mappings (like Go's replace directive)
+type NeighborConfig struct {
+	Projects map[string]string `toml:"neighbor"` // project_name -> local_path
 }
 
 // CreateDefaultProjectConfig creates a default fer.ret configuration file
@@ -234,7 +234,7 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 		"share":   shareEnabled,
 	}
 
-	configData["neighbour"] = toml.TOMLTable{}
+	configData["neighbor"] = toml.TOMLTable{}
 
 	configData["dependencies"] = toml.TOMLTable{}
 
@@ -276,6 +276,35 @@ func IsProjectRoot(dir string) bool {
 	return err == nil
 }
 
+func GetProjectRoot(moduleFullPath string) (string, error) {
+
+	moduleFullPath, err := filepath.Abs(moduleFullPath)
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Dir(moduleFullPath)
+
+	// Walk up the directory tree until we find a fer.ret file
+	for {
+		configPath := filepath.Join(dir, CONFIG_FILE)
+		if _, err := os.Stat(filepath.FromSlash(configPath)); err == nil {
+			return filepath.ToSlash(dir), nil // Found the project root
+		}
+
+		// Move up to parent directory
+		parent := filepath.Dir(dir)
+
+		if parent == dir { // Stop if we can't go up further (reached filesystem root)
+			break
+		}
+
+		dir = parent
+	}
+
+	return "", fmt.Errorf("project root not found")
+}
+
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 
 	projectRoot, err := filepath.Abs(projectRoot)
@@ -302,7 +331,7 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	parseCacheSection(tomlData, config)
 	parseRemoteSection(tomlData, config)
 	parseDependenciesSection(tomlData, config)
-	parseNeighbourSection(tomlData, config)
+	parseNeighborSection(tomlData, config)
 
 	return config, nil
 }
@@ -365,12 +394,12 @@ func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	}
 }
 
-func parseNeighbourSection(tomlData toml.TOMLData, config *ProjectConfig) {
-	if neighbourSection, exists := tomlData["neighbour"]; exists {
-		config.Neighbour.Projects = make(map[string]string)
-		for key, value := range neighbourSection {
+func parseNeighborSection(tomlData toml.TOMLData, config *ProjectConfig) {
+	if neighborSection, exists := tomlData["neighbor"]; exists {
+		config.Neighbor.Projects = make(map[string]string)
+		for key, value := range neighborSection {
 			if strValue, ok := value.(string); ok {
-				config.Neighbour.Projects[key] = strValue
+				config.Neighbor.Projects[key] = strValue
 			}
 		}
 	}

@@ -1,11 +1,13 @@
 package modules
 
 import (
-	"ferret/internal/frontend/ast"
-	"ferret/internal/symbol"
-	"ferret/internal/utils/fs"
 	"path/filepath"
 	"strings"
+
+	"compiler/constants"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/symbol"
+	"compiler/internal/utils/fs"
 )
 
 // ModulePhase represents the current processing phase of a module
@@ -44,7 +46,7 @@ const (
 	LOCAL
 	BUILTIN
 	REMOTE
-	NEIGHBOUR // External neighbouring project (like Go's replace directive)
+	NEIGHBOR // External neighboring project (like Go's replace directive)
 )
 
 func (mt ModuleType) String() string {
@@ -55,8 +57,8 @@ func (mt ModuleType) String() string {
 		return "BUILTIN"
 	case REMOTE:
 		return "REMOTE"
-	case NEIGHBOUR:
-		return "NEIGHBOUR"
+	case NEIGHBOR:
+		return "NEIGHBOR"
 	default:
 		return "UNKNOWN"
 	}
@@ -66,9 +68,7 @@ type Module struct {
 	AST         *ast.Program
 	SymbolTable *symbol.SymbolTable
 	Phase       ModulePhase     // Current processing phase
-	IsBuiltin   bool            // Whether this is a builtin module
 	UsedImports map[string]bool // Track which imports are used in this file
-	Type        ModuleType
 }
 
 // Built-in modules that are part of the standard library
@@ -83,35 +83,8 @@ var BUILTIN_MODULES = map[string]bool{
 	"time": true,
 }
 
-const REMOTE_HOST = "github.com/"
-
 func IsRemote(importPath string) bool {
-	return strings.HasPrefix(importPath, REMOTE_HOST)
-}
-
-func IsBuiltinModule(importRoot string) bool {
-	// With directory-based imports, builtin modules start with "modules/"
-	return importRoot == "modules"
-}
-
-// GetModuleType categorizes an import path
-func GetModuleType(importPath string, projectDirName string) ModuleType {
-	importRoot := fs.FirstPart(importPath)
-
-	if IsRemote(importPath) {
-		return REMOTE
-	}
-
-	if IsBuiltinModule(importRoot) {
-		return BUILTIN
-	}
-
-	if importRoot == projectDirName {
-		return LOCAL
-	}
-
-	// Default to unknown for unrecognized paths
-	return UNKNOWN
+	return strings.HasPrefix(importPath, constants.GITHUB_HOST)
 }
 
 // IsLocalProject checks if an import path refers to a local project defined in locals config
@@ -123,41 +96,6 @@ func IsLocalProject(importPath string, localsConfig map[string]string) bool {
 	importRoot := fs.FirstPart(importPath)
 	_, exists := localsConfig[importRoot]
 	return exists
-}
-
-// IsNeighbourProject checks if an import path refers to a neighbouring project defined in neighbour config
-func IsNeighbourProject(importPath string, neighbourConfig map[string]string) bool {
-	if neighbourConfig == nil {
-		return false
-	}
-
-	importRoot := fs.FirstPart(importPath)
-	_, exists := neighbourConfig[importRoot]
-	return exists
-}
-
-// GetModuleTypeWithConfig categorizes an import path with access to neighbour configuration
-func GetModuleTypeWithConfig(importPath string, projectDirName string, neighbourConfig map[string]string) ModuleType {
-	importRoot := fs.FirstPart(importPath)
-
-	if IsRemote(importPath) {
-		return REMOTE
-	}
-
-	if IsBuiltinModule(importRoot) {
-		return BUILTIN
-	}
-
-	if importRoot == projectDirName {
-		return LOCAL
-	}
-
-	if IsNeighbourProject(importPath, neighbourConfig) {
-		return NEIGHBOUR
-	}
-
-	// Default to unknown for unrecognized paths
-	return UNKNOWN
 }
 
 // GetRemoteModulePrefix extracts the GitHub repository prefix from a cached file path

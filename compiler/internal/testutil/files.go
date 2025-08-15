@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"compiler/constants"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,7 +12,7 @@ func CreateTempProject(t *testing.T) string {
 	tempDir := t.TempDir()
 
 	// Create cache directory structure
-	cacheDir := filepath.Join(tempDir, ".ferret", "modules")
+	cacheDir := filepath.Join(tempDir, constants.CACHE_DIR)
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		t.Fatalf("Failed to create cache directory: %v", err)
 	}

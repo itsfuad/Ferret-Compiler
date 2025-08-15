@@ -1,11 +1,11 @@
 package resolver
 
 import (
-	"ferret/colors"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
+	"compiler/report"
 	"fmt"
 )
 
@@ -89,7 +89,7 @@ func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module)
 	// Collect all imports from the AST
 	for _, node := range r.Program.Nodes {
 		if importStmt, ok := node.(*ast.ImportStmt); ok {
-			alias := importStmt.ModuleName
+			alias := importStmt.Alias
 			if r.Debug {
 				colors.YELLOW.Printf("Found import %q (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, currentModule.UsedImports[alias])
 			}

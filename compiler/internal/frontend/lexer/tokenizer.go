@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"ferret/internal/source"
-	"ferret/internal/utils/numeric"
+	"compiler/internal/source"
+	"compiler/internal/utils/numeric"
 )
 
 type regexHandler func(lex *Lexer, regex *regexp.Regexp)

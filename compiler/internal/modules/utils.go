@@ -59,8 +59,8 @@ func NormalizeVersion(version string) string {
 // StripVersionPrefix removes the "v" prefix from version for GitHub API compatibility
 // Examples: "v1.0.0" -> "1.0.0", "1.0.0" -> "1.0.0"
 func StripVersionPrefix(version string) string {
-	if strings.HasPrefix(version, "v") {
-		return strings.TrimPrefix(version, "v")
+	if after, ok :=strings.CutPrefix(version, "v"); ok  {
+		return after
 	}
 	return version
 }
