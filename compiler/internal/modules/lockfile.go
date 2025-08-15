@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 )
 
@@ -90,10 +91,8 @@ func (l *Lockfile) AddUsedBy(depKey, parentKey string) {
 	if !exists {
 		return
 	}
-	for _, u := range entry.UsedBy {
-		if u == parentKey {
-			return // already present
-		}
+	if slices.Contains(entry.UsedBy, parentKey) {
+		return // already present
 	}
 	entry.UsedBy = append(entry.UsedBy, parentKey)
 	l.Dependencies[depKey] = entry

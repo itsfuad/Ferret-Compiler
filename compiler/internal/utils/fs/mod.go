@@ -14,6 +14,11 @@ func IsValidFile(filename string) bool {
 	return err == nil && fileInfo.Mode().IsRegular()
 }
 
+func IsDir(path string) bool {
+	fileInfo, err := os.Stat(path)
+	return err == nil && fileInfo.Mode().IsDir()
+}
+
 func FirstPart(path string) string {
 	if path == "" {
 		return ""

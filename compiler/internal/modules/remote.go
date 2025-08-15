@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -16,13 +17,12 @@ import (
 const (
 	GitHubTagArchiveURL       = "https://github.com/%s/%s/archive/refs/tags/%s.zip"
 	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
-	FerretConfigFile          = "fer.ret"
 )
 
-// CheckRemoteModuleExists checks if a remote module exists and returns available versions
+// CheckReleaseExists checks if a remote module exists and returns available versions
 // Uses Git refs instead of GitHub API to avoid rate limiting
-func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) {
-	user, repo, _, err := ParseRepoInput(repoName)
+func CheckReleaseExists(repoName, requestedVersion string) (string, error) {
+	_, user, repo, _, err := SplitRepo(repoName)
 	if err != nil {
 		return "", err
 	}
@@ -96,23 +96,35 @@ func findMatchingTag(tags []string, requestedVersion string) string {
 	return "" // Not found
 }
 
-// ParseRepoName parses repository name into user and repo components
-// "github.com/user/repo@version"
-func ParseRepoName(repoName string) (string, string, string, error) {
-	parts := strings.Split(repoName, "/")
-	if len(parts) < 2 {
-		return "", "", "", fmt.Errorf("invalid repository name: %s", repoName)
+// SplitRepo splits a GitHub repository URL into its components.
+// input like "github.com/owner/repo@version" or "github.com/owner/repo" -> ("owner", "repo", "version" || latest)
+func SplitRepo(url string) (host, owner, repo, version string, err error) {
+	// match x.y (github.com)
+	re := regexp.MustCompile(`^(?P<host>[^/]+)/(?P<owner>[^/]+)/(?P<repo>[^/@]+)(?:@(?P<version>.+))?$`)
+	matches := re.FindStringSubmatch(url)
+	if matches == nil {
+		err = fmt.Errorf("invalid repo format")
+		return
 	}
-	return parts[0], parts[1], parts[0] + "/" + parts[1], nil
+
+	host = matches[1]
+	owner = matches[2]
+	repo = matches[3]
+	version = matches[4]
+	if version == "" {
+		version = "latest"
+	}
+
+	return
 }
 
 // Note: The following functions were removed as they depended on GitHub API
 // which caused rate limiting issues. They have been replaced with Git refs-based approach.
 
 // DownloadRemoteModule downloads a remote module to the cache
-func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) error {
+func DownloadRemoteModule(repoURL, cachePath string) error {
 	// Parse user/repo from repoName
-	user, repo, _, err := ParseRepoName(repoName)
+	_, user, repo, version, err := SplitRepo(repoURL)
 	if err != nil {
 		return err
 	}
@@ -124,20 +136,20 @@ func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) erro
 	}
 
 	// Download the module archive using the actual GitHub version
-	downloadPath, err := downloadModuleArchive(user, repo, actualVersion, repoName)
+	downloadPath, err := downloadModuleArchive(user, repo, actualVersion, repoURL)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(downloadPath)
 
 	// Extract to cache using normalized version for consistency
-	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+normalizedVersion)
+	moduleDir := filepath.Join(cachePath, user+repo+"@"+normalizedVersion)
 	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(actualVersion, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
 	}
 
-	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoName, normalizedVersion)
+	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoURL, normalizedVersion)
 	return nil
 }
 
@@ -244,8 +256,8 @@ func extractSingleZipFile(file *zip.File, targetDir, expectedPrefix string) erro
 // processFilePath removes expected prefix from file path
 func processFilePath(fileName, expectedPrefix string) string {
 	relativePath := fileName
-	if strings.HasPrefix(relativePath, expectedPrefix+"/") {
-		relativePath = strings.TrimPrefix(relativePath, expectedPrefix+"/")
+	if after, ok := strings.CutPrefix(relativePath, expectedPrefix+"/"); ok {
+		relativePath = after
 	}
 	return relativePath
 }
@@ -273,8 +285,11 @@ func extractFile(file *zip.File, targetPath string) error {
 
 // IsModuleCached checks if a module is already cached
 func IsModuleCached(cachePath, repoName, version string) bool {
+	fmt.Printf("Checking if module %s@%s is cached...\n", repoName, version)
 	normalizedVersion := NormalizeVersion(version)
-	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+normalizedVersion)
+	moduleDir := filepath.Join(cachePath, repoName+"@"+normalizedVersion)
+	fmt.Printf("Module directory: %s\n", moduleDir)
 	_, err := os.Stat(moduleDir)
+	fmt.Println(err)
 	return err == nil
 }
