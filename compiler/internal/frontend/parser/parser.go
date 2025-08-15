@@ -222,11 +222,11 @@ func (p *Parser) Parse() *ast.Program {
 
 	// Start tracking the entry point parsing
 	p.ctx.StartParsing(p.fullPath)
-	
+
 	defer p.ctx.FinishParsing(p.fullPath)
-	
+
 	colors.CYAN.Printf("Parsing %q from project: %s\n", p.fullPath, config.Name)
-	
+
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
@@ -250,8 +250,7 @@ func (p *Parser) Parse() *ast.Program {
 	if p.alias == "" {
 		panic("Module name cannot be empty, please check the file path: " + p.fullPath)
 	}
-	
-	
+
 	program := &ast.Program{
 		Nodes:      nodes,
 		FullPath:   p.fullPath,
@@ -259,7 +258,7 @@ func (p *Parser) Parse() *ast.Program {
 		Alias:      p.alias,
 		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
-	
+
 	p.ctx.PopProjectStack()
 	p.ctx.AddModule(p.importPath, program)
 

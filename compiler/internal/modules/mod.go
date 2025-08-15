@@ -4,10 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"compiler/constants"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/symbol"
-	"compiler/internal/utils/fs"
 )
 
 // ModulePhase represents the current processing phase of a module
@@ -69,21 +67,6 @@ type Module struct {
 	SymbolTable *symbol.SymbolTable
 	Phase       ModulePhase     // Current processing phase
 	UsedImports map[string]bool // Track which imports are used in this file
-}
-
-func IsRemote(importPath string) bool {
-	return strings.HasPrefix(importPath, constants.GITHUB_HOST)
-}
-
-// IsLocalProject checks if an import path refers to a local project defined in locals config
-func IsLocalProject(importPath string, localsConfig map[string]string) bool {
-	if localsConfig == nil {
-		return false
-	}
-
-	importRoot := fs.FirstPart(importPath)
-	_, exists := localsConfig[importRoot]
-	return exists
 }
 
 // GetRemoteModulePrefix extracts the GitHub repository prefix from a cached file path

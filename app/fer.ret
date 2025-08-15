@@ -12,7 +12,7 @@ path = ".ferret"
 
 [external]
 allow-sharing = false
-allow-remote-import = false
+allow-remote-import = true
 allow-neighbor-import = true
 
 [neighbors]

@@ -1,8 +1,11 @@
-import "demo-app/cmd/exprs";
+import "demo-app/cmd/expr";
 //import "demo-app/cmd/expr";
 import "neighbor/file2/types";
 
-import "math/constants";
+import "std/io";
+
+import "github.com/itsfuad/ferret-mod/data/bigint";
+import "github.com/itsfuad/ferret-mod/external/importer";
 
 let outvar = 10;
 

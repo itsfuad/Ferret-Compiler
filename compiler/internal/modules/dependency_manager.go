@@ -22,4 +22,3 @@ func NewDependencyManager(projectRoot string) (*DependencyManager, error) {
 		lockfile:    lockfile,
 	}, nil
 }
-

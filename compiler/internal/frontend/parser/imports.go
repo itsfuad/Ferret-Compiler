@@ -38,17 +38,16 @@ func parseImport(p *Parser) ast.Node {
 
 	skip := false
 
-	moduleFullPath, config, modType, err := p.ctx.ResolveImportPath(importpath)
 	stmt := &ast.ImportStmt{
 		ImportPath: &ast.StringLiteral{
 			Value:    importpath,
 			Location: loc,
 		},
-		Alias:          alias,
-		LocationOnDisk: moduleFullPath,
-		Location:       loc,
+		Alias:    alias,
+		Location: loc,
 	}
 
+	config, moduleFullPath, modType, err := p.ctx.ResolveImportPath(importpath)
 	if err != nil {
 		p.ctx.Reports.AddError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 		skip = true
@@ -57,12 +56,7 @@ func parseImport(p *Parser) ast.Node {
 	colors.BOLD_PURPLE.Printf("Import module path %q from import path %q\n", moduleFullPath, importpath)
 
 	if !skip {
-		skip = shouldSkip(p, &loc, config, moduleFullPath, modType)
-	}
-
-	if err != nil {
-		p.ctx.Reports.AddError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
-		skip = true
+		skip = shouldSkip(p, &loc, config, importpath, modType)
 	}
 
 	if skip {
@@ -92,22 +86,24 @@ func parseImport(p *Parser) ast.Node {
 		}
 	}
 
+	stmt.LocationOnDisk = moduleFullPath
+
 	return stmt
 }
 
-func shouldSkip(p *Parser, loc *source.Location, config *config.ProjectConfig, moduleFullPath string, modType modules.ModuleType) bool {
+func shouldSkip(p *Parser, loc *source.Location, config *config.ProjectConfig, importPath string, modType modules.ModuleType) bool {
 	if modType != modules.LOCAL && modType != modules.BUILTIN {
-		con := p.ctx.PeekProjectStack()
+		con := p.ctx.PeekProjectConfigStack()
 		if modType == modules.NEIGHBOR && !con.External.AllowExternalImport {
-			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import neighbor module %q as your project disabled neighbor project access", moduleFullPath), report.PARSING_PHASE).AddHint("Enable allow-external-import=true in <project_root>/fer.ret")
+			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import neighbor module %q as your project disabled neighbor project access", importPath), report.PARSING_PHASE).AddHint("Enable allow-external-import=true in <project_root>/fer.ret")
 			return true
 		} else if modType == modules.REMOTE && !con.External.AllowRemoteImport {
-			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import remote module %q as your project disabled remote imports", moduleFullPath), report.PARSING_PHASE).AddHint("Enable allow-remote-import=true in <project_root>/fer.ret")
+			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import remote module %q as your project disabled remote imports", importPath), report.PARSING_PHASE).AddHint("Enable allow-remote-import=true in <project_root>/fer.ret")
 			return true
 		}
 	}
 	if modType == modules.BUILTIN && !config.External.AllowSharing {
-		p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Module %q is not enabled for sharing", moduleFullPath), report.PARSING_PHASE)
+		p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Module %q is not enabled for sharing", importPath), report.PARSING_PHASE)
 		return true
 	}
 	return false

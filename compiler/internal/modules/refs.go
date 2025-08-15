@@ -98,28 +98,8 @@ func GetTagsFromRefs(refs []Ref) []string {
 	return tags
 }
 
-func ParseRepoInput(input string) (owner, repo, version string, err error) {
-	// input like "github.com/owner/repo@version" or "github.com/owner/repo"
-	input = strings.TrimPrefix(input, "github.com/")
-	atIndex := strings.Index(input, "@")
-
-	if atIndex >= 0 {
-		version = input[atIndex+1:]
-		input = input[:atIndex]
-	}
-
-	parts := strings.Split(input, "/")
-	if len(parts) != 2 {
-		err = fmt.Errorf("invalid input format, expected github.com/owner/repo[@version]")
-		return
-	}
-	owner = parts[0]
-	repo = parts[1]
-	return
-}
-
-func GetModule(input string) (string, error) {
-	owner, repo, version, err := ParseRepoInput(input)
+func GetModuleLatestVersion(input string) (string, error) {
+	_, owner, repo, version, err := SplitRepo(input)
 	if err != nil {
 		return "", err
 	}
@@ -136,7 +116,7 @@ func GetModule(input string) (string, error) {
 
 	sort.Strings(tags)
 
-	if version == "" {
+	if version == "" || version == "latest" {
 		// Return latest tag when no version specified
 		return tags[len(tags)-1], nil
 	}
