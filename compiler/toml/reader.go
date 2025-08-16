@@ -173,8 +173,7 @@ func WriteTOMLFile(filename string, data TOMLData, inlineComments map[string]map
 }
 
 func writeTOMLSections(file *os.File, data TOMLData, inlineComments map[string]map[string]string) error {
-	sectionOrder := []string{"default", "compiler", "build", "cache", "remote", "neighbor", "dependencies"}
-
+	sectionOrder := []string{"default", "compiler", "build", "cache", "external", "neighbor", "dependencies"}
 	for _, sectionName := range sectionOrder {
 		if sectionData, exists := data[sectionName]; exists {
 			err := writeTOMLSection(file, sectionName, sectionData, inlineComments)

@@ -46,8 +46,8 @@ func parseRefLine(line string) (Ref, bool) {
 	return Ref{Hash: hash, Name: refRest}, true
 }
 
-func FetchRefs(owner, repo string) ([]Ref, error) {
-	url := fmt.Sprintf("https://github.com/%s/%s.git/info/refs?service=git-upload-pack", owner, repo)
+func FetchRefs(host, owner, repo string) ([]Ref, error) {
+	url := fmt.Sprintf("https://%s/%s/%s.git/info/refs?service=git-upload-pack", host, owner, repo)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -99,12 +99,12 @@ func GetTagsFromRefs(refs []Ref) []string {
 }
 
 func GetModuleLatestVersion(input string) (string, error) {
-	_, owner, repo, version, err := SplitRepo(input)
+	host, owner, repo, version, err := SplitRepo(input)
 	if err != nil {
 		return "", err
 	}
 
-	refs, err := FetchRefs(owner, repo)
+	refs, err := FetchRefs(host, owner, repo)
 	if err != nil {
 		return "", fmt.Errorf("error fetching refs: %w", err)
 	}
