@@ -219,11 +219,9 @@ func (p *Parser) Parse() *ast.Program {
 	config, _ := config.LoadProjectConfig(projectRoot)
 
 	p.ctx.PushProjectStack(config)
-
-	// Start tracking the entry point parsing
-	p.ctx.StartParsing(p.fullPath)
-
-	defer p.ctx.FinishParsing(p.fullPath)
+	p.ctx.MarkParseStart(p.fullPath)
+	defer p.ctx.MarkParseFinish(p.fullPath)
+	defer p.ctx.PopProjectStack()
 
 	colors.CYAN.Printf("Parsing %q from project: %s\n", p.fullPath, config.Name)
 
@@ -259,7 +257,6 @@ func (p *Parser) Parse() *ast.Program {
 		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 
-	p.ctx.PopProjectStack()
 	p.ctx.AddModule(p.importPath, program)
 
 	return program

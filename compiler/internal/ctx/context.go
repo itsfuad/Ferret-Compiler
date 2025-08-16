@@ -444,8 +444,8 @@ func (c *CompilerContext) findCyclePath(start, target string, visited map[string
 	return nil
 }
 
-// StartParsing marks a module as currently being parsed
-func (c *CompilerContext) StartParsing(importPath string) {
+// MarkParseStart marks a module as currently being parsed
+func (c *CompilerContext) MarkParseStart(importPath string) {
 	if c._parsingModules == nil {
 		c._parsingModules = make(map[string]bool)
 	}
@@ -457,8 +457,8 @@ func (c *CompilerContext) StartParsing(importPath string) {
 	c._parsingStack = append(c._parsingStack, importPath)
 }
 
-// FinishParsing marks a module as no longer being parsed
-func (c *CompilerContext) FinishParsing(importPath string) {
+// MarkParseFinish marks a module as no longer being parsed
+func (c *CompilerContext) MarkParseFinish(importPath string) {
 	if c._parsingModules != nil {
 		delete(c._parsingModules, importPath)
 	}
@@ -509,7 +509,7 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 		Modules:             make(map[string]*modules.Module),
 		Reports:             report.Reports{},
 		ProjectConfig:       projectConfig,
-		ProjectStack:        []*config.ProjectConfig{projectConfig},
+		ProjectStack:        []*config.ProjectConfig{},
 		RemoteCachePath:     remoteCachePath,
 		BuiltinModules:      BuiltinModules,
 		ProjectRootFullPath: projectConfig.ProjectRoot,

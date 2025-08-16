@@ -1,0 +1,19 @@
+name = "lib-mod"
+
+[compiler]
+version = "0.0.1"
+
+[build]
+output = ""
+entry = ""
+
+[cache]
+path = ".ferret"
+
+[external]
+allow-sharing = true
+allow-remote-import = true
+allow-neighbor-import = false
+
+[dependencies]
+github.com/itsfuad/ferret-remote-mod = "v0.0.1"
