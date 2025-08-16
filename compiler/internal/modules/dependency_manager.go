@@ -67,7 +67,6 @@ func (dm *DependencyManager) InstallDependency(packagename string) error {
 	// Implementation for installing a specific dependency
 	err := dm.installDependency(packagename)
 	if err != nil {
-		colors.RED.Printf("❌ Failed to install %s: %v\n", packagename, err)
 		return err
 	}
 
@@ -92,41 +91,75 @@ func (dm *DependencyManager) Save() error {
 
 func (dm *DependencyManager) installDependency(packagename string) error {
 	// Implementation for installing a single dependency
-	colors.BLUE.Printf("📦 Installing %s...\n", packagename)
-
+	
 	host, user, repo, version, err := SplitRepo(packagename)
 	if err != nil {
 		return err
 	}
 
+	colors.BLUE.Printf("📦 Installing %s/%s/%s@%s\n", host, user, repo, version)
+
 	// check what versions are available
 	actualVersion, err := CheckRemoteModuleExists(host, user, repo, version)
 	if err != nil {
-		colors.RED.Printf("Module not found: %s\n", packagename)
+		colors.RED.Printf("Package %s/%s/%s@%s not found on %s\n", host, user, repo, version, host)
 		os.Exit(1)
 	}
 
-	isInstalled, err := dm.downloadIfNotCached(host, user, repo, actualVersion, packagename)
+	isInstalled, err := dm.downloadIfNotCached(host, user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
 
 	if !isInstalled {
 		dm.lockfile.SetDependency(host, user, repo, actualVersion, true, []string{}, []string{})
-		colors.GREEN.Printf("✅ Successfully installed %s\n", packagename)
+		colors.GREEN.Printf("✅ Successfully installed %s/%s/%s@%s\n", host, user, repo, actualVersion)
 	}
-
+	
 	colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
+	
+	err = dm.installTransitiveDependencies(host, user, repo, actualVersion)
+	if err != nil {
+		return err
+	}
 	
 	return nil
 }
 
+func (dm *DependencyManager) installTransitiveDependencies(host, user, repo, version string) error {
+
+	// read the currently installed package's config file
+	configFilePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, host, user, BuildModuleSpec(repo, version))
+	installedConfig, err := config.LoadProjectConfig(configFilePath)
+	if err != nil {
+		return err
+	}
+
+	// install each transitive dependency
+	for packageURL, pkgVersion := range installedConfig.Dependencies.Modules {
+		pkg := BuildModuleSpec(packageURL, pkgVersion)
+		parent := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
+
+		// self reference will cause infinite loop.
+		if pkg == parent {
+			colors.YELLOW.Printf("⚠️  Skipping self-referential transitive dependency: %s\n", pkg)
+			continue
+		}
+
+		colors.LIGHT_GREEN.Printf("📦 Installing transitive dependency: %s\n", pkg)
+		if err := dm.InstallDependency(pkg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // ensureModuleCached ensures the module is cached, downloading if necessary
-func (dm *DependencyManager) downloadIfNotCached(host, user, repo, version, packagename string) (bool, error) {
+func (dm *DependencyManager) downloadIfNotCached(host, user, repo, version string) (bool, error) {
 	if !IsModuleCached(filepath.Join(dm.projectRoot, dm.configfile.Cache.Path), filepath.Join(host, user, repo), version) {
 		err := DownloadRemoteModule(host, user, repo, version, filepath.Join(dm.projectRoot, dm.configfile.Cache.Path))
 		if err != nil {
-			colors.RED.Printf("Failed to download module: %s\n", packagename)
 			return false, err
 		}
 	}
