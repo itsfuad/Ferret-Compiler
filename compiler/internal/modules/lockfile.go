@@ -1,15 +1,15 @@
 package modules
 
 import (
+	"compiler/constants"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 )
-
-const LockfileName = "ferret.lock"
 
 type LockfileEntry struct {
 	Version      string   `json:"version"`
@@ -20,48 +20,51 @@ type LockfileEntry struct {
 }
 
 type Lockfile struct {
-	Version      string                   `json:"version"`
+	projectRoot string
+	Version     string                   `json:"version"`
 	Dependencies map[string]LockfileEntry `json:"dependencies"`
 	GeneratedAt  string                   `json:"generated_at"`
 }
 
-func NewLockfile() *Lockfile {
-	return &Lockfile{
-		Version:      "1.0",
+func LoadLockfile(projectRoot string) (*Lockfile, error) {
+	lockfilePath := filepath.Join(projectRoot, constants.LOCKFILE)
+	lockfile := &Lockfile{
+		projectRoot: projectRoot,
 		Dependencies: make(map[string]LockfileEntry),
 	}
-}
 
-func LoadLockfile(projectRoot string) (*Lockfile, error) {
-	lockfilePath := filepath.Join(projectRoot, LockfileName)
+	// if doesn't exist, just return
+	if _, err := os.Stat(lockfilePath); os.IsNotExist(err) {
+		return lockfile, nil
+	}
+
 	data, err := os.ReadFile(lockfilePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return NewLockfile(), nil
-		}
 		return nil, fmt.Errorf("failed to read lockfile: %w", err)
 	}
-	var lockfile Lockfile
-	if err := json.Unmarshal(data, &lockfile); err != nil {
+
+
+	if err := json.Unmarshal(data, lockfile); err != nil {
 		return nil, fmt.Errorf("failed to parse lockfile: %w", err)
 	}
-	return &lockfile, nil
+
+	return lockfile, nil
 }
 
-func SaveLockfile(projectRoot string, lockfile *Lockfile) error {
-	lockfilePath := filepath.Join(projectRoot, LockfileName)
-	sortedDeps := make([]string, 0, len(lockfile.Dependencies))
-	for dep := range lockfile.Dependencies {
+func (l *Lockfile) Save() error {
+	lockfilePath := filepath.Join(l.projectRoot, constants.LOCKFILE)
+	sortedDeps := make([]string, 0, len(l.Dependencies))
+	for dep := range l.Dependencies {
 		sortedDeps = append(sortedDeps, dep)
 	}
 	sort.Strings(sortedDeps)
 	outputLockfile := &Lockfile{
-		Version:      lockfile.Version,
+		Version:      l.Version,
 		Dependencies: make(map[string]LockfileEntry),
-		GeneratedAt:  lockfile.GeneratedAt,
+		GeneratedAt:  l.GeneratedAt,
 	}
 	for _, dep := range sortedDeps {
-		outputLockfile.Dependencies[dep] = lockfile.Dependencies[dep]
+		outputLockfile.Dependencies[dep] = l.Dependencies[dep]
 	}
 	data, err := json.MarshalIndent(outputLockfile, "", "  ")
 	if err != nil {
@@ -75,7 +78,7 @@ func SaveLockfile(projectRoot string, lockfile *Lockfile) error {
 
 // SetDependency sets or updates a dependency in the lockfile
 func (l *Lockfile) SetDependency(repo, version string, direct bool, description string, dependencies, usedBy []string) {
-	key := repo + "@" + version
+	key := BuildModuleSpec(repo, version)
 	l.Dependencies[key] = LockfileEntry{
 		Version:      version,
 		Direct:       direct,
@@ -115,18 +118,18 @@ func (l *Lockfile) RemoveUsedBy(depKey, parentKey string) {
 }
 
 func (l *Lockfile) RemoveDependency(repo, version string) {
-	key := repo + "@" + version
+	key := BuildModuleSpec(repo, version)
 	delete(l.Dependencies, key)
 }
 
 func (l *Lockfile) GetDependency(repo, version string) (LockfileEntry, bool) {
-	key := repo + "@" + version
+	key := BuildModuleSpec(repo, version)
 	entry, exists := l.Dependencies[key]
 	return entry, exists
 }
 
 func (l *Lockfile) GetDependencyVersion(repo, version string) (string, bool) {
-	key := repo + "@" + version
+	key := BuildModuleSpec(repo, version)
 	entry, exists := l.Dependencies[key]
 	if !exists {
 		return "", false
@@ -136,12 +139,6 @@ func (l *Lockfile) GetDependencyVersion(repo, version string) (string, bool) {
 
 func (l *Lockfile) GetAllDependencies() map[string]LockfileEntry {
 	result := make(map[string]LockfileEntry)
-	for k, v := range l.Dependencies {
-		result[k] = v
-	}
+	maps.Copy(result, l.Dependencies)
 	return result
-}
-
-func (l *Lockfile) ValidateLockfile() error {
-	return nil
 }

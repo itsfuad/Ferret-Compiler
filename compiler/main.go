@@ -29,6 +29,12 @@ func main() {
 		return
 	}
 
+	// Handle get command
+	if args.GetCommand {
+		cli.HandleGetCommand(args.GetPackage)
+		return
+	}
+
 	// Handle invalid commands
 	if args.InvalidCommand != "" {
 		colors.RED.Printf("❌ Invalid command: %q\n", args.InvalidCommand)

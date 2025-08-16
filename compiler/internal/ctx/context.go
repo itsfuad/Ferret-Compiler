@@ -128,7 +128,7 @@ func (c *CompilerContext) resolveRemoteModule(importPath string, currentProjectC
 		return nil, "", modules.REMOTE, err
 	}
 
-	resolvedPath := filepath.Join(c.RemoteCachePath, host, owner, repo+"@"+version, modulename)
+	resolvedPath := filepath.Join(c.RemoteCachePath, host, owner, modules.BuildModuleSpec(repo, version), modulename)
 
 	fmt.Printf("Using remote module: %s (%s)\n", repoPath, resolvedPath)
 

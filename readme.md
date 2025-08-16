@@ -313,6 +313,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - **Code Generator**: Translates the validated AST into target assembly code (currently x86-64)
 
 ## Roadmap
+### Language System
 - [x] Basic syntax
 - [x] Tokenizer
 - [x] Parser
@@ -369,6 +370,18 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Type checking (Type inference and validation)
 - [ ] Code generation (x86-64 assembly - basic implementation)
 
+### Dependency Management
+- [x] Read dependency from config file
+- [x] Download dependencies from config file
+  - [ ] Download indirect dependencies
+- [x] Cache downloaded modules
+- [ ] Update config file
+- [ ] Update lockfile
+- [ ] Update dependency
+- [ ] Delete dependencies
+- [ ] Check for updates
+- [ ] Detect orphans
+- [ ] Delete orphans
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
