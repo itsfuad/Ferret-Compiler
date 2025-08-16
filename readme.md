@@ -373,11 +373,11 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 ### Dependency Management
 - [x] Read dependency from config file
 - [x] Download dependencies from config file
-  - [ ] Download indirect dependencies
+  - [x] Download indirect dependencies
 - [x] Cache downloaded modules
-- [ ] Update config file
-- [ ] Update lockfile
-- [ ] Update dependency
+- [x] Update config file
+- [x] Update lockfile
+- [x] Update dependency
 - [ ] Delete dependencies
 - [ ] Check for updates
 - [ ] Detect orphans
