@@ -1,8 +1,8 @@
 package config
 
 import (
-	"compiler/toml"
 	"compiler/constants"
+	"compiler/toml"
 	"os"
 	"path/filepath"
 	"strings"

@@ -19,8 +19,8 @@ type LockfileEntry struct {
 }
 
 type Lockfile struct {
-	projectRoot string
-	Version     string                   `json:"version"`
+	projectRoot  string
+	Version      string                   `json:"version"`
 	Dependencies map[string]LockfileEntry `json:"dependencies"`
 	GeneratedAt  string                   `json:"generated_at"`
 }
@@ -28,7 +28,7 @@ type Lockfile struct {
 func LoadLockfile(projectRoot string) (*Lockfile, error) {
 	lockfilePath := filepath.Join(projectRoot, constants.LOCKFILE)
 	lockfile := &Lockfile{
-		projectRoot: projectRoot,
+		projectRoot:  projectRoot,
 		Dependencies: make(map[string]LockfileEntry),
 	}
 
@@ -41,7 +41,6 @@ func LoadLockfile(projectRoot string) (*Lockfile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read lockfile: %w", err)
 	}
-
 
 	if err := json.Unmarshal(data, lockfile); err != nil {
 		return nil, fmt.Errorf("failed to parse lockfile: %w", err)
@@ -65,21 +64,33 @@ func (l *Lockfile) Save() error {
 	return nil
 }
 
-// SetDependency sets or updates a dependency in the lockfile
-func (l *Lockfile) SetDependency(host, user, repo, version string, direct bool, dependencies, usedBy []string) {
+// SetNewDependency adds or updates a dependency in the lockfile
+func (l *Lockfile) SetNewDependency(host, user, repo, version string, isDirect bool) {
 
 	key := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
 
 	l.Dependencies[key] = LockfileEntry{
 		Version:      version,
-		Direct:       direct,
-		Dependencies: dependencies,
-		UsedBy:       usedBy,
+		Direct:       isDirect,
+		Dependencies: []string{},
+		UsedBy:       []string{},
 	}
 }
 
+func (l *Lockfile) AddIndirectDependency(parent, child string) {
+	entry, exists := l.Dependencies[parent]
+	if !exists {
+		return
+	}
+	if slices.Contains(entry.Dependencies, child) {
+		return // already present
+	}
+	entry.Dependencies = append(entry.Dependencies, child)
+	l.Dependencies[parent] = entry
+}
+
 // AddUsedBy adds a parent to the UsedBy list for a dependency
-func (l *Lockfile) AddUsedBy(depKey, parentKey string) {
+func (l *Lockfile) AddUsedBy(parentKey, depKey string) {
 	entry, exists := l.Dependencies[depKey]
 	if !exists {
 		return
