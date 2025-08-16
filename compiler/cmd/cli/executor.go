@@ -5,6 +5,7 @@ import (
 	"compiler/colors"
 	"compiler/constants"
 	"compiler/internal/modules"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -56,6 +57,8 @@ func HandleGetCommand(packageName string) {
 
 	projectRoot := getRoot()
 
+	fmt.Printf("Root Directory: %s\n", projectRoot)
+
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
 	if err != nil {
@@ -83,11 +86,16 @@ func HandleGetCommand(packageName string) {
 		colors.BLUE.Println("📦 No module specified. Installing all dependencies from fer.ret...")
 		err = dm.InstallAllDependencies()
 		if err != nil {
-			colors.RED.Printf("❌ Failed to install dependencies: %s\n", err)
+			colors.RED.Printf(err.Error())
 			os.Exit(1)
 		}
-		colors.GREEN.Println("✅ All dependencies installed successfully!")
 		return
+	}
+
+	err = dm.InstallDependency(packageName)
+	if err != nil {
+		colors.RED.Printf(err.Error())
+		os.Exit(1)
 	}
 }
 

@@ -19,11 +19,17 @@ const (
 	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
 )
 
+// Uses Git refs instead of GitHub API to avoid rate limiting
+func CheckRemoteModuleExists(host, user, repo, requestedVersion string) (string, error) {
+	normalizedVersion, _, err := CheckAndGetActualVersion(host, user, repo, requestedVersion)
+	return normalizedVersion, err
+}
+
 // CheckAndGetActualVersion checks if a version exists and returns both normalized and actual versions
-func CheckAndGetActualVersion(user, repo, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
+func CheckAndGetActualVersion(host, user, repo, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
 
 	// Fetch all available tags once
-	refs, err := FetchRefs(user, repo)
+	refs, err := FetchRefs(host, user, repo)
 	if err != nil {
 		return "", "", fmt.Errorf("error fetching refs: %w", err)
 	}
@@ -107,10 +113,22 @@ func SplitRepo(url string) (host, owner, repo, version string, err error) {
 	return
 }
 
+func TrimVersion(repo string) (string, string) {
+	// Split the repo into parts
+	parts := strings.Split(repo, "@")
+	if len(parts) == 1 {
+		return parts[0], "latest" // No version specified, return "latest"
+	}
+	if len(parts) == 2 {
+		return parts[0], parts[1] // Return repo and version
+	}
+	return "", "" // Invalid format
+}
+
 // DownloadRemoteModule downloads a remote module to the cache
-func DownloadRemoteModule(user, repo, version, cachePath string) error {
+func DownloadRemoteModule(host, user, repo, version, cachePath string) error {
 	// Get both normalized and actual versions for proper downloading and caching
-	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(user, repo, StripVersionPrefix(version))
+	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(host, user, repo, StripVersionPrefix(version))
 	if err != nil {
 		return fmt.Errorf("failed to resolve version: %w", err)
 	}
@@ -123,7 +141,7 @@ func DownloadRemoteModule(user, repo, version, cachePath string) error {
 	defer os.Remove(downloadPath)
 
 	// Extract to cache using normalized version for consistency
-	moduleDir := filepath.Join(cachePath, user+BuildModuleSpec(repo, normalizedVersion))
+	moduleDir := filepath.Join(cachePath, host, user, BuildModuleSpec(repo, normalizedVersion))
 	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(actualVersion, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
@@ -265,12 +283,11 @@ func extractFile(file *zip.File, targetPath string) error {
 }
 
 // IsModuleCached checks if a module is already cached
-func IsModuleCached(cachePath, repoName, version string) bool {
-	fmt.Printf("Checking if module %s@%s is cached...\n", repoName, version)
+func IsModuleCached(cachePath, url, version string) bool {
+	fmt.Printf("Checking if package %s@%s is cached...\n", url, version)
 	normalizedVersion := NormalizeVersion(version)
-	moduleDir := filepath.Join(cachePath, BuildModuleSpec(repoName, normalizedVersion))
+	moduleDir := filepath.Join(cachePath, BuildModuleSpec(url, normalizedVersion))
 	fmt.Printf("Module directory: %s\n", moduleDir)
-	_, err := os.Stat(moduleDir)
-	fmt.Println(err)
-	return err == nil
+	info, err := os.Stat(moduleDir)
+	return err == nil && info.IsDir()
 }

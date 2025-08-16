@@ -53,7 +53,7 @@ var defaultConfig = toml.TOMLData{
 	"dependencies": toml.TOMLTable{},
 }
 
-func (conf *ProjectConfig) Save() {
+func (conf *ProjectConfig) Save() error {
 
 	// Validate the configuration
 	tomData := defaultConfig
@@ -86,8 +86,10 @@ func (conf *ProjectConfig) Save() {
 	// Save the configuration to the fer.ret file
 	if err := toml.WriteTOMLFile(filepath.Join(conf.ProjectRoot, constants.CONFIG_FILE), tomData, nil); err != nil {
 		colors.RED.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("failed to save config file: %w", err)
 	}
+
+	return nil
 }
 
 // CompilerConfig contains compiler-specific settings

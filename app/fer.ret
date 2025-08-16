@@ -1,4 +1,4 @@
-name = "demo-app"
+name = "demo-apps"
 
 [compiler]
 version = "0.0.1"
@@ -14,9 +14,6 @@ path = ".ferret"
 allow-sharing = false
 allow-remote-import = true
 allow-neighbor-import = true
-
-[neighbors]
-neighbor = "../app2"
 
 [dependencies]
 github.com/itsfuad/ferret-mod = "v0.0.2"

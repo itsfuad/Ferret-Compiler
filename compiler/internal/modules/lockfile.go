@@ -8,13 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
+	"time"
 )
 
 type LockfileEntry struct {
 	Version      string   `json:"version"`
 	Direct       bool     `json:"direct"`
-	Description  string   `json:"description"`
 	Dependencies []string `json:"dependencies"`
 	UsedBy       []string `json:"used_by"`
 }
@@ -53,20 +52,10 @@ func LoadLockfile(projectRoot string) (*Lockfile, error) {
 
 func (l *Lockfile) Save() error {
 	lockfilePath := filepath.Join(l.projectRoot, constants.LOCKFILE)
-	sortedDeps := make([]string, 0, len(l.Dependencies))
-	for dep := range l.Dependencies {
-		sortedDeps = append(sortedDeps, dep)
-	}
-	sort.Strings(sortedDeps)
-	outputLockfile := &Lockfile{
-		Version:      l.Version,
-		Dependencies: make(map[string]LockfileEntry),
-		GeneratedAt:  l.GeneratedAt,
-	}
-	for _, dep := range sortedDeps {
-		outputLockfile.Dependencies[dep] = l.Dependencies[dep]
-	}
-	data, err := json.MarshalIndent(outputLockfile, "", "  ")
+	l.Version = constants.LOCKFILE_VERSION
+	l.GeneratedAt = time.Now().Format(time.RFC3339)
+
+	data, err := json.MarshalIndent(l, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal lockfile: %w", err)
 	}
@@ -77,12 +66,13 @@ func (l *Lockfile) Save() error {
 }
 
 // SetDependency sets or updates a dependency in the lockfile
-func (l *Lockfile) SetDependency(repo, version string, direct bool, description string, dependencies, usedBy []string) {
-	key := BuildModuleSpec(repo, version)
+func (l *Lockfile) SetDependency(host, user, repo, version string, direct bool, dependencies, usedBy []string) {
+
+	key := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
+
 	l.Dependencies[key] = LockfileEntry{
 		Version:      version,
 		Direct:       direct,
-		Description:  description,
 		Dependencies: dependencies,
 		UsedBy:       usedBy,
 	}
