@@ -91,7 +91,7 @@ func HandleGetCommand(packageName string) {
 		return
 	}
 
-	err = dm.InstallDependency(packageName)
+	err = dm.InstallDirectDependency(packageName)
 	if err != nil {
 		colors.RED.Printf(err.Error())
 		os.Exit(1)

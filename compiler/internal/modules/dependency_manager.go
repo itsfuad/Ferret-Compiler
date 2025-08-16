@@ -63,7 +63,7 @@ func (dm *DependencyManager) InstallAllDependencies() error {
 	return dm.Save()
 }
 
-func (dm *DependencyManager) InstallDependency(packagename string) error {
+func (dm *DependencyManager) InstallDirectDependency(packagename string) error {
 	// Implementation for installing a specific dependency
 	err := dm.installDependency(packagename, true)
 	if err != nil {
@@ -117,6 +117,9 @@ func (dm *DependencyManager) installDependency(packagename string, isDirect bool
 
 	colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
 
+	if isDirect {
+		dm.configfile.Dependencies.Modules[fmt.Sprintf("%s/%s/%s", host, user, repo)] = actualVersion
+	}
 	dm.lockfile.SetNewDependency(host, user, repo, actualVersion, isDirect)
 
 	err = dm.installTransitiveDependencies(host, user, repo, actualVersion)

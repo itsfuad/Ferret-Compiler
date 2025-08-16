@@ -11,9 +11,9 @@ output = "bin"
 path = ".ferret"
 
 [external]
-allow-sharing = false
 allow-remote-import = true
 allow-neighbor-import = true
+allow-sharing = false
 
 [dependencies]
-github.com/itsfuad/ferret-mod = "v0.0.2"
+github.com/itsfuad/ferret-mod = "v0.0.3"
