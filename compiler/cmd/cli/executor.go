@@ -4,6 +4,7 @@ import (
 	"compiler/cmd"
 	"compiler/colors"
 	"compiler/constants"
+	"compiler/internal/modules"
 	"os"
 	"path/filepath"
 
@@ -16,7 +17,7 @@ const (
 	DEPENDENCY_ERROR           = "❌ Failed to create dependency manager: %s\n"
 	CONFIG_LOAD_ERROR          = "⚠️  Error loading project configuration: %v\n"
 	REMOTE_IMPORTS_DISABLED    = "🔒 Remote module imports are disabled in this project."
-	REMOTE_IMPORTS_ENABLE_HELP = "💡 To enable remote imports, set 'enabled = true' in the [remote] section of fer.ret"
+	REMOTE_IMPORTS_ENABLE_HELP = "💡 To enable remote imports, set 'allow-remote-import = true' in the [external] section of fer.ret"
 )
 
 func HandleInitCommand(projectName string) {
@@ -51,15 +52,58 @@ func HandleRunCommand(target string, debug bool) {
 	}
 }
 
-// isInProjectRoot returns true if the current working directory contains fer.ret
-func isInProjectRoot() bool {
+func HandleGetCommand(packageName string) {
+
+	projectRoot := getRoot()
+
+	// Load and validate project configuration
+	projectConfig, err := config.LoadProjectConfig(projectRoot)
+	if err != nil {
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
+		os.Exit(1)
+	}
+
+	// ✅ SECURITY CHECK: Check if remote imports are enabled
+	if !projectConfig.External.AllowRemoteImport {
+		colors.RED.Println(REMOTE_IMPORTS_DISABLED)
+		colors.YELLOW.Println(REMOTE_IMPORTS_ENABLE_HELP)
+		os.Exit(1)
+	}
+
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+
+	if packageName == "" {
+		// No module specified, install all dependencies from fer.ret
+		colors.BLUE.Println("📦 No module specified. Installing all dependencies from fer.ret...")
+		err = dm.InstallAllDependencies()
+		if err != nil {
+			colors.RED.Printf("❌ Failed to install dependencies: %s\n", err)
+			os.Exit(1)
+		}
+		colors.GREEN.Println("✅ All dependencies installed successfully!")
+		return
+	}
+}
+
+func getRoot() string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return false
+		colors.RED.Println("❌ Error getting current directory:", err)
+		os.Exit(1)
 	}
+
+	// Enforce: must be run from project root (directory containing fer.ret)
 	ferretPath := filepath.Join(cwd, constants.CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
-		return false
+		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
+		os.Exit(1)
 	}
-	return true
+
+	return cwd
 }

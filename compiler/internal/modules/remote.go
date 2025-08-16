@@ -19,17 +19,6 @@ const (
 	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
 )
 
-// CheckReleaseExists checks if a remote module exists and returns available versions
-// Uses Git refs instead of GitHub API to avoid rate limiting
-func CheckReleaseExists(repoName, requestedVersion string) (string, error) {
-	_, user, repo, _, err := SplitRepo(repoName)
-	if err != nil {
-		return "", err
-	}
-	normalizedVersion, _, err := CheckAndGetActualVersion(user, repo, requestedVersion)
-	return normalizedVersion, err
-}
-
 // CheckAndGetActualVersion checks if a version exists and returns both normalized and actual versions
 func CheckAndGetActualVersion(user, repo, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
 
@@ -55,7 +44,7 @@ func CheckAndGetActualVersion(user, repo, requestedVersion string) (normalizedVe
 	// Check if requested version exists in available tags
 	actualVersion = findMatchingTag(tags, requestedVersion)
 	if actualVersion == "" {
-		return "", "", fmt.Errorf("version %s not found in available tags: %v", requestedVersion, tags)
+		return "", "", fmt.Errorf("version %s not found in available tags: %s", requestedVersion, strings.Join(tags, ", "))
 	}
 
 	// Verify that the tag is actually downloadable
@@ -79,9 +68,9 @@ func findMatchingTag(tags []string, requestedVersion string) string {
 
 	// If no exact match, try alternative format
 	var alternativeVersion string
-	if strings.HasPrefix(requestedVersion, "v") {
+	if after, ok :=strings.CutPrefix(requestedVersion, "v"); ok  {
 		// If requested version has "v", try without "v"
-		alternativeVersion = strings.TrimPrefix(requestedVersion, "v")
+		alternativeVersion = after
 	} else {
 		// If requested version doesn't have "v", try with "v"
 		alternativeVersion = "v" + requestedVersion
@@ -118,17 +107,8 @@ func SplitRepo(url string) (host, owner, repo, version string, err error) {
 	return
 }
 
-// Note: The following functions were removed as they depended on GitHub API
-// which caused rate limiting issues. They have been replaced with Git refs-based approach.
-
 // DownloadRemoteModule downloads a remote module to the cache
-func DownloadRemoteModule(repoURL, cachePath string) error {
-	// Parse user/repo from repoName
-	_, user, repo, version, err := SplitRepo(repoURL)
-	if err != nil {
-		return err
-	}
-
+func DownloadRemoteModule(user, repo, version, cachePath string) error {
 	// Get both normalized and actual versions for proper downloading and caching
 	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(user, repo, StripVersionPrefix(version))
 	if err != nil {
@@ -136,28 +116,29 @@ func DownloadRemoteModule(repoURL, cachePath string) error {
 	}
 
 	// Download the module archive using the actual GitHub version
-	downloadPath, err := downloadModuleArchive(user, repo, actualVersion, repoURL)
+	downloadPath, err := internalDownloadModuleArchive(user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(downloadPath)
 
 	// Extract to cache using normalized version for consistency
-	moduleDir := filepath.Join(cachePath, user+repo+"@"+normalizedVersion)
+	moduleDir := filepath.Join(cachePath, user+BuildModuleSpec(repo, normalizedVersion))
 	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(actualVersion, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
 	}
 
-	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoURL, normalizedVersion)
+	colors.GREEN.Printf("Successfully downloaded and cached %s/%s@%s\n", user, repo, normalizedVersion)
 	return nil
 }
 
-// downloadModuleArchive downloads the module archive and returns the temporary file path
-func downloadModuleArchive(user, repo, version, repoName string) (string, error) {
+// internalDownloadModuleArchive downloads the module archive and returns the temporary file path
+func internalDownloadModuleArchive(user, repo, version string) (string, error) {
 	// Create download URL
 	downloadURL := fmt.Sprintf(GitHubTagArchiveURL, user, repo, version)
-	colors.BLUE.Printf("Downloading %s@%s from %s\n", repoName, version, downloadURL)
+
+	colors.BLUE.Printf("Downloading %s from %s\n", repo, downloadURL)
 
 	// Download the archive
 	resp, err := http.Get(downloadURL)
@@ -173,11 +154,11 @@ func downloadModuleArchive(user, repo, version, repoName string) (string, error)
 	case http.StatusNotFound:
 		return "", fmt.Errorf("tag %s not found for repository %s/%s. The tag may exist but the archive is not available", version, user, repo)
 	case http.StatusForbidden:
-		return "", fmt.Errorf("access denied when downloading %s@%s. Repository may be private or access restricted", repoName, version)
+		return "", fmt.Errorf("access denied when downloading %s@%s. Repository may be private or access restricted", repo, version)
 	case http.StatusTooManyRequests:
-		return "", fmt.Errorf("rate limited when downloading %s@%s. Please try again later", repoName, version)
+		return "", fmt.Errorf("rate limited when downloading %s@%s. Please try again later", repo, version)
 	default:
-		return "", fmt.Errorf("failed to download module %s@%s: HTTP %d", repoName, version, resp.StatusCode)
+		return "", fmt.Errorf("failed to download module %s@%s: HTTP %d", repo, version, resp.StatusCode)
 	}
 
 	// Create temporary file for download
@@ -287,7 +268,7 @@ func extractFile(file *zip.File, targetPath string) error {
 func IsModuleCached(cachePath, repoName, version string) bool {
 	fmt.Printf("Checking if module %s@%s is cached...\n", repoName, version)
 	normalizedVersion := NormalizeVersion(version)
-	moduleDir := filepath.Join(cachePath, repoName+"@"+normalizedVersion)
+	moduleDir := filepath.Join(cachePath, BuildModuleSpec(repoName, normalizedVersion))
 	fmt.Printf("Module directory: %s\n", moduleDir)
 	_, err := os.Stat(moduleDir)
 	fmt.Println(err)

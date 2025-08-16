@@ -73,32 +73,32 @@ func TestParseArgs(t *testing.T) {
 		{
 			name:     "get command with module",
 			args:     []string{"program", "get", testModule},
-			expected: &Args{GetCommand: true, GetModule: testModule},
+			expected: &Args{GetCommand: true, GetPackage: testModule},
 		},
 		{
 			name:     "get command without module",
 			args:     []string{"program", "get"},
-			expected: &Args{GetCommand: true, GetModule: ""},
+			expected: &Args{GetCommand: true, GetPackage: ""},
 		},
 		{
 			name:     "update command with module",
 			args:     []string{"program", "update", testModule},
-			expected: &Args{UpdateCommand: true, UpdateModule: testModule},
+			expected: &Args{UpdateCommand: true, UpdatePackage: testModule},
 		},
 		{
 			name:     "update command without module",
 			args:     []string{"program", "update"},
-			expected: &Args{UpdateCommand: true, UpdateModule: ""},
+			expected: &Args{UpdateCommand: true, UpdatePackage: ""},
 		},
 		{
 			name:     "remove command with module",
 			args:     []string{"program", "remove", testModule},
-			expected: &Args{RemoveCommand: true, RemoveModule: testModule},
+			expected: &Args{RemoveCommand: true, RemovePackage: testModule},
 		},
 		{
 			name:     "remove command without module",
 			args:     []string{"program", "remove"},
-			expected: &Args{RemoveCommand: true, RemoveModule: ""},
+			expected: &Args{RemoveCommand: true, RemovePackage: ""},
 		},
 		{
 			name:     "list command",
@@ -130,7 +130,7 @@ func TestParseArgs(t *testing.T) {
 		{
 			name:     "flag that looks like module name",
 			args:     []string{"program", "get", "-not-a-module"},
-			expected: &Args{GetCommand: true, GetModule: ""},
+			expected: &Args{GetCommand: true, GetPackage: ""},
 		},
 	}
 

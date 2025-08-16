@@ -56,26 +56,3 @@ func TestRunCommandParsing(t *testing.T) {
 		t.Error("Expected debug to be true")
 	}
 }
-
-func TestIsInProjectRoot(t *testing.T) {
-	tempDir := t.TempDir()
-	oldDir, _ := os.Getwd()
-	defer os.Chdir(oldDir)
-
-	// Should be false when no fer.ret
-	os.Chdir(tempDir)
-	if isInProjectRoot() {
-		t.Error("Expected false when fer.ret is missing")
-	}
-
-	// Create fer.ret
-	f, err := os.Create(filepath.Join(tempDir, "fer.ret"))
-	if err != nil {
-		t.Fatalf("Failed to create fer.ret: %v", err)
-	}
-	f.Close()
-
-	if !isInProjectRoot() {
-		t.Error("Expected true when fer.ret is present")
-	}
-}
