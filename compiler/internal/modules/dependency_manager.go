@@ -53,7 +53,7 @@ func (dm *DependencyManager) InstallAllDependencies() error {
 	colors.BLUE.Printf("📦 Installing %d dependencies from fer.ret...\n", len(dependencies))
 
 	for packagename, version := range dependencies {
-		if err := dm.installDependency(BuildModuleSpec(packagename, version)); err != nil {
+		if err := dm.installDependency(BuildModuleSpec(packagename, version), true); err != nil {
 			colors.RED.Printf("❌ Failed to install %s: %v\n", packagename, err)
 		}
 	}
@@ -65,7 +65,7 @@ func (dm *DependencyManager) InstallAllDependencies() error {
 
 func (dm *DependencyManager) InstallDependency(packagename string) error {
 	// Implementation for installing a specific dependency
-	err := dm.installDependency(packagename)
+	err := dm.installDependency(packagename, true)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (dm *DependencyManager) InstallDependency(packagename string) error {
 }
 
 func (dm *DependencyManager) Save() error {
-		// save lockfile
+	// save lockfile
 	if err := dm.lockfile.Save(); err != nil {
 		colors.RED.Printf("❌ Failed to save lockfile: %v\n", err)
 		return err
@@ -89,9 +89,9 @@ func (dm *DependencyManager) Save() error {
 	return nil
 }
 
-func (dm *DependencyManager) installDependency(packagename string) error {
+func (dm *DependencyManager) installDependency(packagename string, isDirect bool) error {
 	// Implementation for installing a single dependency
-	
+
 	host, user, repo, version, err := SplitRepo(packagename)
 	if err != nil {
 		return err
@@ -112,17 +112,18 @@ func (dm *DependencyManager) installDependency(packagename string) error {
 	}
 
 	if !isInstalled {
-		dm.lockfile.SetDependency(host, user, repo, actualVersion, true, []string{}, []string{})
 		colors.GREEN.Printf("✅ Successfully installed %s/%s/%s@%s\n", host, user, repo, actualVersion)
 	}
-	
+
 	colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
-	
+
+	dm.lockfile.SetNewDependency(host, user, repo, actualVersion, isDirect)
+
 	err = dm.installTransitiveDependencies(host, user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -140,6 +141,10 @@ func (dm *DependencyManager) installTransitiveDependencies(host, user, repo, ver
 		pkg := BuildModuleSpec(packageURL, pkgVersion)
 		parent := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
 
+		// update parent lockfile
+		dm.lockfile.AddIndirectDependency(parent, pkg)
+		dm.lockfile.AddUsedBy(parent, pkg)
+
 		// self reference will cause infinite loop.
 		if pkg == parent {
 			colors.YELLOW.Printf("⚠️  Skipping self-referential transitive dependency: %s\n", pkg)
@@ -147,7 +152,7 @@ func (dm *DependencyManager) installTransitiveDependencies(host, user, repo, ver
 		}
 
 		colors.LIGHT_GREEN.Printf("📦 Installing transitive dependency: %s\n", pkg)
-		if err := dm.InstallDependency(pkg); err != nil {
+		if err := dm.installDependency(pkg, false); err != nil {
 			return err
 		}
 	}

@@ -74,7 +74,7 @@ func findMatchingTag(tags []string, requestedVersion string) string {
 
 	// If no exact match, try alternative format
 	var alternativeVersion string
-	if after, ok :=strings.CutPrefix(requestedVersion, "v"); ok  {
+	if after, ok := strings.CutPrefix(requestedVersion, "v"); ok {
 		// If requested version has "v", try without "v"
 		alternativeVersion = after
 	} else {

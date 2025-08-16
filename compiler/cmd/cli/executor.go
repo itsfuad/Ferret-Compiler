@@ -80,7 +80,6 @@ func HandleGetCommand(packageName string) {
 		os.Exit(1)
 	}
 
-
 	if packageName == "" {
 		// No module specified, install all dependencies from fer.ret
 		colors.BLUE.Println("📦 No module specified. Installing all dependencies from fer.ret...")
