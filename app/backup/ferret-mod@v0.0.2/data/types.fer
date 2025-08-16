@@ -1,0 +1,5 @@
+type BigInt i64;
+
+type BigFloat f64;
+
+let typeName = "aaa";

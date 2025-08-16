@@ -1,0 +1,8 @@
+import "lib-mod/data/mods/constants";
+import "lib-mod/data/types";
+
+let name = types::typeName;
+
+const r: types::BigInt = 10 as types::BigInt; // radius as BigInt
+
+let radius = constants::PI * (r * r) as types::BigFloat;
