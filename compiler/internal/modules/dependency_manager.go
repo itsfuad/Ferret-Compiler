@@ -15,6 +15,13 @@ type DependencyManager struct {
 	configfile  *config.ProjectConfig
 }
 
+type ModuleUpdateInfo struct {
+	Name           string
+	CurrentVersion string
+	LatestVersion  string
+	IsModuleCached bool
+}
+
 // NewDependencyManager creates a new dependency manager for the given project
 func NewDependencyManager(projectRoot string) (*DependencyManager, error) {
 
@@ -79,8 +86,7 @@ func (dm *DependencyManager) RemoveDependency(packageName string) error {
 	// Must present in fer.ret
 	version, ok := dm.configfile.Dependencies.Modules[packageName]
 	if !ok {
-		colors.YELLOW.Printf("⚠️  Dependency %s is not listed in current project config file\n", packageName)
-		return nil
+		return fmt.Errorf("⚠️  dependency %s is not listed in fer.ret", packageName)
 	}
 
 	key := BuildModuleSpec(packageName, version)
@@ -167,6 +173,55 @@ func (dm *DependencyManager) cleanupEmptyDirectories() {
 	if err != nil {
 		colors.RED.Printf("❌ Failed to clean up empty directories: %v\n", err)
 	}
+}
+
+func (dm *DependencyManager) CheckForAvailableUpdates() []ModuleUpdateInfo {
+
+	var updates []ModuleUpdateInfo
+
+	// check if any direct dependency has a newer version available
+	for dep, version := range dm.configfile.Dependencies.Modules {
+		key := BuildModuleSpec(dep, version)
+		host, user, repo, _, err := SplitRepo(key)
+		if err != nil {
+			colors.RED.Printf("❌ Failed to parse dependency %s: %v\n", dep, err)
+			continue
+		}
+
+		_, latestVersion, err := CheckAndGetActualVersion(host, user, repo, "")
+		if err != nil {
+			colors.RED.Printf("❌ Failed to check for updates for %s: %v\n", dep, err)
+			continue
+		}
+
+		if hasUpdate(version, latestVersion) {
+			// check if has cache
+			updates = append(updates, ModuleUpdateInfo{
+				Name:           dep,
+				CurrentVersion: version,
+				LatestVersion:  latestVersion,
+				IsModuleCached: IsModuleCached(dm.configfile.Cache.Path, dep, latestVersion),
+			})
+		}
+	}
+
+	if len(updates) > 0 {
+		colors.YELLOW.Printf("⚠️  Found updates for the following modules:\n")
+		for _, update := range updates {
+			colors.YELLOW.Printf("📦 %s: %s -> %s%s\n", update.Name, update.CurrentVersion, update.LatestVersion, getCacheStatus(update.IsModuleCached))
+		}
+	} else {
+		colors.GREEN.Println("✅ All up to date")
+	}
+
+	return updates
+}
+
+func getCacheStatus(isCached bool) string {
+	if isCached {
+		return " (cached)"
+	}
+	return ""
 }
 
 func installDependency(dm *DependencyManager, packagename string, isDirect bool) error {

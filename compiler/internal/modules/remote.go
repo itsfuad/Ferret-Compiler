@@ -284,10 +284,8 @@ func extractFile(file *zip.File, targetPath string) error {
 
 // IsModuleCached checks if a module is already cached
 func IsModuleCached(cachePath, url, version string) bool {
-	fmt.Printf("Checking if package %s@%s is cached...\n", url, version)
 	normalizedVersion := NormalizeVersion(version)
 	moduleDir := filepath.Join(cachePath, BuildModuleSpec(url, normalizedVersion))
-	fmt.Printf("Module directory: %s\n", moduleDir)
 	info, err := os.Stat(moduleDir)
 	return err == nil && info.IsDir()
 }

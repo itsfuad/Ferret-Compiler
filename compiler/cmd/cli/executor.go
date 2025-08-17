@@ -115,6 +115,19 @@ func HandleRemoveCommand(packageName string) {
 	}
 }
 
+func HandleSniffCommand() {
+	colors.BLUE.Println("🔍 Sniffing for module updates...")
+	projectRoot := getRoot()
+
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	dm.CheckForAvailableUpdates()
+}
+
 func getRoot() string {
 	cwd, err := os.Getwd()
 	if err != nil {
