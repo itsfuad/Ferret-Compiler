@@ -61,3 +61,10 @@ func BuildModuleSpec(repoName, version string) string {
 	}
 	return repoName
 }
+
+func hasUpdate(current, latest string) bool {
+	current = NormalizeVersion(current)
+	latest = NormalizeVersion(latest)
+
+	return current != latest
+}

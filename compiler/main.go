@@ -40,6 +40,11 @@ func main() {
 		return
 	}
 
+	if args.SniffCommand {
+		cli.HandleSniffCommand()
+		return
+	}
+
 	// Handle invalid commands
 	if args.InvalidCommand != "" {
 		colors.RED.Printf("❌ Invalid command: %q\n", args.InvalidCommand)
