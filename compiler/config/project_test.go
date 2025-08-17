@@ -225,7 +225,7 @@ func setupTestProjectStructure(t *testing.T) string {
 func validateFindProjectRoot(t *testing.T, entryFile, wantRoot string, wantErr bool) {
 	t.Helper()
 
-	got, err := FindProjectRoot(entryFile)
+	got, err := GetProjectRoot(entryFile)
 	if wantErr {
 		if err == nil {
 			t.Errorf("FindProjectRoot() expected error but got none")

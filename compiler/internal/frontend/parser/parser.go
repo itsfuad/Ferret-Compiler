@@ -223,8 +223,6 @@ func (p *Parser) Parse() *ast.Program {
 	defer p.ctx.MarkParseFinish(p.fullPath)
 	defer p.ctx.PopProjectStack()
 
-	colors.CYAN.Printf("Parsing %q from project: %s\n", p.fullPath, config.Name)
-
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
