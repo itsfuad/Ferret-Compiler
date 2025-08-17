@@ -86,7 +86,8 @@ func (l *Lockfile) AddIndirectDependency(parent, child string) {
 		return // already present
 	}
 	entry.Dependencies = append(entry.Dependencies, child)
-	l.Dependencies[parent] = entry
+	l.Dependencies[parent] = entry // Update the parent entry
+	l.AddUsedBy(parent, child)
 }
 
 // AddUsedBy adds a parent to the UsedBy list for a dependency
@@ -99,7 +100,7 @@ func (l *Lockfile) AddUsedBy(parentKey, depKey string) {
 		return // already present
 	}
 	entry.UsedBy = append(entry.UsedBy, parentKey)
-	l.Dependencies[depKey] = entry
+	l.Dependencies[depKey] = entry // Update the dependency entry
 }
 
 // RemoveUsedBy removes a parent from the UsedBy list for a dependency
@@ -118,9 +119,9 @@ func (l *Lockfile) RemoveUsedBy(depKey, parentKey string) {
 	l.Dependencies[depKey] = entry
 }
 
-func (l *Lockfile) RemoveDependency(repo, version string) {
-	key := BuildModuleSpec(repo, version)
+func (l *Lockfile) RemoveDependency(key string) {
 	delete(l.Dependencies, key)
+	fmt.Printf("Removed dependency %s from lockfile\n", key)
 }
 
 func (l *Lockfile) GetDependency(repo, version string) (LockfileEntry, bool) {

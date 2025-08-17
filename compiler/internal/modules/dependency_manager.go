@@ -38,22 +38,22 @@ func NewDependencyManager(projectRoot string) (*DependencyManager, error) {
 // InstallAllDependencies is the internal implementation with migration control
 func (dm *DependencyManager) InstallAllDependencies() error {
 	// First, migrate fer.ret versions to normalized format if needed
-	err := dm.migrateFerRetVersions()
+	err := migrateFerRetVersions(dm)
 	if err != nil {
 		return fmt.Errorf("failed to migrate fer.ret versions: %w", err)
 	}
 
-	dependencies := dm.configfile.Dependencies.Modules
+	directDependencies := dm.configfile.Dependencies.Modules
 
-	if len(dependencies) == 0 {
-		colors.YELLOW.Println("⚠️ No dependencies found in fer.ret. Skipping installation.")
+	if len(directDependencies) == 0 {
+		colors.YELLOW.Println("⚠️  No dependencies found in config file. Skipping installation...")
 		return nil
 	}
 
-	colors.BLUE.Printf("📦 Installing %d dependencies from fer.ret...\n", len(dependencies))
+	colors.BLUE.Printf("📦 Installing %d dependencies from fer.ret...\n", len(directDependencies))
 
-	for packagename, version := range dependencies {
-		if err := dm.installDependency(BuildModuleSpec(packagename, version), true); err != nil {
+	for packagename, version := range directDependencies {
+		if err := installDependency(dm, BuildModuleSpec(packagename, version), true); err != nil {
 			colors.RED.Printf("❌ Failed to install %s: %v\n", packagename, err)
 		}
 	}
@@ -63,14 +63,69 @@ func (dm *DependencyManager) InstallAllDependencies() error {
 	return dm.Save()
 }
 
-func (dm *DependencyManager) InstallDirectDependency(packagename string) error {
+func (dm *DependencyManager) InstallDependency(packagename string) error {
 	// Implementation for installing a specific dependency
-	err := dm.installDependency(packagename, true)
+	err := installDependency(dm, packagename, true)
 	if err != nil {
 		return err
 	}
 
 	return dm.Save()
+}
+
+func (dm *DependencyManager) RemoveDependency(packageName string) error {
+
+	// If a dependency has no used by references, it can be safely removed
+	// Must present in fer.ret
+	version, ok := dm.configfile.Dependencies.Modules[packageName]
+	if !ok {
+		colors.YELLOW.Printf("⚠️  Dependency %s is not listed in current project config file\n", packageName)
+		return nil
+	}
+
+	key := BuildModuleSpec(packageName, version)
+
+	entry, exists := dm.lockfile.Dependencies[key]
+	if !exists {
+		return fmt.Errorf("⚠️  dependency %s is not listed in lockfile", packageName)
+	}
+
+	// must be direct
+	if !entry.Direct {
+		return fmt.Errorf("⚠️  dependency %s is not a direct dependency", packageName)
+	}
+
+	if len(entry.UsedBy) > 0 {
+		return fmt.Errorf("⚠️  dependency %s is still in use by other modules and cannot be removed", packageName)
+	}
+
+	delete(dm.configfile.Dependencies.Modules, packageName)
+
+	cachesToDelete := []string{key}
+
+	// remove it's dependencies from the lockfile
+	if len(entry.Dependencies) > 0 {
+		// remove its name from that deps, used by
+		for _, dep := range entry.Dependencies {
+			dm.lockfile.RemoveUsedBy(dep, key)
+			if len(dm.lockfile.Dependencies[dep].UsedBy) == 0 {
+				cachesToDelete = append(cachesToDelete, dep)
+			}
+		}
+	}
+
+	for _, cache := range cachesToDelete {
+		dm.lockfile.RemoveDependency(cache)
+		// delete cache
+		cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, cache)
+		if err := os.RemoveAll(cachePath); err != nil {
+			return fmt.Errorf("❌ failed to delete cache for %s: %v", cache, err)
+		}
+	}
+
+	dm.Save()
+
+	return nil
 }
 
 func (dm *DependencyManager) Save() error {
@@ -89,7 +144,7 @@ func (dm *DependencyManager) Save() error {
 	return nil
 }
 
-func (dm *DependencyManager) installDependency(packagename string, isDirect bool) error {
+func installDependency(dm *DependencyManager, packagename string, isDirect bool) error {
 	// Implementation for installing a single dependency
 
 	host, user, repo, version, err := SplitRepo(packagename)
@@ -106,7 +161,7 @@ func (dm *DependencyManager) installDependency(packagename string, isDirect bool
 		os.Exit(1)
 	}
 
-	isInstalled, err := dm.downloadIfNotCached(host, user, repo, actualVersion)
+	isInstalled, err := downloadIfNotCached(dm, host, user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
@@ -118,11 +173,13 @@ func (dm *DependencyManager) installDependency(packagename string, isDirect bool
 	colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
 
 	if isDirect {
+		// add to config file
 		dm.configfile.Dependencies.Modules[fmt.Sprintf("%s/%s/%s", host, user, repo)] = actualVersion
 	}
+
 	dm.lockfile.SetNewDependency(host, user, repo, actualVersion, isDirect)
 
-	err = dm.installTransitiveDependencies(host, user, repo, actualVersion)
+	err = installTransitiveDependencies(dm, host, user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
@@ -130,24 +187,22 @@ func (dm *DependencyManager) installDependency(packagename string, isDirect bool
 	return nil
 }
 
-func (dm *DependencyManager) installTransitiveDependencies(host, user, repo, version string) error {
+func installTransitiveDependencies(dm *DependencyManager, host, user, repo, version string) error {
 
 	// read the currently installed package's config file
-	configFilePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, host, user, BuildModuleSpec(repo, version))
-	installedConfig, err := config.LoadProjectConfig(configFilePath)
+	repoPath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, host, user, BuildModuleSpec(repo, version))
+	parent := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
+
+	indirectDependencies, err := getTrasitiveList(repoPath)
 	if err != nil {
 		return err
 	}
 
 	// install each transitive dependency
-	for packageURL, pkgVersion := range installedConfig.Dependencies.Modules {
-		pkg := BuildModuleSpec(packageURL, pkgVersion)
-		parent := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
-
+	for _, pkg := range indirectDependencies {
+		colors.LIGHT_GREEN.Printf("📦 Found transitive dependency: %s\n", pkg)
 		// update parent lockfile
 		dm.lockfile.AddIndirectDependency(parent, pkg)
-		dm.lockfile.AddUsedBy(parent, pkg)
-
 		// self reference will cause infinite loop.
 		if pkg == parent {
 			colors.YELLOW.Printf("⚠️  Skipping self-referential transitive dependency: %s\n", pkg)
@@ -155,7 +210,7 @@ func (dm *DependencyManager) installTransitiveDependencies(host, user, repo, ver
 		}
 
 		colors.LIGHT_GREEN.Printf("📦 Installing transitive dependency: %s\n", pkg)
-		if err := dm.installDependency(pkg, false); err != nil {
+		if err := installDependency(dm, pkg, false); err != nil {
 			return err
 		}
 	}
@@ -163,8 +218,36 @@ func (dm *DependencyManager) installTransitiveDependencies(host, user, repo, ver
 	return nil
 }
 
+func getTrasitiveList(repoPath string) ([]string, error) {
+
+	var indirectDependencies []string
+
+	// walk all folders, for all fer.ret files found, install their dependencies
+	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		// if has a fer.ret file (os.Stat)
+		if _, err := os.Stat(filepath.Join(path, "fer.ret")); err == nil {
+			// read this file
+			config, err := config.LoadProjectConfig(path)
+			if err != nil {
+				return err
+			}
+
+			// install each transitive dependency
+			for dep, version := range config.Dependencies.Modules {
+				indirectDependencies = append(indirectDependencies, fmt.Sprintf("%s@%s", dep, version))
+			}
+		}
+		return nil
+	})
+
+	return indirectDependencies, err
+}
+
 // ensureModuleCached ensures the module is cached, downloading if necessary
-func (dm *DependencyManager) downloadIfNotCached(host, user, repo, version string) (bool, error) {
+func downloadIfNotCached(dm *DependencyManager, host, user, repo, version string) (bool, error) {
 	if !IsModuleCached(filepath.Join(dm.projectRoot, dm.configfile.Cache.Path), filepath.Join(host, user, repo), version) {
 		err := DownloadRemoteModule(host, user, repo, version, filepath.Join(dm.projectRoot, dm.configfile.Cache.Path))
 		if err != nil {
@@ -175,7 +258,7 @@ func (dm *DependencyManager) downloadIfNotCached(host, user, repo, version strin
 }
 
 // migrateFerRetVersions is the internal migration function that doesn't trigger reinstall
-func (dm *DependencyManager) migrateFerRetVersions() error {
+func migrateFerRetVersions(dm *DependencyManager) error {
 	colors.BLUE.Println("🔄 Checking fer.ret for version format migration...")
 
 	dependencies := dm.configfile.Dependencies.Modules
