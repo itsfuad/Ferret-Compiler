@@ -47,7 +47,7 @@ func TestSplitRepo(t *testing.T) {
 			wantOwner:    "owner",
 			wantRepo:     "repo",
 			wantVersion:  "v1.0.0",
-			expectingErr: false,
+			expectingErr: true,
 		},
 		{
 			input:        "bitbucket.com/owner/repo",
