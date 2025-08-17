@@ -121,7 +121,6 @@ func (l *Lockfile) RemoveUsedBy(depKey, parentKey string) {
 
 func (l *Lockfile) RemoveDependency(key string) {
 	delete(l.Dependencies, key)
-	fmt.Printf("Removed dependency %s from lockfile\n", key)
 }
 
 func (l *Lockfile) GetDependency(repo, version string) (LockfileEntry, bool) {

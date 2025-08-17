@@ -320,33 +320,36 @@ func IsProjectRoot(dir string) bool {
 	return err == nil
 }
 
-func GetProjectRoot(moduleFullPath string) (string, error) {
+func GetProjectRoot(filePath string) (string, error) {
 
-	moduleFullPath, err := filepath.Abs(moduleFullPath)
+	filePath, err := filepath.Abs(filePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("❌ failed to get absolute path of entry: %w", err)
 	}
 
-	dir := filepath.Dir(moduleFullPath)
+	dir := filepath.Dir(filePath)
 
 	// Walk up the directory tree until we find a fer.ret file
 	for {
 		configPath := filepath.Join(dir, constants.CONFIG_FILE)
-		if _, err := os.Stat(filepath.FromSlash(configPath)); err == nil {
-			return filepath.ToSlash(dir), nil // Found the project root
+		// Check if fer.ret exists in this directory
+		if _, err := os.Stat(configPath); err == nil {
+			// Found the project root
+			return filepath.ToSlash(dir), nil
 		}
 
 		// Move up to parent directory
 		parent := filepath.Dir(dir)
 
-		if parent == dir { // Stop if we can't go up further (reached filesystem root)
+		// Stop if we can't go up further (reached filesystem root)
+		if parent == dir {
 			break
 		}
 
 		dir = parent
 	}
 
-	return "", fmt.Errorf("project root not found")
+	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", constants.CONFIG_FILE, dir)
 }
 
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
@@ -456,36 +459,4 @@ func parseNeighborSection(tomlData toml.TOMLData, config *ProjectConfig) {
 			}
 		}
 	}
-}
-
-func FindProjectRoot(filePath string) (string, error) {
-
-	filePath, err := filepath.Abs(filePath)
-	if err != nil {
-		return "", fmt.Errorf("❌ failed to get absolute path of entry: %w", err)
-	}
-
-	dir := filepath.Dir(filePath)
-
-	// Walk up the directory tree until we find a fer.ret file
-	for {
-		configPath := filepath.Join(dir, constants.CONFIG_FILE)
-		// Check if fer.ret exists in this directory
-		if _, err := os.Stat(configPath); err == nil {
-			// Found the project root
-			return filepath.ToSlash(dir), nil
-		}
-
-		// Move up to parent directory
-		parent := filepath.Dir(dir)
-
-		// Stop if we can't go up further (reached filesystem root)
-		if parent == dir {
-			break
-		}
-
-		dir = parent
-	}
-
-	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", constants.CONFIG_FILE, dir)
 }

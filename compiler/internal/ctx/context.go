@@ -187,8 +187,6 @@ func (c *CompilerContext) PushProjectStack(projectConfig *config.ProjectConfig) 
 		c.ProjectStack = make([]*config.ProjectConfig, 0)
 	}
 
-	colors.BRIGHT_GREEN.Printf("Pushing project %q to stack\n", projectConfig.Name)
-
 	c.ProjectStack = append(c.ProjectStack, projectConfig)
 }
 
@@ -198,8 +196,6 @@ func (c *CompilerContext) PopProjectStack() *config.ProjectConfig {
 	}
 	projectConfig := c.PeekProjectConfigStack()
 	c.ProjectStack = c.ProjectStack[:len(c.ProjectStack)-1]
-
-	colors.BRIGHT_RED.Printf("Popping project %q from stack, remaining projects: %d\n", projectConfig.Name, len(c.ProjectStack))
 
 	return projectConfig
 }

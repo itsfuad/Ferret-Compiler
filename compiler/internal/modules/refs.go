@@ -16,6 +16,9 @@ type Ref struct {
 }
 
 func parsePacketLength(body []byte) (int, error) {
+	if len(body) < 4 {
+		return 0, fmt.Errorf("input too short: need at least 4 bytes, got %d", len(body))
+	}
 	lengthHex := string(body[:4])
 	lengthBytes, err := hex.DecodeString(lengthHex)
 	if err != nil {

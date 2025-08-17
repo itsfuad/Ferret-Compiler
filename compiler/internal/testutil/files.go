@@ -11,10 +11,14 @@ import (
 func CreateTempProject(t *testing.T) string {
 	tempDir := t.TempDir()
 
-	// Create cache directory structure
-	cacheDir := filepath.Join(tempDir, constants.CACHE_DIR)
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		t.Fatalf("Failed to create cache directory: %v", err)
+	// skip if fer.ret file already exists
+	if _, err := os.Stat(filepath.Join(tempDir, constants.CONFIG_FILE)); err == nil {
+		return tempDir
+	}
+
+	// create a fer.ret file
+	if err := os.WriteFile(filepath.Join(tempDir, constants.CONFIG_FILE), []byte("name = \"demo-apps\""), 0644); err != nil {
+		t.Fatalf("Failed to create fer.ret file: %v", err)
 	}
 
 	return tempDir
