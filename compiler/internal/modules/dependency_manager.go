@@ -124,6 +124,7 @@ func (dm *DependencyManager) RemoveDependency(packageName string) error {
 	}
 
 	dm.Save()
+	dm.cleanupEmptyDirectories()
 
 	return nil
 }
@@ -142,6 +143,30 @@ func (dm *DependencyManager) Save() error {
 	}
 
 	return nil
+}
+
+func (dm *DependencyManager) cleanupEmptyDirectories() {
+	// walk all dir and clean up empty ones
+	err := filepath.Walk(filepath.Join(dm.projectRoot, dm.configfile.Cache.Path), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			// check if directory is empty
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				return err
+			}
+			if len(entries) == 0 {
+				colors.YELLOW.Printf("🗑️  Removing empty directory: %s\n", path)
+				return os.RemoveAll(path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		colors.RED.Printf("❌ Failed to clean up empty directories: %v\n", err)
+	}
 }
 
 func installDependency(dm *DependencyManager, packagename string, isDirect bool) error {
@@ -201,8 +226,6 @@ func installTransitiveDependencies(dm *DependencyManager, host, user, repo, vers
 	// install each transitive dependency
 	for _, pkg := range indirectDependencies {
 		colors.LIGHT_GREEN.Printf("📦 Found transitive dependency: %s\n", pkg)
-		// update parent lockfile
-		dm.lockfile.AddIndirectDependency(parent, pkg)
 		// self reference will cause infinite loop.
 		if pkg == parent {
 			colors.YELLOW.Printf("⚠️  Skipping self-referential transitive dependency: %s\n", pkg)
@@ -213,6 +236,9 @@ func installTransitiveDependencies(dm *DependencyManager, host, user, repo, vers
 		if err := installDependency(dm, pkg, false); err != nil {
 			return err
 		}
+
+		// update parent lockfile AFTER the dependency is installed
+		dm.lockfile.AddIndirectDependency(parent, pkg)
 	}
 
 	return nil
