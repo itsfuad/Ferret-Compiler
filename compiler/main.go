@@ -35,6 +35,11 @@ func main() {
 		return
 	}
 
+	if args.RemoveCommand {
+		cli.HandleRemoveCommand(args.RemovePackage)
+		return
+	}
+
 	// Handle invalid commands
 	if args.InvalidCommand != "" {
 		colors.RED.Printf("❌ Invalid command: %q\n", args.InvalidCommand)

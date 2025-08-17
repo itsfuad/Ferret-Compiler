@@ -91,7 +91,24 @@ func HandleGetCommand(packageName string) {
 		return
 	}
 
-	err = dm.InstallDirectDependency(packageName)
+	err = dm.InstallDependency(packageName)
+	if err != nil {
+		colors.RED.Printf(err.Error())
+		os.Exit(1)
+	}
+}
+
+func HandleRemoveCommand(packageName string) {
+	projectRoot := getRoot()
+
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	err = dm.RemoveDependency(packageName)
 	if err != nil {
 		colors.RED.Printf(err.Error())
 		os.Exit(1)

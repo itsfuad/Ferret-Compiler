@@ -133,6 +133,20 @@ func CreateDefaultProjectConfig(projectName string) error {
 
 	configPath := filepath.Join(cwd, constants.CONFIG_FILE)
 
+	// if already exist, ask for overwrite
+	if _, err := os.Stat(configPath); err == nil {
+		overwrite, err := ReadBoolFromPrompt("⚠️  Config file already exists. Overwrite? (Y/N, default: N): ", false)
+		if err != nil {
+			colors.RED.Println(err)
+			os.Exit(1)
+		}
+		if !overwrite {
+			colors.YELLOW.Println("❌ Aborted project creation.")
+			return nil
+		}
+		colors.YELLOW.Println("⚠️  This will overwrite the existing config file")
+	}
+
 	// Generate config using TOML data structure for consistency
 	configData := generateDefaultConfigData(projectName)
 
@@ -140,7 +154,25 @@ func CreateDefaultProjectConfig(projectName string) error {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	// create a .gitignore file
+	gitignorePath := filepath.Join(cwd, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte(".ferret\nferret.lock"), 0644); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+
 	colors.GREEN.Printf("📁 Created %s successfully!\n", constants.CONFIG_FILE)
+
+	// remove old lockfiles and cache
+	if err := os.RemoveAll(filepath.Join(cwd, ".ferret")); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+	if err := os.RemoveAll(filepath.Join(cwd, "ferret.lock")); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+
 	return nil
 }
 
@@ -174,9 +206,9 @@ func ReadBoolFromPrompt(prompt string, defaultValue bool) (bool, error) {
 		}
 
 		switch strings.ToLower(value) {
-		case "true", "yes", "y":
+		case "y":
 			return true, nil
-		case "false", "no", "n":
+		case "n":
 			return false, nil
 		default:
 			fmt.Printf("Invalid input %q. Please enter true/false, yes/no, or y/n: ", value)
@@ -203,19 +235,19 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 		os.Exit(1)
 	}
 
-	allowShare, err := ReadBoolFromPrompt("Allow sharing of this project with other projects? (true/false, default: false): ", false)
+	allowShare, err := ReadBoolFromPrompt("Allow sharing of this project with other projects? (Y/N, default: N): ", false)
 	if err != nil {
 		fmt.Printf("❌ Error reading share setting: %v\n", err)
 		os.Exit(1)
 	}
 
-	allowRemoteImport, err := ReadBoolFromPrompt("Allow remote imports? [e.g. github, gitlab] (true/false, default: false): ", false)
+	allowRemoteImport, err := ReadBoolFromPrompt("Allow remote imports? [e.g. github, gitlab] (Y/N, default: N): ", false)
 	if err != nil {
 		fmt.Printf("❌ Error reading remote import setting: %v\n", err)
 		os.Exit(1)
 	}
 
-	allowNeighborImport, err := ReadBoolFromPrompt("Allow neighbor imports from other projects? (true/false, default: false): ", false)
+	allowNeighborImport, err := ReadBoolFromPrompt("Allow neighbor imports from other projects? (Y/N, default: N): ", false)
 	if err != nil {
 		fmt.Printf("❌ Error reading neighbor import setting: %v\n", err)
 		os.Exit(1)
