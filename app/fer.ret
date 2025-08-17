@@ -18,4 +18,3 @@ allow-neighbor-import = true
 [neighbors]
 
 [dependencies]
-github.com/itsfuad/ferret-mod = "v0.0.4"
