@@ -1,6 +1,0 @@
-import "lib-mod/data/types";
-
-const PI: types::BigFloat = 3.14159265358979323846 as types::BigFloat;
-const E: types::BigFloat = 2.71828182845904523536 as types::BigFloat; // explitic cast to BigFloat for testing
-
-const MAX_INT: types::BigInt = 9223372036854775807 as types::BigInt; // maximum value for i64

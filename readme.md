@@ -380,9 +380,9 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Update dependency
 - [x] Delete dependencies
 - [x] Check for updates
-- [ ] Auto update
-- [ ] Detect orphans
-- [ ] Delete orphans
+- [x] Auto update
+- [x] Detect orphans
+- [x] Delete orphans
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
