@@ -81,62 +81,153 @@ func (dm *DependencyManager) InstallDependency(packagename string) error {
 }
 
 func (dm *DependencyManager) RemoveDependency(packageName string) error {
-
 	if packageName == "" {
 		return fmt.Errorf("⚠️  package name is required")
 	}
 
-	// If a dependency has no used by references, it can be safely removed
-	// Must present in fer.ret
-	version, ok := dm.configfile.Dependencies.Packages[packageName]
-	if !ok {
-		return fmt.Errorf("⚠️  dependency %s is not listed in fer.ret", packageName)
+	// Find package in fer.ret and lockfile
+	packageInfo, err := dm.findPackageForRemoval(packageName)
+	if err != nil {
+		return err
 	}
 
-	key := BuildPackageSpec(packageName, version)
-
-	entry, exists := dm.lockfile.Dependencies[key]
-	if !exists {
-		return fmt.Errorf("⚠️  dependency %s is not listed in lockfile", packageName)
-	}
-
-	// must be direct
-	if !entry.Direct {
-		return fmt.Errorf("⚠️  dependency %s is not a direct dependency", packageName)
-	}
-
-	if len(entry.UsedBy) > 0 {
-		return fmt.Errorf("⚠️  dependency %s is still in use by other packages and cannot be removed", packageName)
-	}
-
+	// Remove from fer.ret
 	delete(dm.configfile.Dependencies.Packages, packageName)
 
-	cachesToDelete := []string{key}
-
-	// remove it's dependencies from the lockfile
-	if len(entry.Dependencies) > 0 {
-		// remove its name from that deps, used by
-		for _, dep := range entry.Dependencies {
-			dm.lockfile.RemoveUsedBy(dep, key)
-			if len(dm.lockfile.Dependencies[dep].UsedBy) == 0 {
-				cachesToDelete = append(cachesToDelete, dep)
-			}
-		}
+	// Handle the removal based on usage
+	if len(packageInfo.lockfileEntry.UsedBy) > 0 {
+		return dm.convertToIndirect(packageName, packageInfo.lockfileKey)
 	}
 
-	for _, cache := range cachesToDelete {
-		dm.lockfile.RemoveDependency(cache)
-		// delete cache
-		cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, cache)
-		if err := os.RemoveAll(cachePath); err != nil {
-			return fmt.Errorf("❌ failed to delete cache for %s: %v", cache, err)
+	return dm.completelyRemovePackage(packageName, packageInfo)
+}
+
+// packageRemovalInfo holds information about a package being removed
+type packageRemovalInfo struct {
+	lockfileKey   string
+	lockfileEntry LockfileEntry
+}
+
+// findPackageForRemoval locates package in fer.ret and lockfile, returns error for invalid states
+func (dm *DependencyManager) findPackageForRemoval(packageName string) (*packageRemovalInfo, error) {
+	version, inFerRet := dm.configfile.Dependencies.Packages[packageName]
+
+	var lockfileKey string
+	var lockfileEntry LockfileEntry
+	var inLockfile bool
+
+	if inFerRet {
+		lockfileKey = BuildPackageSpec(packageName, version)
+		lockfileEntry, inLockfile = dm.lockfile.Dependencies[lockfileKey]
+	} else {
+		lockfileKey, lockfileEntry, inLockfile = dm.findPackageInLockfile(packageName)
+	}
+
+	return dm.validatePackageRemovalState(packageName, inFerRet, inLockfile, lockfileKey, lockfileEntry)
+}
+
+// findPackageInLockfile searches for package in lockfile with any version
+func (dm *DependencyManager) findPackageInLockfile(packageName string) (string, LockfileEntry, bool) {
+	for key, entry := range dm.lockfile.Dependencies {
+		if strings.HasPrefix(key, packageName+"@") {
+			return key, entry, true
 		}
+	}
+	return "", LockfileEntry{}, false
+}
+
+// validatePackageRemovalState checks package state and returns appropriate errors
+func (dm *DependencyManager) validatePackageRemovalState(packageName string, inFerRet, inLockfile bool, lockfileKey string, lockfileEntry LockfileEntry) (*packageRemovalInfo, error) {
+	if !inFerRet && !inLockfile {
+		return nil, fmt.Errorf("📦 Package %s is not installed", packageName)
+	}
+
+	if !inFerRet && inLockfile {
+		return nil, fmt.Errorf("📦 Package %s is not a direct dependency", packageName)
+	}
+
+	if inFerRet && !inLockfile {
+		delete(dm.configfile.Dependencies.Packages, packageName)
+		dm.Save()
+		return nil, fmt.Errorf("⚠️  Package %s was in fer.ret but not in lockfile, removed from fer.ret", packageName)
+	}
+
+	return &packageRemovalInfo{
+		lockfileKey:   lockfileKey,
+		lockfileEntry: lockfileEntry,
+	}, nil
+}
+
+// convertToIndirect marks package as indirect instead of removing it
+func (dm *DependencyManager) convertToIndirect(packageName, lockfileKey string) error {
+	dm.lockfile.SetDirect(lockfileKey, false)
+	dm.Save()
+	colors.GREEN.Printf("✅ Successfully removed %s as direct dependency (kept as indirect)\n", packageName)
+	return nil
+}
+
+// completelyRemovePackage removes package and its unused transitive dependencies
+func (dm *DependencyManager) completelyRemovePackage(packageName string, info *packageRemovalInfo) error {
+	cachesToDelete := dm.findCachesToDelete(info)
+
+	colors.GREEN.Printf("🗑️  Removing package %s\n", packageName)
+
+	if err := dm.deleteCachesAndShowMessages(packageName, info.lockfileKey, cachesToDelete); err != nil {
+		return err
 	}
 
 	dm.Save()
 	dm.cleanupEmptyDirectories()
-
 	return nil
+}
+
+// findCachesToDelete identifies all caches that should be deleted
+func (dm *DependencyManager) findCachesToDelete(info *packageRemovalInfo) []string {
+	cachesToDelete := []string{info.lockfileKey}
+
+	for _, dep := range info.lockfileEntry.Dependencies {
+		dm.lockfile.RemoveUsedBy(dep, info.lockfileKey)
+		if len(dm.lockfile.Dependencies[dep].UsedBy) == 0 {
+			cachesToDelete = append(cachesToDelete, dep)
+		}
+	}
+
+	return cachesToDelete
+}
+
+// deleteCachesAndShowMessages removes caches and displays appropriate messages
+func (dm *DependencyManager) deleteCachesAndShowMessages(packageName, lockfileKey string, cachesToDelete []string) error {
+	for _, cache := range cachesToDelete {
+		dm.lockfile.RemoveDependency(cache)
+
+		if err := dm.deleteCacheDirectory(cache); err != nil {
+			return err
+		}
+
+		dm.showRemovalMessage(packageName, lockfileKey, cache)
+	}
+	return nil
+}
+
+// deleteCacheDirectory removes the physical cache directory
+func (dm *DependencyManager) deleteCacheDirectory(cache string) error {
+	cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, cache)
+	if err := os.RemoveAll(cachePath); err != nil {
+		return fmt.Errorf("❌ failed to delete cache for %s: %v", cache, err)
+	}
+	return nil
+}
+
+// showRemovalMessage displays appropriate message for removed package
+func (dm *DependencyManager) showRemovalMessage(packageName, lockfileKey, cache string) {
+	if cache == lockfileKey {
+		colors.GREEN.Printf("✅ Successfully removed %s\n", packageName)
+	} else {
+		parts := strings.Split(cache, "@")
+		if len(parts) > 0 {
+			colors.BLUE.Printf("🗑️  Also removed unused transitive dependency: %s\n", parts[0])
+		}
+	}
 }
 
 func (dm *DependencyManager) Save() error {
@@ -299,9 +390,17 @@ func (dm *DependencyManager) GetOrphans() map[string]bool {
 
 	orphanedPackages := make(map[string]bool)
 
+	// Find cached packages not in lockfile
 	for pkg := range cachedPackages {
 		if _, found := dm.lockfile.Dependencies[pkg]; !found {
 			orphanedPackages[pkg] = true
+		}
+	}
+
+	// Find lockfile entries that are not used by anything and not direct dependencies
+	for depKey, entry := range dm.lockfile.Dependencies {
+		if !entry.Direct && len(entry.UsedBy) == 0 {
+			orphanedPackages[depKey] = true
 		}
 	}
 
@@ -311,11 +410,27 @@ func (dm *DependencyManager) GetOrphans() map[string]bool {
 func (dm *DependencyManager) RemoveOrphanedPackages() error {
 	orphanedPackages := dm.GetOrphans()
 	for depKey := range orphanedPackages {
-		if err := os.RemoveAll(filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, depKey)); err != nil {
-			return fmt.Errorf("❌ Failed to remove orphaned package %s: %w", depKey, err)
+		// Remove from cache if it exists
+		cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, depKey)
+		if _, err := os.Stat(cachePath); err == nil {
+			if err := os.RemoveAll(cachePath); err != nil {
+				return fmt.Errorf("❌ Failed to remove orphaned package cache %s: %w", depKey, err)
+			}
+			colors.BLUE.Printf("🗑️  Removed orphaned package cache: %s\n", depKey)
 		}
-		colors.BLUE.Printf("🗑️  Removed orphaned package: %s\n", depKey)
+
+		// Remove from lockfile if it exists
+		if _, found := dm.lockfile.Dependencies[depKey]; found {
+			dm.lockfile.RemoveDependency(depKey)
+			colors.BLUE.Printf("🗑️  Removed orphaned lockfile entry: %s\n", depKey)
+		}
 	}
+
+	// Save lockfile after cleanup
+	if len(orphanedPackages) > 0 {
+		dm.Save()
+	}
+
 	return nil
 }
 
@@ -323,7 +438,6 @@ func (dm *DependencyManager) GetPackagesInCache() (map[string]bool, error) {
 	packageDir := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path)
 
 	if _, err := os.Stat(packageDir); err != nil {
-		fmt.Printf("❌ Cache directory %s does not exist: %v\n", packageDir, err)
 		// No package directory means no cached modules
 		return nil, nil
 	}
@@ -377,7 +491,6 @@ func handleCacheDirEntry(packageDir, path string, d os.DirEntry, err error, cach
 	return nil
 }
 
-
 func installDependency(dm *DependencyManager, packagename string, isDirect bool) error {
 	// Implementation for installing a single dependency
 
@@ -405,7 +518,6 @@ func installDependency(dm *DependencyManager, packagename string, isDirect bool)
 	} else {
 		colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
 	}
-
 
 	if isDirect {
 		// add to config file

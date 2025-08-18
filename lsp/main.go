@@ -298,7 +298,7 @@ func processDiagnostics(writer *bufio.Writer, uri string) {
 		return
 	}
 
-	projectRoot, err := config.FindProjectRoot(filePath)
+	projectRoot, err := config.GetProjectRoot(filePath)
 	if err != nil {
 		log.Println("Error finding project root:", err)
 		publishDiagnostics(writer, uri, []map[string]interface{}{})
