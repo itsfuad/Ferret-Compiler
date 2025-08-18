@@ -1,6 +1,6 @@
 package ast
 
-import "ferret/internal/source"
+import "compiler/internal/source"
 
 // BlockStmt represents a block of statements
 type Block struct {

@@ -1,15 +1,15 @@
 package resolver
 
 import (
-	"ferret/colors"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic"
-	"ferret/internal/semantic/analyzer"
-	"ferret/internal/semantic/stype"
-	"ferret/internal/symbol"
-	"ferret/internal/types"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/stype"
+	"compiler/internal/symbol"
+	"compiler/internal/types"
+	"compiler/report"
 	"fmt"
 )
 

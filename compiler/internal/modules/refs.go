@@ -16,6 +16,9 @@ type Ref struct {
 }
 
 func parsePacketLength(body []byte) (int, error) {
+	if len(body) < 4 {
+		return 0, fmt.Errorf("input too short: need at least 4 bytes, got %d", len(body))
+	}
 	lengthHex := string(body[:4])
 	lengthBytes, err := hex.DecodeString(lengthHex)
 	if err != nil {
@@ -46,8 +49,8 @@ func parseRefLine(line string) (Ref, bool) {
 	return Ref{Hash: hash, Name: refRest}, true
 }
 
-func FetchRefs(owner, repo string) ([]Ref, error) {
-	url := fmt.Sprintf("https://github.com/%s/%s.git/info/refs?service=git-upload-pack", owner, repo)
+func FetchRefs(host, owner, repo string) ([]Ref, error) {
+	url := fmt.Sprintf("https://%s/%s/%s.git/info/refs?service=git-upload-pack", host, owner, repo)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -98,33 +101,13 @@ func GetTagsFromRefs(refs []Ref) []string {
 	return tags
 }
 
-func ParseRepoInput(input string) (owner, repo, version string, err error) {
-	// input like "github.com/owner/repo@version" or "github.com/owner/repo"
-	input = strings.TrimPrefix(input, "github.com/")
-	atIndex := strings.Index(input, "@")
-
-	if atIndex >= 0 {
-		version = input[atIndex+1:]
-		input = input[:atIndex]
-	}
-
-	parts := strings.Split(input, "/")
-	if len(parts) != 2 {
-		err = fmt.Errorf("invalid input format, expected github.com/owner/repo[@version]")
-		return
-	}
-	owner = parts[0]
-	repo = parts[1]
-	return
-}
-
-func GetModule(input string) (string, error) {
-	owner, repo, version, err := ParseRepoInput(input)
+func GetModuleLatestVersion(input string) (string, error) {
+	host, owner, repo, version, err := SplitRepo(input)
 	if err != nil {
 		return "", err
 	}
 
-	refs, err := FetchRefs(owner, repo)
+	refs, err := FetchRefs(host, owner, repo)
 	if err != nil {
 		return "", fmt.Errorf("error fetching refs: %w", err)
 	}
@@ -136,7 +119,7 @@ func GetModule(input string) (string, error) {
 
 	sort.Strings(tags)
 
-	if version == "" {
+	if version == "" || version == "latest" {
 		// Return latest tag when no version specified
 		return tags[len(tags)-1], nil
 	}

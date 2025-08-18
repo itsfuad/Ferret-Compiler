@@ -2,16 +2,19 @@ package parser
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
-	"ferret/colors"
-	"ferret/internal/ctx"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/frontend/lexer"
-	"ferret/internal/source"
-	"ferret/internal/utils/fs"
-	"ferret/report"
+	"compiler/colors"
+	"compiler/config"
+	"compiler/internal/ctx"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/source"
+	"compiler/internal/utils/fs"
+	"compiler/report"
 )
 
 type Parser struct {
@@ -19,16 +22,26 @@ type Parser struct {
 	tokenNo    int
 	fullPath   string
 	importPath string
-	modulename string // module name derived from full path
+	alias      string
 	ctx        *ctx.CompilerContext
 	debug      bool // debug mode for additional logging
 }
 
 func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
-	return NewParserWithImportPath(filePath, "", ctxx, debug)
+
+	rel, err := filepath.Rel(ctxx.ProjectRootFullPath, filePath)
+	if err != nil {
+		return nil
+	}
+
+	rel = strings.TrimSuffix(rel, filepath.Ext(rel))
+	rel = filepath.Join(ctxx.ProjectConfig.Name, rel) // Prepend project name
+	importPath := filepath.ToSlash(rel)
+
+	return NewParserWithImportPath(filePath, importPath, ctxx, debug)
 }
 
-func NewParserWithImportPath(filePath string, explicitImportPath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
+func NewParserWithImportPath(filePath string, importPath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 
 	if ctxx == nil {
 		panic("Cannot create parser: Compiler context is nil")
@@ -43,25 +56,17 @@ func NewParserWithImportPath(filePath string, explicitImportPath string, ctxx *c
 		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
 	}
 
-	//relative path to the file
-	var importPath string
-	if explicitImportPath != "" {
-		importPath = explicitImportPath
-	} else {
-		importPath = ctxx.FullPathToImportPath(filePath)
-	}
-
-	modulename := ctxx.FullPathToModuleName(filePath)
+	alias := ctxx.FullPathToAlias(filePath)
 
 	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
 		tokens:     tokens,
 		tokenNo:    0,
-		ctx:        ctxx,
 		fullPath:   filePath,
 		importPath: importPath,
-		modulename: modulename,
+		alias:      alias,
+		ctx:        ctxx,
 		debug:      debug,
 	}
 }
@@ -205,10 +210,18 @@ func parseNode(p *Parser) ast.Node {
 func (p *Parser) Parse() *ast.Program {
 	var nodes []ast.Node
 
-	// Start tracking the entry point parsing
-	p.ctx.StartParsing(p.fullPath)
-	// Finish tracking the entry point parsing
-	defer p.ctx.FinishParsing(p.fullPath)
+	projectRoot, err := config.GetProjectRoot(p.fullPath)
+	if err != nil {
+		colors.RED.Println("❌ Error getting project root:", err)
+		os.Exit(1)
+	}
+
+	config, _ := config.LoadProjectConfig(projectRoot)
+
+	p.ctx.PushProjectStack(config)
+	p.ctx.MarkParseStart(p.fullPath)
+	defer p.ctx.MarkParseFinish(p.fullPath)
+	defer p.ctx.PopProjectStack()
 
 	for !p.isAtEnd() {
 		// Parse the statement
@@ -216,6 +229,7 @@ func (p *Parser) Parse() *ast.Program {
 		if node != nil {
 			nodes = append(nodes, node)
 		} else {
+			fmt.Printf("Failed to parse node at %s: %+v\n", p.fullPath, p.peek())
 			handleUnexpectedToken(p)
 			break
 		}
@@ -229,7 +243,7 @@ func (p *Parser) Parse() *ast.Program {
 		colors.BLUE.Printf("Parsed %q\n", p.fullPath)
 	}
 
-	if p.modulename == "" {
+	if p.alias == "" {
 		panic("Module name cannot be empty, please check the file path: " + p.fullPath)
 	}
 
@@ -237,13 +251,11 @@ func (p *Parser) Parse() *ast.Program {
 		Nodes:      nodes,
 		FullPath:   p.fullPath,
 		ImportPath: p.importPath,
-		Modulename: p.modulename,
+		Alias:      p.alias,
 		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 
-	// Add the module to the context
-	isBuiltin := p.ctx.IsBuiltinModuleFile(p.fullPath)
-	p.ctx.AddModule(p.importPath, program, isBuiltin)
+	p.ctx.AddModule(p.importPath, program)
 
 	return program
 }

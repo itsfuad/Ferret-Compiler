@@ -1,29 +1,55 @@
 package modules
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-const (
-	CACHE_DIR = ".ferret"
-	LOCK_FILE = "ferret.lock"
-	MAIN_FILE = "main.fer"
+func TestExtractRepoPathFromImport(t *testing.T) {
+	tests := []struct {
+		importPath string
+		want       string
+		wantErr    bool
+	}{
+		{"gitlab.com/owner/repo/folderA/folderB/file", "gitlab.com/owner/repo", false},
+		{"bitbucket.com/owner/repo", "bitbucket.com/owner/repo", false},
+		{"github.com/owner", "", true},
+		{"github.com", "", true},
+		{"", "", true},
+	}
 
-	TEST_MODULE = "github.com/itsfuad/ferret-mod/data/bigint"
-)
+	for _, tt := range tests {
+		got, err := ExtractRepoPathFromImport(tt.importPath)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("ExtractRepoPathFromImport(%q) error = %v, wantErr %v", tt.importPath, err, tt.wantErr)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("ExtractRepoPathFromImport(%q) = %q, want %q", tt.importPath, got, tt.want)
+		}
+	}
+}
 
-func TestResolveRemoteModuleMissingDependency(t *testing.T) {
-	tempDir := t.TempDir()
-	ferretPath := filepath.Join(tempDir, CONFIG_FILE)
-	os.WriteFile(ferretPath, []byte(`[dependencies]
-`), 0644)
-	lockfilePath := filepath.Join(tempDir, LOCK_FILE)
-	os.WriteFile(lockfilePath, []byte(`{"version": "1.0", "dependencies": {}, "generated_at": "now"}`), 0644)
-	importPath := TEST_MODULE
-	_, err := ResolveRemoteModule(importPath, tempDir, filepath.Join(tempDir, CACHE_DIR, "modules"), filepath.Join(tempDir, MAIN_FILE))
-	if err == nil || err.Error() == "" {
-		t.Errorf("Expected error for missing dependency, got nil")
+func TestExtractModuleFromImport(t *testing.T) {
+	tests := []struct {
+		importPath string
+		want       string
+		wantErr    bool
+	}{
+		{"github.com/owner/repo/folderA/folderB/file", "folderA/folderB/file", false},
+		{"github.com/owner/repo/folderA", "folderA", false},
+		{"github.com/owner/repo", "", true},
+		{"github.com/owner", "", true},
+		{"", "", true},
+	}
+
+	for _, tt := range tests {
+		got, err := ExtractModuleFromImport(tt.importPath)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("ExtractModuleFromImport(%q) error = %v, wantErr %v", tt.importPath, err, tt.wantErr)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("ExtractModuleFromImport(%q) = %q, want %q", tt.importPath, got, tt.want)
+		}
 	}
 }

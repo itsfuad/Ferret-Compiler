@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ferret/colors"
-	"ferret/internal/source"
+	"compiler/colors"
+	"compiler/internal/source"
 
-	//"ferret/internal/symboltable"
-	_strings "ferret/internal/utils/strings"
+	//"compiler/internal/symboltable"
+	_strings "compiler/internal/utils/strings"
 )
 
 type PROBLEM_TYPE string
@@ -351,7 +351,7 @@ func (r Reports) ShowStatus() {
 	totalProblemsString := ""
 
 	if warningCount > 0 {
-		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s) ", warningCount, _strings.Plural("warning", "warnings ", warningCount))
+		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s) ", warningCount, _strings.Plural("warning", "warnings", warningCount))
 		if probCount > 0 {
 			totalProblemsString += colors.ORANGE.Sprintf(", ")
 		}

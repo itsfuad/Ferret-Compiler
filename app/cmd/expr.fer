@@ -1,5 +1,6 @@
 
-import "app/cmd/types";
+import "demo-app/cmd/types";
+//import "demo-app/cmd/main";
 
 type Integer types::Int; // Integer is an alias for Int, which is an alias for i32
 

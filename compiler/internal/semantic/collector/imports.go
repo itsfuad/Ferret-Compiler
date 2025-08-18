@@ -1,11 +1,10 @@
 package collector
 
 import (
-	"ferret/colors"
-	"ferret/internal/frontend/ast"
-	"ferret/internal/modules"
-	"ferret/internal/semantic/analyzer"
-	"ferret/report"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/modules"
+	"compiler/internal/semantic/analyzer"
+	"compiler/report"
 
 	"fmt"
 )
@@ -17,8 +16,14 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 		}
 	}()
 
+	moduleKey := imp.ImportPath.Value
+
+	if moduleKey == "" {
+		return
+	}
+
 	// Get the current module
-	currentModule, err := collector.Ctx.GetModule(collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
+	currentModule, err := collector.Ctx.GetModule(collector.Program.ImportPath)
 	if err != nil {
 		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), "Failed to get current module for import validation", report.COLLECTOR_PHASE)
 		return
@@ -26,14 +31,6 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 
 	// Resolve the import path based on context
 	// For local imports within remote modules, convert to full GitHub path
-	moduleKey := modules.ResolveImportPath(imp.ImportPath.Value, collector.Program.FullPath, collector.Ctx.RemoteCachePath)
-	colors.BLUE.Sprintf("moduleKey: %s", moduleKey)
-
-	// ✅ SECURITY CHECK: Validate remote import permissions
-	if err := modules.CheckCanImportRemoteModules(collector.Ctx.ProjectRootFullPath, moduleKey); err != nil {
-		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), err.Error(), report.COLLECTOR_PHASE)
-		return
-	}
 
 	//module must be parses and stored already
 	module, err := collector.Ctx.GetModule(moduleKey)
@@ -43,7 +40,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	}
 
 	// Add import to current module's symbol table with validation
-	alias := imp.ModuleName
+	alias := imp.Alias
 	if err := currentModule.SymbolTable.AddImport(alias, moduleKey, module.SymbolTable); err != nil {
 		collector.Ctx.Reports.AddSemanticError(
 			collector.Program.FullPath,
@@ -52,10 +49,6 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 			report.COLLECTOR_PHASE,
 		)
 		return
-	}
-
-	if collector.Debug {
-		colors.GREEN.Printf("Added import %q with alias %q to module %q\n", moduleKey, alias, collector.Ctx.FullPathToImportPath(collector.Program.FullPath))
 	}
 
 	//if already analyzed don't analyze again

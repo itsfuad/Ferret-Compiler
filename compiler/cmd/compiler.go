@@ -8,17 +8,17 @@ import (
 	"strconv"
 	"strings"
 
-	"ferret/cmd/flags"
-	"ferret/colors"
-	"ferret/config"
-	"ferret/internal/ctx"
+	"compiler/cmd/flags"
+	"compiler/colors"
+	"compiler/config"
+	"compiler/internal/ctx"
 
-	"ferret/internal/frontend/parser"
+	"compiler/internal/frontend/parser"
 
-	"ferret/internal/semantic/analyzer"
-	"ferret/internal/semantic/collector"
-	"ferret/internal/semantic/resolver"
-	"ferret/internal/semantic/typecheck"
+	"compiler/internal/semantic/analyzer"
+	"compiler/internal/semantic/collector"
+	"compiler/internal/semantic/resolver"
+	"compiler/internal/semantic/typecheck"
 )
 
 // checkCompilerVersion checks if the current compiler version is compatible

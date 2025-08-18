@@ -1,11 +1,13 @@
-name = "helper"
+[default]
+name = "math"
+version = "1.0.0"
 
 [compiler]
 version = "0.0.1"
 
 [build]
-output = ""
 entry = ""
+output = "bin"
 
 [cache]
 path = ".ferret"
@@ -14,3 +16,7 @@ path = ".ferret"
 allow-sharing = true
 allow-remote-import = false
 allow-neighbor-import = false
+
+[neighbors]
+
+[dependencies]

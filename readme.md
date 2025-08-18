@@ -95,7 +95,7 @@ path = ".ferret/cache"
 enabled = true
 share = false
 
-[neighbour]
+[neighbor]
 modulename = "../path/to/your/module"
 
 [dependencies]
@@ -313,6 +313,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - **Code Generator**: Translates the validated AST into target assembly code (currently x86-64)
 
 ## Roadmap
+### Language System
 - [x] Basic syntax
 - [x] Tokenizer
 - [x] Parser
@@ -369,6 +370,19 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Type checking (Type inference and validation)
 - [ ] Code generation (x86-64 assembly - basic implementation)
 
+### Dependency Management
+- [x] Read dependency from config file
+- [x] Download dependencies from config file
+  - [x] Download indirect dependencies
+- [x] Cache downloaded modules
+- [x] Update config file
+- [x] Update lockfile
+- [x] Update dependency
+- [x] Delete dependencies
+- [x] Check for updates
+- [x] Auto update
+- [x] Detect orphans
+- [x] Delete orphans
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.

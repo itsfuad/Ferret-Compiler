@@ -1,7 +1,8 @@
 package config
 
 import (
-	"ferret/toml"
+	"compiler/constants"
+	"compiler/toml"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,7 +111,7 @@ func TestIsProjectRoot(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	configPath := filepath.Join(tempDir, CONFIG_FILE)
+	configPath := filepath.Join(tempDir, constants.CONFIG_FILE)
 	if err := os.WriteFile(configPath, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
@@ -207,7 +208,7 @@ func setupTestProjectStructure(t *testing.T) string {
 	}
 
 	// Create config file in root
-	configPath := filepath.Join(tempDir, CONFIG_FILE)
+	configPath := filepath.Join(tempDir, constants.CONFIG_FILE)
 	if err := os.WriteFile(configPath, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
@@ -224,7 +225,7 @@ func setupTestProjectStructure(t *testing.T) string {
 func validateFindProjectRoot(t *testing.T, entryFile, wantRoot string, wantErr bool) {
 	t.Helper()
 
-	got, err := FindProjectRoot(entryFile)
+	got, err := GetProjectRoot(entryFile)
 	if wantErr {
 		if err == nil {
 			t.Errorf("FindProjectRoot() expected error but got none")
@@ -325,46 +326,6 @@ func TestParseCompilerSection(t *testing.T) {
 	}
 }
 
-func TestParseRemoteSection(t *testing.T) {
-	tests := []struct {
-		name     string
-		tomlData toml.TOMLData
-		want     RemoteConfig
-	}{
-		{
-			name: "with remote section",
-			tomlData: toml.TOMLData{
-				"remote": toml.TOMLTable{
-					"enabled": true,
-					"share":   false,
-				},
-			},
-			want: RemoteConfig{
-				Enabled: true,
-				Share:   false,
-			},
-		},
-		{
-			name:     "without remote section",
-			tomlData: toml.TOMLData{},
-			want:     RemoteConfig{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &ProjectConfig{}
-			parseRemoteSection(tt.tomlData, config)
-			if config.Remote.Enabled != tt.want.Enabled {
-				t.Errorf("parseRemoteSection() Enabled = %v, want %v", config.Remote.Enabled, tt.want.Enabled)
-			}
-			if config.Remote.Share != tt.want.Share {
-				t.Errorf("parseRemoteSection() Share = %v, want %v", config.Remote.Share, tt.want.Share)
-			}
-		})
-	}
-}
-
 func TestParseDependenciesSection(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -396,12 +357,12 @@ func TestParseDependenciesSection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &ProjectConfig{}
 			parseDependenciesSection(tt.tomlData, config)
-			if len(config.Dependencies.Modules) != len(tt.want) {
-				t.Errorf("parseDependenciesSection() modules count = %v, want %v", len(config.Dependencies.Modules), len(tt.want))
+			if len(config.Dependencies.Packages) != len(tt.want) {
+				t.Errorf("parseDependenciesSection() modules count = %v, want %v", len(config.Dependencies.Packages), len(tt.want))
 			}
 			for k, v := range tt.want {
-				if config.Dependencies.Modules[k] != v {
-					t.Errorf("parseDependenciesSection() modules[%s] = %v, want %v", k, config.Dependencies.Modules[k], v)
+				if config.Dependencies.Packages[k] != v {
+					t.Errorf("parseDependenciesSection() modules[%s] = %v, want %v", k, config.Dependencies.Packages[k], v)
 				}
 			}
 		})

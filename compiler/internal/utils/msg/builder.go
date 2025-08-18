@@ -1,7 +1,7 @@
 package msg
 
 import (
-	"ferret/internal/semantic/stype"
+	"compiler/internal/semantic/stype"
 
 	"fmt"
 )

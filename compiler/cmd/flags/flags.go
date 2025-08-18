@@ -4,8 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
-	"ferret/colors"
+	"compiler/colors"
 )
 
 const FERRET_VERSION = "0.0.1"
@@ -16,12 +17,13 @@ type Args struct {
 	InitProject    bool
 	ProjectName    string
 	GetCommand     bool
-	GetModule      string
+	GetPackage     string
 	UpdateCommand  bool
-	UpdateModule   string
+	UpdatePackage  string
 	SniffCommand   bool
+	SniffPackage   string
 	RemoveCommand  bool
-	RemoveModule   string
+	RemovePackage  string
 	ListCommand    bool
 	CleanCommand   bool
 	ListOrphan     bool
@@ -34,6 +36,8 @@ func getVal(commandArgs *[]string, target *string) {
 	if len(*commandArgs) > 0 && (*commandArgs)[0][0] != '-' {
 		*target = (*commandArgs)[0]
 		*commandArgs = (*commandArgs)[1:]
+		// trim whitespace
+		*target = strings.TrimSpace(*target)
 	}
 }
 
@@ -59,18 +63,19 @@ func ParseArgs() *Args {
 		getVal(&commandArgs, &result.ProjectName)
 	case "get":
 		result.GetCommand = true
-		getVal(&commandArgs, &result.GetModule)
+		getVal(&commandArgs, &result.GetPackage)
 	case "update":
 		result.UpdateCommand = true
-		getVal(&commandArgs, &result.UpdateModule)
+		getVal(&commandArgs, &result.UpdatePackage)
 	case "remove":
 		result.RemoveCommand = true
-		getVal(&commandArgs, &result.RemoveModule)
+		getVal(&commandArgs, &result.RemovePackage)
 	case "run":
 		result.RunCommand = true
 		getVal(&commandArgs, &result.RunTarget)
 	case "sniff":
 		result.SniffCommand = true
+		getVal(&commandArgs, &result.SniffPackage)
 	case "list":
 		result.ListCommand = true
 	case "orphan":
@@ -109,13 +114,13 @@ func Usage() {
 
 	colors.YELLOW.Println("MODULE MANAGEMENT:")
 	fmt.Println("  ferret init [path]                   Initialize a new Ferret project")
-	fmt.Println("  ferret get <module>                  Install a module dependency")
-	fmt.Println("  ferret update [module]               Update module(s) to latest version")
-	fmt.Println("  ferret remove <module>               Remove a module dependency")
-	fmt.Println("  ferret list                          List all installed modules")
-	fmt.Println("  ferret sniff                         Check for available module updates")
-	fmt.Println("  ferret orphan                        List orphaned cached modules")
-	fmt.Println("  ferret clean                         Remove unused module cache")
+	fmt.Println("  ferret get <package>                 Install a package dependency")
+	fmt.Println("  ferret update [package]              Update package(s) to latest version")
+	fmt.Println("  ferret remove <package>              Remove a package dependency")
+	fmt.Println("  ferret list                          List all installed packages")
+	fmt.Println("  ferret sniff                         Check for available package updates")
+	fmt.Println("  ferret orphan                        List orphaned cached packages")
+	fmt.Println("  ferret clean                         Remove unused package cache")
 	fmt.Println()
 
 	colors.YELLOW.Println("OPTIONS:")

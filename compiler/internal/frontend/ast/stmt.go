@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	"ferret/internal/source"
+	"compiler/internal/source"
 )
 
 type Program struct {
 	FullPath   string // the physical full path to the file
 	ImportPath string // the logical path to the module
-	Modulename string // the module name derived from the full path
+	Alias      string
 	Nodes      []Node
 	source.Location
 }
@@ -86,7 +86,7 @@ func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 // ImportStmt represents an import statement
 type ImportStmt struct {
 	ImportPath     *StringLiteral // The import path as written in source (e.g., "code/data")
-	ModuleName     string         // The alias or last part of the import path (e.g., "data")
+	Alias          string         // The alias or last part of the import path (e.g., "data")
 	LocationOnDisk string         // The fully resolved, normalized file path (always with .fer)
 	source.Location
 }

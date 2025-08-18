@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"ferret/cmd"
-	"ferret/config"
-	"ferret/report"
+	"compiler/cmd"
+	"compiler/config"
+	"compiler/report"
 	"lsp/wio"
 )
 
@@ -117,7 +117,7 @@ func handleConnection(conn net.Conn) {
 		case "shutdown":
 			handleShutdown(writer, req)
 		case "exit":
-			handleExit(writer,conn)
+			handleExit(writer, conn)
 		default:
 			handleUnknownMethod(req)
 		}
@@ -187,7 +187,6 @@ func handleShutdown(writer *bufio.Writer, req Request) {
 
 	log.Println("Server received shutdown request")
 }
-
 
 func handleUnknownMethod(req Request) {
 	log.Printf("Unknown method: %v", req.Method)
@@ -299,7 +298,7 @@ func processDiagnostics(writer *bufio.Writer, uri string) {
 		return
 	}
 
-	projectRoot, err := config.FindProjectRoot(filePath)
+	projectRoot, err := config.GetProjectRoot(filePath)
 	if err != nil {
 		log.Println("Error finding project root:", err)
 		publishDiagnostics(writer, uri, []map[string]interface{}{})

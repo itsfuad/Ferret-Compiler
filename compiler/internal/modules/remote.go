@@ -7,35 +7,29 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
-	"ferret/colors"
+	"compiler/colors"
 )
 
 const (
 	GitHubTagArchiveURL       = "https://github.com/%s/%s/archive/refs/tags/%s.zip"
 	ErrFailedToGetDownloadURL = "failed to get download URL for %s@%s: %w"
-	FerretConfigFile          = "fer.ret"
 )
 
-// CheckRemoteModuleExists checks if a remote module exists and returns available versions
 // Uses Git refs instead of GitHub API to avoid rate limiting
-func CheckRemoteModuleExists(repoName, requestedVersion string) (string, error) {
-	normalizedVersion, _, err := CheckAndGetActualVersion(repoName, requestedVersion)
+func CheckRemoteModuleExists(host, user, repo, requestedVersion string) (string, error) {
+	normalizedVersion, _, err := CheckAndGetActualVersion(host, user, repo, requestedVersion)
 	return normalizedVersion, err
 }
 
 // CheckAndGetActualVersion checks if a version exists and returns both normalized and actual versions
-func CheckAndGetActualVersion(repoName, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
-	// Parse user/repo from repoName
-	user, repo, err := parseRepoName(repoName)
-	if err != nil {
-		return "", "", err
-	}
+func CheckAndGetActualVersion(host, user, repo, requestedVersion string) (normalizedVersion, actualVersion string, err error) {
 
 	// Fetch all available tags once
-	refs, err := FetchRefs(user, repo)
+	refs, err := FetchRefs(host, user, repo)
 	if err != nil {
 		return "", "", fmt.Errorf("error fetching refs: %w", err)
 	}
@@ -56,7 +50,7 @@ func CheckAndGetActualVersion(repoName, requestedVersion string) (normalizedVers
 	// Check if requested version exists in available tags
 	actualVersion = findMatchingTag(tags, requestedVersion)
 	if actualVersion == "" {
-		return "", "", fmt.Errorf("version %s not found in available tags: %v", requestedVersion, tags)
+		return "", "", fmt.Errorf("version %s not found in available tags: %s", requestedVersion, strings.Join(tags, ", "))
 	}
 
 	// Verify that the tag is actually downloadable
@@ -80,9 +74,9 @@ func findMatchingTag(tags []string, requestedVersion string) string {
 
 	// If no exact match, try alternative format
 	var alternativeVersion string
-	if strings.HasPrefix(requestedVersion, "v") {
+	if after, ok := strings.CutPrefix(requestedVersion, "v"); ok {
 		// If requested version has "v", try without "v"
-		alternativeVersion = strings.TrimPrefix(requestedVersion, "v")
+		alternativeVersion = after
 	} else {
 		// If requested version doesn't have "v", try with "v"
 		alternativeVersion = "v" + requestedVersion
@@ -97,55 +91,72 @@ func findMatchingTag(tags []string, requestedVersion string) string {
 	return "" // Not found
 }
 
-// parseRepoName parses repository name into user and repo components
-func parseRepoName(repoName string) (string, string, error) {
-	parts := strings.Split(repoName, "/")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid repository name: %s", repoName)
+// SplitRepo splits a GitHub repository URL into its components.
+// input like "github.com/owner/repo@version" or "github.com/owner/repo" -> ("owner", "repo", "version" || latest)
+func SplitRepo(url string) (host, owner, repo, version string, err error) {
+	// match x.y (github.com)
+	re := regexp.MustCompile(`^(?P<host>[^/]+)/(?P<owner>[^/]+)/(?P<repo>[^/@]+)(?:@(?P<version>.+))?$`)
+	matches := re.FindStringSubmatch(url)
+	if matches == nil {
+		err = fmt.Errorf("invalid repo format")
+		return
 	}
-	return parts[0], parts[1], nil
+
+	host = matches[1]
+	owner = matches[2]
+	repo = matches[3]
+	version = matches[4]
+	if version == "" {
+		version = "latest"
+	}
+
+	return
 }
 
-// Note: The following functions were removed as they depended on GitHub API
-// which caused rate limiting issues. They have been replaced with Git refs-based approach.
+func TrimVersion(repo string) (string, string) {
+	// Split the repo into parts
+	parts := strings.Split(repo, "@")
+	if len(parts) == 1 {
+		return parts[0], "latest" // No version specified, return "latest"
+	}
+	if len(parts) == 2 {
+		return parts[0], parts[1] // Return repo and version
+	}
+	return "", "" // Invalid format
+}
 
 // DownloadRemoteModule downloads a remote module to the cache
-func DownloadRemoteModule(projectRoot, repoName, version, cachePath string) error {
-	// Parse user/repo from repoName
-	user, repo, err := parseRepoName(repoName)
-	if err != nil {
-		return err
-	}
-
+func DownloadRemoteModule(host, user, repo, version, cachePath string) error {
 	// Get both normalized and actual versions for proper downloading and caching
-	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(repoName, StripVersionPrefix(version))
+	normalizedVersion, actualVersion, err := CheckAndGetActualVersion(host, user, repo, StripVersionPrefix(version))
 	if err != nil {
 		return fmt.Errorf("failed to resolve version: %w", err)
 	}
 
 	// Download the module archive using the actual GitHub version
-	downloadPath, err := downloadModuleArchive(user, repo, actualVersion, repoName)
+	downloadPath, err := internalDownloadModuleArchive(user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(downloadPath)
 
 	// Extract to cache using normalized version for consistency
-	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+normalizedVersion)
+	moduleDir := filepath.Join(cachePath, host, user, BuildPackageSpec(repo, normalizedVersion))
 	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(actualVersion, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
 	}
 
-	colors.GREEN.Printf("Successfully downloaded and cached %s@%s\n", repoName, normalizedVersion)
+	colors.GREEN.Printf("Successfully downloaded and cached %s/%s@%s\n", user, repo, normalizedVersion)
 	return nil
 }
 
-// downloadModuleArchive downloads the module archive and returns the temporary file path
-func downloadModuleArchive(user, repo, version, repoName string) (string, error) {
+// internalDownloadModuleArchive downloads the module archive and returns the temporary file path
+func internalDownloadModuleArchive(user, repo, version string) (string, error) {
 	// Create download URL
 	downloadURL := fmt.Sprintf(GitHubTagArchiveURL, user, repo, version)
-	colors.BLUE.Printf("Downloading %s@%s from %s\n", repoName, version, downloadURL)
+
+	colors.BLUE.Printf("Downloading %s from %s\n", repo, downloadURL)
 
 	// Download the archive
 	resp, err := http.Get(downloadURL)
@@ -161,11 +172,11 @@ func downloadModuleArchive(user, repo, version, repoName string) (string, error)
 	case http.StatusNotFound:
 		return "", fmt.Errorf("tag %s not found for repository %s/%s. The tag may exist but the archive is not available", version, user, repo)
 	case http.StatusForbidden:
-		return "", fmt.Errorf("access denied when downloading %s@%s. Repository may be private or access restricted", repoName, version)
+		return "", fmt.Errorf("access denied when downloading %s@%s. Repository may be private or access restricted", repo, version)
 	case http.StatusTooManyRequests:
-		return "", fmt.Errorf("rate limited when downloading %s@%s. Please try again later", repoName, version)
+		return "", fmt.Errorf("rate limited when downloading %s@%s. Please try again later", repo, version)
 	default:
-		return "", fmt.Errorf("failed to download module %s@%s: HTTP %d", repoName, version, resp.StatusCode)
+		return "", fmt.Errorf("failed to download module %s@%s: HTTP %d", repo, version, resp.StatusCode)
 	}
 
 	// Create temporary file for download
@@ -184,39 +195,6 @@ func downloadModuleArchive(user, repo, version, repoName string) (string, error)
 
 	return tmpFile.Name(), nil
 }
-
-// Note: The following functions are deprecated in favor of Git refs-based approach
-// They are kept for potential fallback scenarios but are no longer used by default
-
-/*
-// getGitHubReleases fetches releases from GitHub API (DEPRECATED - causes rate limiting)
-func getGitHubReleases(user, repo string) ([]GitHubRelease, error) {
-	url := fmt.Sprintf(GitHubReleasesURL, user, repo)
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch releases: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("repository not found: %s/%s", user, repo)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API error: HTTP %d", resp.StatusCode)
-	}
-
-	var releases []GitHubRelease
-	err = json.NewDecoder(resp.Body).Decode(&releases)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse GitHub API response: %w", err)
-	}
-
-	return releases, nil
-}
-*/
 
 // extractZipToCache extracts a zip file to the cache directory
 func extractZipToCache(zipPath, targetDir, expectedPrefix string) error {
@@ -277,8 +255,8 @@ func extractSingleZipFile(file *zip.File, targetDir, expectedPrefix string) erro
 // processFilePath removes expected prefix from file path
 func processFilePath(fileName, expectedPrefix string) string {
 	relativePath := fileName
-	if strings.HasPrefix(relativePath, expectedPrefix+"/") {
-		relativePath = strings.TrimPrefix(relativePath, expectedPrefix+"/")
+	if after, ok := strings.CutPrefix(relativePath, expectedPrefix+"/"); ok {
+		relativePath = after
 	}
 	return relativePath
 }
@@ -305,9 +283,9 @@ func extractFile(file *zip.File, targetPath string) error {
 }
 
 // IsModuleCached checks if a module is already cached
-func IsModuleCached(cachePath, repoName, version string) bool {
+func IsModuleCached(cachePath, url, version string) bool {
 	normalizedVersion := NormalizeVersion(version)
-	moduleDir := filepath.Join(cachePath, "github.com", repoName+"@"+normalizedVersion)
-	_, err := os.Stat(moduleDir)
-	return err == nil
+	moduleDir := filepath.Join(cachePath, BuildPackageSpec(url, normalizedVersion))
+	info, err := os.Stat(moduleDir)
+	return err == nil && info.IsDir()
 }

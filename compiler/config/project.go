@@ -7,24 +7,27 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ferret/cmd/flags"
-	"ferret/colors"
-	"ferret/toml"
+	"compiler/cmd/flags"
+	"compiler/colors"
+	"compiler/constants"
+	"compiler/toml"
 )
 
-const CONFIG_FILE = "fer.ret"
+const SHAREKEY = "allow-sharing"
+const REMOTEKEY = "allow-remote-import"
+const EXTERNALKEY = "allow-neighbor-import"
 
 // ProjectConfig represents the structure
 type ProjectConfig struct {
+	Name         string           `toml:"name"`
 	Compiler     CompilerConfig   `toml:"compiler"`
-	Cache        CacheConfig      `toml:"cache"`
-	Remote       RemoteConfig     `toml:"remote"`
 	Build        BuildConfig      `toml:"build"`
+	Cache        CacheConfig      `toml:"cache"`
+	External     ExternalConfig   `toml:"external"`
+	Neighbors    NeighborConfig   `toml:"neighbors"`
 	Dependencies DependencyConfig `toml:"dependencies"`
-	Neighbour    NeighbourConfig  `toml:"neighbour"`
-	ProjectRoot  string
 	// Top-level project metadata
-	Name string `toml:"name"`
+	ProjectRoot string
 }
 
 var defaultConfig = toml.TOMLData{
@@ -41,15 +44,16 @@ var defaultConfig = toml.TOMLData{
 	"cache": toml.TOMLTable{
 		"path": "",
 	},
-	"remote": toml.TOMLTable{
-		"enabled": "",
-		"share":   "",
+	"external": toml.TOMLTable{
+		SHAREKEY:    "",
+		REMOTEKEY:   "",
+		EXTERNALKEY: "",
 	},
-	"neighbour":    toml.TOMLTable{},
+	"neighbors":    toml.TOMLTable{},
 	"dependencies": toml.TOMLTable{},
 }
 
-func (conf *ProjectConfig) Save() {
+func (conf *ProjectConfig) Save() error {
 
 	// Validate the configuration
 	tomData := defaultConfig
@@ -66,23 +70,26 @@ func (conf *ProjectConfig) Save() {
 	tomData["cache"] = toml.TOMLTable{
 		"path": conf.Cache.Path,
 	}
-	tomData["remote"] = toml.TOMLTable{
-		"enabled": conf.Remote.Enabled,
-		"share":   conf.Remote.Share,
+	tomData["external"] = toml.TOMLTable{
+		SHAREKEY:    conf.External.AllowSharing,
+		REMOTEKEY:   conf.External.AllowRemoteImport,
+		EXTERNALKEY: conf.External.AllowExternalImport,
 	}
 
-	for key, value := range conf.Neighbour.Projects {
-		tomData["neighbour"][key] = value
+	for key, value := range conf.Neighbors.Projects {
+		tomData["neighbors"][key] = value
 	}
-	for key, value := range conf.Dependencies.Modules {
+	for key, value := range conf.Dependencies.Packages {
 		tomData["dependencies"][key] = value
 	}
 
 	// Save the configuration to the fer.ret file
-	if err := toml.WriteTOMLFile(filepath.Join(conf.ProjectRoot, CONFIG_FILE), tomData, nil); err != nil {
+	if err := toml.WriteTOMLFile(filepath.Join(conf.ProjectRoot, constants.CONFIG_FILE), tomData, nil); err != nil {
 		colors.RED.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("failed to save config file: %w", err)
 	}
+
+	return nil
 }
 
 // CompilerConfig contains compiler-specific settings
@@ -95,10 +102,10 @@ type CacheConfig struct {
 	Path string `toml:"path"`
 }
 
-// RemoteConfig defines remote module import/export settings
-type RemoteConfig struct {
-	Enabled bool `toml:"enabled"`
-	Share   bool `toml:"share"`
+type ExternalConfig struct {
+	AllowSharing        bool `toml:"allow-sharing"`
+	AllowRemoteImport   bool `toml:"allow-remote-import"`
+	AllowExternalImport bool `toml:"allow-neighbor-import"`
 }
 
 // BuildConfig defines build settings
@@ -108,12 +115,12 @@ type BuildConfig struct {
 }
 
 type DependencyConfig struct {
-	Modules map[string]string `toml:"dependencies"` // module_name -> version
+	Packages map[string]string `toml:"dependencies"` // module_name -> version
 }
 
-// NeighbourConfig defines neighbouring project mappings (like Go's replace directive)
-type NeighbourConfig struct {
-	Projects map[string]string `toml:"neighbour"` // project_name -> local_path
+// NeighborConfig defines neighboring project mappings (like Go's replace directive)
+type NeighborConfig struct {
+	Projects map[string]string `toml:"neighbors"` // project_name -> local_path
 }
 
 // CreateDefaultProjectConfig creates a default fer.ret configuration file
@@ -124,7 +131,21 @@ func CreateDefaultProjectConfig(projectName string) error {
 		os.Exit(1)
 	}
 
-	configPath := filepath.Join(cwd, CONFIG_FILE)
+	configPath := filepath.Join(cwd, constants.CONFIG_FILE)
+
+	// if already exist, ask for overwrite
+	if _, err := os.Stat(configPath); err == nil {
+		overwrite, err := ReadBoolFromPrompt("⚠️  Config file already exists. Overwrite? (Y/N, default: N): ", false)
+		if err != nil {
+			colors.RED.Println(err)
+			os.Exit(1)
+		}
+		if !overwrite {
+			colors.YELLOW.Println("❌ Aborted project creation.")
+			return nil
+		}
+		colors.YELLOW.Println("⚠️  This will overwrite the existing config file")
+	}
 
 	// Generate config using TOML data structure for consistency
 	configData := generateDefaultConfigData(projectName)
@@ -133,7 +154,25 @@ func CreateDefaultProjectConfig(projectName string) error {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
-	colors.GREEN.Printf("📁 Created %s successfully!\n", CONFIG_FILE)
+	// create a .gitignore file
+	gitignorePath := filepath.Join(cwd, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte(".ferret\nferret.lock"), 0644); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+
+	colors.GREEN.Printf("📁 Created %s successfully!\n", constants.CONFIG_FILE)
+
+	// remove old lockfiles and cache
+	if err := os.RemoveAll(filepath.Join(cwd, ".ferret")); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+	if err := os.RemoveAll(filepath.Join(cwd, "ferret.lock")); err != nil {
+		colors.RED.Println(err)
+		os.Exit(1)
+	}
+
 	return nil
 }
 
@@ -167,9 +206,9 @@ func ReadBoolFromPrompt(prompt string, defaultValue bool) (bool, error) {
 		}
 
 		switch strings.ToLower(value) {
-		case "true", "yes", "y":
+		case "y":
 			return true, nil
-		case "false", "no", "n":
+		case "n":
 			return false, nil
 		default:
 			fmt.Printf("Invalid input %q. Please enter true/false, yes/no, or y/n: ", value)
@@ -196,17 +235,21 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 		os.Exit(1)
 	}
 
-	// Get remote enabled setting
-	remoteEnabled, err := ReadBoolFromPrompt("Do you want to allow remote module import ([Yes|No|Y|N] default: no)? ", false)
+	allowShare, err := ReadBoolFromPrompt("Allow sharing of this project with other projects? (Y/N, default: N): ", false)
 	if err != nil {
-		fmt.Printf("❌ Error reading remote setting: %v\n", err)
+		fmt.Printf("❌ Error reading share setting: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get share enabled setting
-	shareEnabled, err := ReadBoolFromPrompt("Do you want to allow sharing your modules to others as remote modules ([Yes|No|Y|N] default: no)? ", false)
+	allowRemoteImport, err := ReadBoolFromPrompt("Allow remote imports? [e.g. github, gitlab] (Y/N, default: N): ", false)
 	if err != nil {
-		fmt.Printf("❌ Error reading share setting: %v\n", err)
+		fmt.Printf("❌ Error reading remote import setting: %v\n", err)
+		os.Exit(1)
+	}
+
+	allowNeighborImport, err := ReadBoolFromPrompt("Allow neighbor imports from other projects? (Y/N, default: N): ", false)
+	if err != nil {
+		fmt.Printf("❌ Error reading neighbor import setting: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -221,20 +264,21 @@ func generateDefaultConfigData(projectName string) toml.TOMLData {
 	}
 
 	configData["build"] = toml.TOMLTable{
-		"entry":  "# app.fer",
+		"entry":  "yourproject.fer",
 		"output": "bin/" + projectName,
 	}
 
 	configData["cache"] = toml.TOMLTable{
-		"path": ".ferret/cache",
+		"path": ".ferret",
 	}
 
-	configData["remote"] = toml.TOMLTable{
-		"enabled": remoteEnabled,
-		"share":   shareEnabled,
+	configData["external"] = toml.TOMLTable{
+		SHAREKEY:    allowShare,
+		REMOTEKEY:   allowRemoteImport,
+		EXTERNALKEY: allowNeighborImport,
 	}
 
-	configData["neighbour"] = toml.TOMLTable{}
+	configData["neighbors"] = toml.TOMLTable{}
 
 	configData["dependencies"] = toml.TOMLTable{}
 
@@ -271,9 +315,41 @@ func ValidateProjectConfig(config *ProjectConfig) error {
 
 // IsProjectRoot checks if the given directory contains a fer.ret file
 func IsProjectRoot(dir string) bool {
-	configPath := filepath.Join(dir, CONFIG_FILE)
+	configPath := filepath.Join(dir, constants.CONFIG_FILE)
 	_, err := os.Stat(filepath.FromSlash(configPath))
 	return err == nil
+}
+
+func GetProjectRoot(filePath string) (string, error) {
+
+	filePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", fmt.Errorf("❌ failed to get absolute path of entry: %w", err)
+	}
+
+	dir := filepath.Dir(filePath)
+
+	// Walk up the directory tree until we find a fer.ret file
+	for {
+		configPath := filepath.Join(dir, constants.CONFIG_FILE)
+		// Check if fer.ret exists in this directory
+		if _, err := os.Stat(configPath); err == nil {
+			// Found the project root
+			return filepath.ToSlash(dir), nil
+		}
+
+		// Move up to parent directory
+		parent := filepath.Dir(dir)
+
+		// Stop if we can't go up further (reached filesystem root)
+		if parent == dir {
+			break
+		}
+
+		dir = parent
+	}
+
+	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", constants.CONFIG_FILE, dir)
 }
 
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
@@ -284,7 +360,13 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 		os.Exit(1)
 	}
 
-	configPath := filepath.Join(projectRoot, CONFIG_FILE)
+	configPath := filepath.Join(projectRoot, constants.CONFIG_FILE)
+
+	// if not exists, ask user to create one
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		colors.RED.Printf("❌ Configuration file %s not found in %s\nCreate project by running 'ferret init' command\n", constants.CONFIG_FILE, projectRoot)
+	}
+
 	// Use our custom TOML parser
 	tomlData, err := toml.ParseTOMLFile(filepath.FromSlash(configPath))
 	if err != nil {
@@ -300,9 +382,9 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 	parseCompilerSection(tomlData, config)
 	parseBuildSection(tomlData, config)
 	parseCacheSection(tomlData, config)
-	parseRemoteSection(tomlData, config)
+	parseExternalSection(tomlData, config)
 	parseDependenciesSection(tomlData, config)
-	parseNeighbourSection(tomlData, config)
+	parseNeighborSection(tomlData, config)
 
 	return config, nil
 }
@@ -312,6 +394,20 @@ func parseDefaultSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if defaultSection, exists := tomlData["default"]; exists {
 		if name, ok := defaultSection["name"].(string); ok {
 			config.Name = name
+		}
+	}
+}
+
+func parseExternalSection(tomlData toml.TOMLData, config *ProjectConfig) {
+	if externalSection, exists := tomlData["external"]; exists {
+		if allowRemote, ok := externalSection[REMOTEKEY].(bool); ok {
+			config.External.AllowRemoteImport = allowRemote
+		}
+		if allowSharing, ok := externalSection[SHAREKEY].(bool); ok {
+			config.External.AllowSharing = allowSharing
+		}
+		if allowExternal, ok := externalSection[EXTERNALKEY].(bool); ok {
+			config.External.AllowExternalImport = allowExternal
 		}
 	}
 }
@@ -332,17 +428,6 @@ func parseCacheSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	}
 }
 
-func parseRemoteSection(tomlData toml.TOMLData, config *ProjectConfig) {
-	if remoteSection, exists := tomlData["remote"]; exists {
-		if enabled, ok := remoteSection["enabled"].(bool); ok {
-			config.Remote.Enabled = enabled
-		}
-		if share, ok := remoteSection["share"].(bool); ok {
-			config.Remote.Share = share
-		}
-	}
-}
-
 func parseBuildSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if buildSection, exists := tomlData["build"]; exists {
 		if entry, ok := buildSection["entry"].(string); ok {
@@ -356,54 +441,22 @@ func parseBuildSection(tomlData toml.TOMLData, config *ProjectConfig) {
 
 func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if dependenciesSection, exists := tomlData["dependencies"]; exists {
-		config.Dependencies.Modules = make(map[string]string)
+		config.Dependencies.Packages = make(map[string]string)
 		for key, value := range dependenciesSection {
 			if strValue, ok := value.(string); ok {
-				config.Dependencies.Modules[key] = strValue
+				config.Dependencies.Packages[key] = strValue
 			}
 		}
 	}
 }
 
-func parseNeighbourSection(tomlData toml.TOMLData, config *ProjectConfig) {
-	if neighbourSection, exists := tomlData["neighbour"]; exists {
-		config.Neighbour.Projects = make(map[string]string)
-		for key, value := range neighbourSection {
+func parseNeighborSection(tomlData toml.TOMLData, config *ProjectConfig) {
+	if neighborSection, exists := tomlData["neighbors"]; exists {
+		config.Neighbors.Projects = make(map[string]string)
+		for key, value := range neighborSection {
 			if strValue, ok := value.(string); ok {
-				config.Neighbour.Projects[key] = strValue
+				config.Neighbors.Projects[key] = strValue
 			}
 		}
 	}
-}
-
-func FindProjectRoot(filePath string) (string, error) {
-
-	filePath, err := filepath.Abs(filePath)
-	if err != nil {
-		return "", fmt.Errorf("❌ failed to get absolute path of entry: %w", err)
-	}
-
-	dir := filepath.Dir(filePath)
-
-	// Walk up the directory tree until we find a fer.ret file
-	for {
-		configPath := filepath.Join(dir, CONFIG_FILE)
-		// Check if fer.ret exists in this directory
-		if _, err := os.Stat(configPath); err == nil {
-			// Found the project root
-			return filepath.ToSlash(dir), nil
-		}
-
-		// Move up to parent directory
-		parent := filepath.Dir(dir)
-
-		// Stop if we can't go up further (reached filesystem root)
-		if parent == dir {
-			break
-		}
-
-		dir = parent
-	}
-
-	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", CONFIG_FILE, dir)
 }

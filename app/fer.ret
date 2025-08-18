@@ -1,21 +1,22 @@
-name = "app"
+name = "demo-app"
 
 [compiler]
 version = "0.0.1"
 
 [build]
-entry = "cmd/start.fer"
+entry = "cmd/main.fer"
 output = "bin"
 
 [cache]
-path = ".ferret/cache"
+path = ".ferret"
 
-[remote]
-enabled = true
-share = false
+[external]
+allow-sharing = false
+allow-remote-import = true
+allow-neighbor-import = true
 
-[neighbour]
-app2 = "../app2"
+[neighbors]
+neighbor = "../app2"
 
 [dependencies]
-github.com/itsfuad/ferret-mod = "v0.0.2"
+github.com/itsfuad/ferret-mod = "v0.0.4"

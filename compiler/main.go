@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"ferret/cmd/cli"
-	"ferret/cmd/flags"
-	"ferret/colors"
+	"compiler/cmd/cli"
+	"compiler/cmd/flags"
+	"compiler/colors"
 )
 
 func main() {
@@ -17,47 +17,6 @@ func main() {
 
 	args := flags.ParseArgs()
 
-	// Handle remove command
-	if args.RemoveCommand {
-		cli.HandleRemoveCommand(args.RemoveModule)
-		return
-	}
-
-	// Handle get command
-	if args.GetCommand {
-		cli.HandleGetCommand(args.GetModule)
-		return
-	}
-
-	// Handle update command
-	if args.UpdateCommand {
-		cli.HandleUpdateCommand(args.UpdateModule)
-		return
-	}
-
-	// Handle sniff command
-	if args.SniffCommand {
-		cli.HandleSniffCommand()
-		return
-	}
-
-	// Handle list command
-	if args.ListCommand {
-		cli.HandleListCommand()
-		return
-	}
-
-	if args.ListOrphan {
-		cli.HandleListOrphanCommand()
-		return
-	}
-
-	// Handle clean command
-	if args.CleanCommand {
-		cli.HandleCleanCommand()
-		return
-	}
-
 	// Handle init command
 	if args.InitProject {
 		cli.HandleInitCommand(args.ProjectName)
@@ -67,6 +26,37 @@ func main() {
 	// Handle run command
 	if args.RunCommand {
 		cli.HandleRunCommand(args.RunTarget, args.Debug)
+		return
+	}
+
+	// Handle get command
+	if args.GetCommand {
+		cli.HandleGetCommand(args.GetPackage)
+		return
+	}
+
+	if args.RemoveCommand {
+		cli.HandleRemoveCommand(args.RemovePackage)
+		return
+	}
+
+	if args.SniffCommand {
+		cli.HandleSniffCommand(args.SniffPackage)
+		return
+	}
+
+	if args.UpdateCommand {
+		cli.HandleUpdateCommand(args.UpdatePackage)
+		return
+	}
+
+	if args.ListOrphan {
+		cli.HandleOrphansCommand()
+		return
+	}
+
+	if args.CleanCommand {
+		cli.HandleRemoveOrphansCommand()
 		return
 	}
 
