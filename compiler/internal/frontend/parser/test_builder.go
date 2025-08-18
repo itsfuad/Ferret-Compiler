@@ -28,7 +28,7 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 			Path: ".ferret/modules",
 		},
 		Dependencies: config.DependencyConfig{
-			Modules: make(map[string]string),
+			Packages: make(map[string]string),
 		},
 		ProjectRoot: tempDir,
 	}

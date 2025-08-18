@@ -141,7 +141,7 @@ func DownloadRemoteModule(host, user, repo, version, cachePath string) error {
 	defer os.Remove(downloadPath)
 
 	// Extract to cache using normalized version for consistency
-	moduleDir := filepath.Join(cachePath, host, user, BuildModuleSpec(repo, normalizedVersion))
+	moduleDir := filepath.Join(cachePath, host, user, BuildPackageSpec(repo, normalizedVersion))
 	err = extractZipToCache(downloadPath, moduleDir, repo+"-"+strings.TrimPrefix(actualVersion, "v"))
 	if err != nil {
 		return fmt.Errorf("failed to extract module: %w", err)
@@ -285,7 +285,7 @@ func extractFile(file *zip.File, targetPath string) error {
 // IsModuleCached checks if a module is already cached
 func IsModuleCached(cachePath, url, version string) bool {
 	normalizedVersion := NormalizeVersion(version)
-	moduleDir := filepath.Join(cachePath, BuildModuleSpec(url, normalizedVersion))
+	moduleDir := filepath.Join(cachePath, BuildPackageSpec(url, normalizedVersion))
 	info, err := os.Stat(moduleDir)
 	return err == nil && info.IsDir()
 }

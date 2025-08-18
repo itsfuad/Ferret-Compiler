@@ -41,7 +41,22 @@ func main() {
 	}
 
 	if args.SniffCommand {
-		cli.HandleSniffCommand()
+		cli.HandleSniffCommand(args.SniffPackage)
+		return
+	}
+
+	if args.UpdateCommand {
+		cli.HandleUpdateCommand(args.UpdatePackage)
+		return
+	}
+
+	if args.ListOrphan {
+		cli.HandleOrphansCommand()
+		return
+	}
+
+	if args.CleanCommand {
+		cli.HandleRemoveOrphansCommand()
 		return
 	}
 
