@@ -24,7 +24,8 @@ func FirstPart(path string) string {
 		return ""
 	}
 
-	normalized := filepath.ToSlash(path) // Ensure forward slashes for consistency
+	// Normalize path separators to forward slashes for cross-platform consistency
+	normalized := strings.ReplaceAll(path, "\\", "/")
 	//remove leading and trailing slashes
 	normalized = strings.Trim(normalized, "/")
 
@@ -42,7 +43,8 @@ func LastPart(path string) string {
 		return ""
 	}
 
-	normalized := filepath.ToSlash(path) // Ensure forward slashes for consistency
+	// Normalize path separators to forward slashes for cross-platform consistency
+	normalized := strings.ReplaceAll(path, "\\", "/")
 	normalized = strings.Trim(normalized, "/")
 
 	parts := strings.Split(normalized, "/")
