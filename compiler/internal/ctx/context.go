@@ -525,6 +525,4 @@ func (c *CompilerContext) Destroy() {
 	c.ProjectStack = nil
 	c._parsingModules = nil
 	c._parsingStack = nil
-
-	colors.RED.Println("Compiler context destroyed")
 }

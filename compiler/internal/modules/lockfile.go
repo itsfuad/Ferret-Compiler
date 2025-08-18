@@ -69,11 +69,19 @@ func (l *Lockfile) SetNewDependency(host, user, repo, version string, isDirect b
 
 	key := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, version)
 
-	l.Dependencies[key] = LockfileEntry{
-		Version:      version,
-		Direct:       isDirect,
-		Dependencies: []string{},
-		UsedBy:       []string{},
+	// If entry already exists, preserve existing relationships
+	if entry, exists := l.Dependencies[key]; exists {
+		entry.Version = version
+		entry.Direct = isDirect || entry.Direct // Make direct if either existing or new is direct
+		l.Dependencies[key] = entry
+	} else {
+		// Create new entry
+		l.Dependencies[key] = LockfileEntry{
+			Version:      version,
+			Direct:       isDirect,
+			Dependencies: []string{},
+			UsedBy:       []string{},
+		}
 	}
 }
 
@@ -121,6 +129,16 @@ func (l *Lockfile) RemoveUsedBy(depKey, parentKey string) {
 
 func (l *Lockfile) RemoveDependency(key string) {
 	delete(l.Dependencies, key)
+}
+
+// SetDirect sets the direct flag for a dependency
+func (l *Lockfile) SetDirect(key string, isDirect bool) {
+	entry, exists := l.Dependencies[key]
+	if !exists {
+		return
+	}
+	entry.Direct = isDirect
+	l.Dependencies[key] = entry
 }
 
 func (l *Lockfile) GetDependency(repo, version string) (LockfileEntry, bool) {
