@@ -366,16 +366,60 @@ func (dm *DependencyManager) AutoUpdate(packagename string) error {
 				continue
 			}
 
-			installDependency(dm, update.Name, true)
-			// remive old version
-			key := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, update.CurrentVersion)
-			dm.lockfile.RemoveDependency(key)
+			// Remove old version first to clean up old dependencies
+			oldKey := fmt.Sprintf("%s/%s/%s@%s", host, user, repo, update.CurrentVersion)
+			if err := dm.removeOldVersionForUpdate(oldKey); err != nil {
+				colors.RED.Printf("❌ Failed to remove old version %s: %v\n", oldKey, err)
+				continue
+			}
+
+			// Install new version with proper version specification
+			newPackageSpec := fmt.Sprintf("%s@%s", update.Name, update.LatestVersion)
+			if err := installDependency(dm, newPackageSpec, true); err != nil {
+				colors.RED.Printf("❌ Failed to update %s: %v\n", update.Name, err)
+				continue
+			}
+
 			colors.GREEN.Printf("✅ Updated %s to version %s\n", update.Name, update.LatestVersion)
 		}
 	}
 
 	// save
 	dm.Save()
+
+	return nil
+}
+
+// removeOldVersionForUpdate removes an old version during update, cleaning up unused transitive dependencies
+func (dm *DependencyManager) removeOldVersionForUpdate(oldKey string) error {
+	entry, exists := dm.lockfile.Dependencies[oldKey]
+	if !exists {
+		return nil // already removed
+	}
+
+	// Clean up transitive dependencies that might become unused
+	for _, dep := range entry.Dependencies {
+		dm.lockfile.RemoveUsedBy(dep, oldKey)
+		// If the dependency is no longer used by anyone and is not direct, remove it
+		if depEntry, exists := dm.lockfile.Dependencies[dep]; exists {
+			if !depEntry.Direct && len(depEntry.UsedBy) == 0 {
+				dm.lockfile.RemoveDependency(dep)
+				// Also remove its cache directory
+				cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, dep)
+				os.RemoveAll(cachePath)
+				colors.BLUE.Printf("🗑️  Removed unused transitive dependency: %s\n", dep)
+			}
+		}
+	}
+
+	// Remove the old version itself
+	dm.lockfile.RemoveDependency(oldKey)
+
+	// Remove its cache directory
+	cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, oldKey)
+	if err := os.RemoveAll(cachePath); err != nil {
+		return fmt.Errorf("failed to remove cache for %s: %w", oldKey, err)
+	}
 
 	return nil
 }
@@ -508,12 +552,12 @@ func installDependency(dm *DependencyManager, packagename string, isDirect bool)
 		os.Exit(1)
 	}
 
-	isInstalled, err := downloadIfNotCached(dm, host, user, repo, actualVersion)
+	alreadyCached, err := downloadIfNotCached(dm, host, user, repo, actualVersion)
 	if err != nil {
 		return err
 	}
 
-	if !isInstalled {
+	if alreadyCached {
 		colors.GREEN.Printf("✅ Successfully installed %s/%s/%s@%s\n", host, user, repo, actualVersion)
 	} else {
 		colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
@@ -548,7 +592,8 @@ func installTransitiveDependencies(dm *DependencyManager, host, user, repo, vers
 	// install each transitive dependency
 	for _, pkg := range indirectDependencies {
 		colors.LIGHT_GREEN.Printf("📦 Found transitive dependency: %s\n", pkg)
-		// self reference will cause infinite loop.
+
+		// self reference will cause infinite loop and should be completely ignored
 		if pkg == parent {
 			colors.YELLOW.Printf("⚠️  Skipping self-referential transitive dependency: %s\n", pkg)
 			continue
@@ -585,7 +630,8 @@ func getTrasitiveList(repoPath string) ([]string, error) {
 
 			// install each transitive dependency
 			for dep, version := range config.Dependencies.Packages {
-				indirectDependencies = append(indirectDependencies, fmt.Sprintf("%s@%s", dep, version))
+				normalizedVersion := NormalizeVersion(version)
+				indirectDependencies = append(indirectDependencies, fmt.Sprintf("%s@%s", dep, normalizedVersion))
 			}
 		}
 		return nil
