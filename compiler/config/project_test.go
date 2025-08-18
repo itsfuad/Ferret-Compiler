@@ -357,12 +357,12 @@ func TestParseDependenciesSection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &ProjectConfig{}
 			parseDependenciesSection(tt.tomlData, config)
-			if len(config.Dependencies.Modules) != len(tt.want) {
-				t.Errorf("parseDependenciesSection() modules count = %v, want %v", len(config.Dependencies.Modules), len(tt.want))
+			if len(config.Dependencies.Packages) != len(tt.want) {
+				t.Errorf("parseDependenciesSection() modules count = %v, want %v", len(config.Dependencies.Packages), len(tt.want))
 			}
 			for k, v := range tt.want {
-				if config.Dependencies.Modules[k] != v {
-					t.Errorf("parseDependenciesSection() modules[%s] = %v, want %v", k, config.Dependencies.Modules[k], v)
+				if config.Dependencies.Packages[k] != v {
+					t.Errorf("parseDependenciesSection() modules[%s] = %v, want %v", k, config.Dependencies.Packages[k], v)
 				}
 			}
 		})

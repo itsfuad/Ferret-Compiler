@@ -5,7 +5,6 @@ import (
 	"compiler/colors"
 	"compiler/constants"
 	"compiler/internal/modules"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -56,8 +55,6 @@ func HandleRunCommand(target string, debug bool) {
 func HandleGetCommand(packageName string) {
 
 	projectRoot := getRoot()
-
-	fmt.Printf("Root Directory: %s\n", projectRoot)
 
 	// Load and validate project configuration
 	projectConfig, err := config.LoadProjectConfig(projectRoot)
@@ -115,8 +112,7 @@ func HandleRemoveCommand(packageName string) {
 	}
 }
 
-func HandleSniffCommand() {
-	colors.BLUE.Println("🔍 Sniffing for module updates...")
+func HandleSniffCommand(packagename string) {
 	projectRoot := getRoot()
 
 	dm, err := modules.NewDependencyManager(projectRoot)
@@ -125,7 +121,55 @@ func HandleSniffCommand() {
 		os.Exit(1)
 	}
 
-	dm.CheckForAvailableUpdates()
+	dm.CheckForAvailableUpdates(packagename)
+}
+
+func HandleUpdateCommand(packageName string) {
+	projectRoot := getRoot()
+
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	err = dm.AutoUpdate(packageName)
+	if err != nil {
+		colors.RED.Printf("❌ Failed to update %s: %v\n", packageName, err)
+		os.Exit(1)
+	}
+}
+
+func HandleOrphansCommand() {
+	projectRoot := getRoot()
+
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	orphans := dm.GetOrphans()
+	if len(orphans) == 0 {
+		colors.GREEN.Println("✅ No orphaned packages found")
+		return
+	}
+	colors.YELLOW.Println("⚠️  Found orphaned packages:")
+	for depKey := range orphans {
+		colors.YELLOW.Printf("📦 %s\n", depKey)
+	}
+}
+
+func HandleRemoveOrphansCommand() {
+	projectRoot := getRoot()
+
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	dm.RemoveOrphanedPackages()
 }
 
 func getRoot() string {

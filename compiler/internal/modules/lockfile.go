@@ -124,13 +124,13 @@ func (l *Lockfile) RemoveDependency(key string) {
 }
 
 func (l *Lockfile) GetDependency(repo, version string) (LockfileEntry, bool) {
-	key := BuildModuleSpec(repo, version)
+	key := BuildPackageSpec(repo, version)
 	entry, exists := l.Dependencies[key]
 	return entry, exists
 }
 
 func (l *Lockfile) GetDependencyVersion(repo, version string) (string, bool) {
-	key := BuildModuleSpec(repo, version)
+	key := BuildPackageSpec(repo, version)
 	entry, exists := l.Dependencies[key]
 	if !exists {
 		return "", false

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"compiler/colors"
 )
@@ -20,6 +21,7 @@ type Args struct {
 	UpdateCommand  bool
 	UpdatePackage  string
 	SniffCommand   bool
+	SniffPackage   string
 	RemoveCommand  bool
 	RemovePackage  string
 	ListCommand    bool
@@ -34,6 +36,8 @@ func getVal(commandArgs *[]string, target *string) {
 	if len(*commandArgs) > 0 && (*commandArgs)[0][0] != '-' {
 		*target = (*commandArgs)[0]
 		*commandArgs = (*commandArgs)[1:]
+		// trim whitespace
+		*target = strings.TrimSpace(*target)
 	}
 }
 
@@ -71,6 +75,7 @@ func ParseArgs() *Args {
 		getVal(&commandArgs, &result.RunTarget)
 	case "sniff":
 		result.SniffCommand = true
+		getVal(&commandArgs, &result.SniffPackage)
 	case "list":
 		result.ListCommand = true
 	case "orphan":

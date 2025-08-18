@@ -1,11 +1,11 @@
 {
   "version": "1.0.0",
   "dependencies": {
-    "github.com/itsfuad/ferret-mod@v0.0.3": {
-      "version": "v0.0.3",
+    "github.com/itsfuad/ferret-mod@v0.0.4": {
+      "version": "v0.0.4",
       "direct": true,
       "dependencies": [
-        "github.com/itsfuad/ferret-remote-mod@0.0.1"
+        "github.com/itsfuad/ferret-remote-mod@v0.0.3"
       ],
       "used_by": []
     },
@@ -14,7 +14,15 @@
       "direct": false,
       "dependencies": [],
       "used_by": []
+    },
+    "github.com/itsfuad/ferret-remote-mod@v0.0.3": {
+      "version": "v0.0.3",
+      "direct": false,
+      "dependencies": [],
+      "used_by": [
+        "github.com/itsfuad/ferret-mod@v0.0.4"
+      ]
     }
   },
-  "generated_at": "2025-08-17T23:39:45+06:00"
+  "generated_at": "2025-08-18T20:07:54+06:00"
 }

@@ -108,7 +108,7 @@ func (c *CompilerContext) resolveRemoteModule(importPath string, currentProjectC
 	fmt.Printf("Extracted repo path: %s\n", repoPath)
 
 	// Check if module is in dependencies
-	version, found := currentProjectConfig.Dependencies.Modules[repoPath]
+	version, found := currentProjectConfig.Dependencies.Packages[repoPath]
 	if !found {
 		return nil, "", modules.REMOTE, fmt.Errorf("remote module %q is not installed\nRun `ferret get %s` to install it", repoPath, repoPath)
 	}
@@ -128,7 +128,7 @@ func (c *CompilerContext) resolveRemoteModule(importPath string, currentProjectC
 		return nil, "", modules.REMOTE, err
 	}
 
-	resolvedPath := filepath.Join(c.RemoteCachePath, host, owner, modules.BuildModuleSpec(repo, version), modulename)
+	resolvedPath := filepath.Join(c.RemoteCachePath, host, owner, modules.BuildPackageSpec(repo, version), modulename)
 
 	fmt.Printf("Using remote module: %s (%s)\n", repoPath, resolvedPath)
 

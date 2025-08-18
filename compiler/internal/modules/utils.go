@@ -55,7 +55,7 @@ func isSemanticVersion(version string) bool {
 	return true
 }
 
-func BuildModuleSpec(repoName, version string) string {
+func BuildPackageSpec(repoName, version string) string {
 	if version != "" {
 		return repoName + "@" + version
 	}

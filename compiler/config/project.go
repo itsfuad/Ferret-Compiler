@@ -79,7 +79,7 @@ func (conf *ProjectConfig) Save() error {
 	for key, value := range conf.Neighbors.Projects {
 		tomData["neighbors"][key] = value
 	}
-	for key, value := range conf.Dependencies.Modules {
+	for key, value := range conf.Dependencies.Packages {
 		tomData["dependencies"][key] = value
 	}
 
@@ -115,7 +115,7 @@ type BuildConfig struct {
 }
 
 type DependencyConfig struct {
-	Modules map[string]string `toml:"dependencies"` // module_name -> version
+	Packages map[string]string `toml:"dependencies"` // module_name -> version
 }
 
 // NeighborConfig defines neighboring project mappings (like Go's replace directive)
@@ -441,10 +441,10 @@ func parseBuildSection(tomlData toml.TOMLData, config *ProjectConfig) {
 
 func parseDependenciesSection(tomlData toml.TOMLData, config *ProjectConfig) {
 	if dependenciesSection, exists := tomlData["dependencies"]; exists {
-		config.Dependencies.Modules = make(map[string]string)
+		config.Dependencies.Packages = make(map[string]string)
 		for key, value := range dependenciesSection {
 			if strValue, ok := value.(string); ok {
-				config.Dependencies.Modules[key] = strValue
+				config.Dependencies.Packages[key] = strValue
 			}
 		}
 	}
