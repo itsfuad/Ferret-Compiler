@@ -2,7 +2,6 @@ package fs
 
 import (
 	"compiler/config"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,12 +73,6 @@ func DirectChilds(dirname string) (map[string]string, error) {
 			}
 			childs[projectConfig.Name] = rootLocation
 		}
-	}
-
-	fmt.Printf("Total child modules found: %d\n", len(childs))
-
-	for name, dir := range childs {
-		fmt.Printf(" - %q -> %q\n", name, dir)
 	}
 
 	return childs, nil

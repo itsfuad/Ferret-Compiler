@@ -1,9 +1,9 @@
-import "app/cmd/types";
+//import "app/cmd/types";
 
 //arrays
 let arrWithoutType = [1, 2, 3, 4]; // array without explicit type
 
-let arrWithType: []types::Int = [1, 2, 3, 4, 3] as []types::Int; // array with explicit type
+//let arrWithType: []types::Int = [1, 2, 3, 4, 3] as []types::Int; // array with explicit type
 
-arrWithType[2] = 10 as types::Int; // modifying an element
+//arrWithType[2] = 10 as types::Int; // modifying an element
 //arrWithType[2][2]; // accessing an element of invalid type, should be i32

@@ -1,0 +1,51 @@
+
+// implement Map
+type map struct {
+    entries: []struct {
+        key: str,
+        value: str
+    },
+    size: i32,
+    capacity: i32
+};
+
+// methods
+fn (m: map) add(key: str, value: str) {
+    if m.size >= m.capacity {
+        // Resize the map if capacity is reached
+        m.resize();
+    }
+    //m.entries = append(m.entries, { key: key, value: value });
+    m.size++;
+}
+
+fn (m: map) get(key: str) -> str {
+    for entry in m.entries {
+        if entry.key == key {
+            return entry.value;
+        }
+    }
+    return ""; // Return empty string if key not found
+}
+
+fn (m: map) remove(key: str) {
+    for i, entry in range m.entries {
+        if entry.key == key {
+            m.entries = append(m.entries[:i], m.entries[i+1:]...)
+            m.size--
+            return
+        }
+    }
+}
+
+fn (m: map) resize() {
+    m.capacity *= 2
+    newEntries := make([]struct {
+        key: str,
+        value: str
+    }, 0, m.capacity)
+    for _, entry in range m.entries {
+        newEntries = append(newEntries, entry)
+    }
+    m.entries = newEntries
+}

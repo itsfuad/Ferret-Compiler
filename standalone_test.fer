@@ -1,0 +1,9 @@
+// This is a standalone Ferret file for testing single-file LSP analysis
+
+let x = 10;
+let y = undeclared_variable; // This should cause an error
+
+fn main() {
+    print("Hello from standalone file");
+    let z = unknown_function(); // This should also cause an error
+}

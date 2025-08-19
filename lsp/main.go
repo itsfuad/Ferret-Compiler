@@ -18,8 +18,9 @@ import (
 	"lsp/wio"
 )
 
-// Track files that have had diagnostics published
+// Track files that have had diagnostics published and their analysis mode
 var filesWithDiagnostics = make(map[string]bool)
+var fileAnalysisMode = make(map[string]string) // "project" or "single"
 
 type Request struct {
 	Jsonrpc string          `json:"jsonrpc"`
@@ -78,9 +79,15 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
+	var connectionClosed bool
+
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Panic in handleConnection: %v", r)
+		}
+		if !connectionClosed {
+			conn.Close()
+			connectionClosed = true
 		}
 	}()
 
@@ -163,18 +170,15 @@ func handleTextDocumentChange(writer *bufio.Writer, req Request) {
 func handleExit(writer *bufio.Writer, conn net.Conn) {
 	log.Printf("Client requested exit")
 
-	// flush pending messages
+	// flush pending messages safely
 	if writer != nil {
-		writer.Flush()
+		if err := writer.Flush(); err != nil {
+			log.Printf("Warning: Could not flush buffer on exit: %v", err)
+		}
 	}
 
-	// defer closing conn until after graceful shutdown
-	if conn != nil {
-		conn.Close()
-	}
-
-	// exit cleanly
-	os.Exit(0)
+	// Don't close connection here - let the defer handle it
+	log.Println("Exit request processed")
 }
 
 func handleShutdown(writer *bufio.Writer, req Request) {
@@ -236,6 +240,12 @@ func readMessage(reader *bufio.Reader) (string, error) {
 }
 
 func writeMessage(writer *bufio.Writer, resp Response) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in writeMessage: %v", r)
+		}
+	}()
+
 	data, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Failed to marshal response: %v", err)
@@ -253,6 +263,12 @@ func writeMessage(writer *bufio.Writer, resp Response) {
 }
 
 func writeRawMessage(writer *bufio.Writer, msg interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in writeRawMessage: %v", r)
+		}
+	}()
+
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Failed to marshal message: %v", err)
@@ -269,63 +285,160 @@ func writeRawMessage(writer *bufio.Writer, msg interface{}) {
 	}
 }
 
-func processDiagnostics(writer *bufio.Writer, uri string) {
+// hasFileInReports checks if a specific file has any reports/diagnostics
+func hasFileInReports(reports report.Reports, filePath string) bool {
+	if reports == nil {
+		return false
+	}
 
-	var reports report.Reports
-
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Panic in processDiagnostics: %v", r)
-			makeDiagnostics(nil, writer, uri)
+	for _, r := range reports {
+		if r.FilePath == filePath {
+			return true
 		}
-	}()
+	}
+	return false
+}
+
+func processDiagnostics(writer *bufio.Writer, uri string) {
+	defer recoverFromProcessingPanic(writer, uri)
 
 	log.Println("Processing diagnostics for:", uri)
 
-	filePath, err := wio.UriToFilePath(uri)
+	filePath, err := validateFile(uri, writer)
 	if err != nil {
-		log.Println("Error converting URI to file path:", err)
-		publishDiagnostics(writer, uri, []map[string]interface{}{})
 		return
 	}
 
 	log.Println("File path:", filePath)
 
-	// Check if file exists
+	// Try project-based analysis first
+	if tryProjectBasedAnalysis(writer, uri, filePath) {
+		return
+	}
+
+	// Fall back to single-file analysis
+	trySingleFileAnalysis(writer, uri, filePath)
+}
+
+func recoverFromProcessingPanic(writer *bufio.Writer, uri string) {
+	if r := recover(); r != nil {
+		log.Printf("Panic in processDiagnostics: %v", r)
+		safelySendEmptyDiagnostics(writer, uri)
+	}
+}
+
+func safelySendEmptyDiagnostics(writer *bufio.Writer, uri string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Failed to send error diagnostics: %v", r)
+		}
+	}()
+	publishDiagnostics(writer, uri, []map[string]interface{}{})
+}
+
+func validateFile(uri string, writer *bufio.Writer) (string, error) {
+	filePath, err := wio.UriToFilePath(uri)
+	if err != nil {
+		log.Println("Error converting URI to file path:", err)
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		return "", err
+	}
+
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		log.Printf("File does not exist: %s", filePath)
 		publishDiagnostics(writer, uri, []map[string]interface{}{})
-		return
+		return "", err
+	}
+
+	return filePath, nil
+}
+
+func tryProjectBasedAnalysis(writer *bufio.Writer, uri, filePath string) bool {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in tryProjectBasedAnalysis: %v", r)
+		}
+	}()
+
+	if uri == "" || filePath == "" {
+		log.Printf("Empty URI or file path provided")
+		return false
 	}
 
 	projectRoot, err := config.GetProjectRoot(filePath)
 	if err != nil {
-		log.Println("Error finding project root:", err)
-		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		log.Printf("No project root found for %s: %v", filePath, err)
+		return false
+	}
+
+	log.Printf("Found project root for %s: %s", filePath, projectRoot)
+	result := cmd.CompileProjectForLSP(projectRoot, false)
+
+	if result == nil {
+		log.Printf("Project analysis returned nil result for %s", projectRoot)
+		return false
+	}
+
+	log.Printf("Project analysis completed - Success: %v, Reports: %d", result.Success, len(result.Reports))
+
+	if !result.Success && len(result.Reports) == 0 {
+		log.Printf("Project analysis failed and produced no reports for %s", projectRoot)
+		return false
+	}
+
+	if !hasFileInReports(result.Reports, filePath) {
+		log.Printf("File %s not found in project analysis results (checked %d reports)", filePath, len(result.Reports))
+		// Log the files that were found in reports for debugging
+		filePathsInReports := make([]string, 0)
+		for _, report := range result.Reports {
+			filePathsInReports = append(filePathsInReports, report.FilePath)
+		}
+		log.Printf("Files found in reports: %v", filePathsInReports)
+		return false
+	}
+
+	log.Printf("Project-based analysis successful for %s, processing %d reports", filePath, len(result.Reports))
+
+	// Mark all files in this project analysis as "project" mode - safely
+	for _, report := range result.Reports {
+		if report.FilePath != "" {
+			reportURI := wio.PathToURI(report.FilePath)
+			if reportURI != "" {
+				fileAnalysisMode[reportURI] = "project"
+			}
+		}
+	}
+
+	makeDiagnostics(result.Reports, writer, uri)
+	return true
+}
+
+func trySingleFileAnalysis(writer *bufio.Writer, uri, filePath string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in trySingleFileAnalysis: %v", r)
+		}
+	}()
+
+	if uri == "" || filePath == "" {
+		log.Printf("Empty URI or file path provided to single file analysis")
 		return
 	}
 
-	conf, err := config.LoadProjectConfig(projectRoot)
-	if err != nil {
-		log.Println("Error loading project configuration:", err)
-		publishDiagnostics(writer, uri, []map[string]interface{}{})
-		return
+	log.Println("Falling back to single-file analysis")
+	result := cmd.CompileForLSP(filePath, false)
+
+	// Mark this file as "single" mode - safely
+	if uri != "" {
+		fileAnalysisMode[uri] = "single"
 	}
 
-	context := cmd.Compile(conf, false)
-
-	// Check if context or Reports is nil
-	if context == nil {
-		log.Println("Compilation context is nil")
+	if result != nil {
+		makeDiagnostics(result.Reports, writer, uri)
+	} else {
+		log.Printf("Single-file analysis failed for %s", filePath)
 		publishDiagnostics(writer, uri, []map[string]interface{}{})
-		return
 	}
-
-	reports = context.Reports
-
-	makeDiagnostics(reports, writer, uri)
-
-	context.Destroy()
 }
 
 func makeDiagnostics(reports report.Reports, writer *bufio.Writer, uri string) {
@@ -336,14 +449,21 @@ func makeDiagnostics(reports report.Reports, writer *bufio.Writer, uri string) {
 	}
 
 	// Group diagnostics by file URI
+	diagnosticsByFile := createDiagnosticsByFile(reports)
+	log.Printf("Found %d problems grouped into %d files\n", len(reports), len(diagnosticsByFile))
+
+	// Publish diagnostics for each file separately
+	publishDiagnosticsForFiles(writer, diagnosticsByFile)
+
+	// Clear diagnostics for files that no longer have problems
+	clearOldDiagnostics(writer, diagnosticsByFile, uri)
+}
+
+func createDiagnosticsByFile(reports report.Reports) map[string][]map[string]interface{} {
 	diagnosticsByFile := make(map[string][]map[string]interface{})
 
-	log.Printf("Found %d problems\n", len(reports))
-
 	for _, report := range reports {
-		// Convert file path to URI format
 		fileURI := wio.PathToURI(report.FilePath)
-
 		diagnostic := map[string]interface{}{
 			"range": map[string]interface{}{
 				"start": map[string]int{"line": report.Location.Start.Line - 1, "character": report.Location.Start.Column - 1},
@@ -353,28 +473,57 @@ func makeDiagnostics(reports report.Reports, writer *bufio.Writer, uri string) {
 			"severity": getSeverity(report.Level),
 		}
 
-		// Group diagnostics by file
 		if diagnosticsByFile[fileURI] == nil {
 			diagnosticsByFile[fileURI] = make([]map[string]interface{}, 0)
 		}
 		diagnosticsByFile[fileURI] = append(diagnosticsByFile[fileURI], diagnostic)
 	}
 
-	// Publish diagnostics for each file separately
+	return diagnosticsByFile
+}
+
+func publishDiagnosticsForFiles(writer *bufio.Writer, diagnosticsByFile map[string][]map[string]interface{}) {
 	for fileURI, fileDiagnostics := range diagnosticsByFile {
 		log.Printf("Publishing %d diagnostics for %s", len(fileDiagnostics), fileURI)
 		publishDiagnostics(writer, fileURI, fileDiagnostics)
 		filesWithDiagnostics[fileURI] = true
 	}
+}
 
-	// Clear diagnostics for files that previously had problems but now don't
+func clearOldDiagnostics(writer *bufio.Writer, diagnosticsByFile map[string][]map[string]interface{}, uri string) {
+	if len(diagnosticsByFile) == 1 {
+		clearSingleFileDiagnostics(writer, diagnosticsByFile, uri)
+	} else {
+		clearProjectFileDiagnostics(writer, diagnosticsByFile)
+	}
+}
+
+func clearSingleFileDiagnostics(writer *bufio.Writer, diagnosticsByFile map[string][]map[string]interface{}, uri string) {
+	if len(diagnosticsByFile[uri]) == 0 {
+		log.Printf("Clearing diagnostics for single file %s (no problems)", uri)
+		publishDiagnostics(writer, uri, []map[string]interface{}{})
+		delete(filesWithDiagnostics, uri)
+	}
+}
+
+func clearProjectFileDiagnostics(writer *bufio.Writer, diagnosticsByFile map[string][]map[string]interface{}) {
 	for previousFileURI := range filesWithDiagnostics {
-		if _, hasProblems := diagnosticsByFile[previousFileURI]; !hasProblems {
-			log.Printf("Clearing diagnostics for %s (no longer has problems)", previousFileURI)
+		if shouldClearFile(previousFileURI, diagnosticsByFile) {
+			log.Printf("Clearing diagnostics for project file %s (no longer has problems)", previousFileURI)
 			publishDiagnostics(writer, previousFileURI, []map[string]interface{}{})
 			delete(filesWithDiagnostics, previousFileURI)
+			delete(fileAnalysisMode, previousFileURI)
 		}
 	}
+}
+
+func shouldClearFile(fileURI string, diagnosticsByFile map[string][]map[string]interface{}) bool {
+	if fileURI == "" {
+		return false
+	}
+	mode, exists := fileAnalysisMode[fileURI]
+	_, hasProblems := diagnosticsByFile[fileURI]
+	return exists && mode == "project" && !hasProblems
 }
 
 func getSeverity(level report.PROBLEM_TYPE) int {
