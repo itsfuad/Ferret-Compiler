@@ -75,12 +75,12 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 		return
 	}
 
-	if ok, err := isImplicitCastable(explicitType, inferredType); !ok {
+	if ok, _ := isImplicitCastable(explicitType, inferredType); !ok {
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			initializer.Loc(),
-			fmt.Sprintf("cannot assign value of type %q to variable %q of type %q: %s",
-				inferredType, variable.Identifier.Name, explicitType, err.Error()),
+			fmt.Sprintf("cannot assign value of type %q to variable %q of type %q",
+				inferredType, variable.Identifier.Name, explicitType),
 			report.TYPECHECK_PHASE,
 		)
 
@@ -275,7 +275,7 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
 	if fn == nil || fn.ID == "" {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.TYPECHECK_PHASE)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Get function symbol and its scope
@@ -287,7 +287,7 @@ func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral,
 			"Function literal '"+fn.ID+"' not found in symbol table",
 			report.TYPECHECK_PHASE,
 		)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Check the function literal using the helper function

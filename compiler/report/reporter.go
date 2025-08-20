@@ -69,8 +69,12 @@ func (r *Reports) HasWarnings() bool {
 }
 func (r *Reports) DisplayAll() {
 
-	for _, report := range *r {
+	ln := len(*r) - 1
+	for i, report := range *r {
 		printReport(report)
+		if i < ln {
+			fmt.Print("\n\n")
+		}
 	}
 
 	(*r).ShowStatus()
@@ -95,7 +99,6 @@ type Report struct {
 // It shows file location, a code snippet, underline highlighting, any hints,
 // and panics if the diagnostic level is critical or indicates a syntax error.
 func printReport(r *Report) {
-
 	// Generate the code snippet and underline.
 	// hLen is the padding length for hint messages.
 	snippet, underline := makeParts(r)
@@ -122,6 +125,9 @@ func printReport(r *Report) {
 	//numlen is the length of the line number
 	numlen := len(fmt.Sprint(r.Location.Start.Line))
 
+	// The error message type and the message itself are printed in the same color.
+	reportColor.Print(reportMsgType)
+	colors.WHITE.Println(r.Message)
 	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
 	// The code snippet and underline are printed in the same color.
 	fmt.Print(snippet)
@@ -133,11 +139,7 @@ func printReport(r *Report) {
 		reportColor.Println(underline)
 	}
 
-	// The error message type and the message itself are printed in the same color.
-	reportColor.Print(reportMsgType)
-	// The file path is printed in grey.
-
-	colors.WHITE.Println(r.Message)
+	colors.GREY.Println(strings.Repeat("-", numlen+2))
 }
 
 // makeParts reads the source file and generates a code snippet and underline
@@ -343,7 +345,7 @@ func (r Reports) ShowStatus() {
 
 	if probCount > 0 {
 		messageColor = colors.RED
-		messageColor.Print("------------- failed with ")
+		messageColor.Print("------------- failed ")
 	} else {
 		messageColor = colors.GREEN
 		messageColor.Print("------------- Passed ")
@@ -351,18 +353,18 @@ func (r Reports) ShowStatus() {
 
 	totalProblemsString := ""
 
-	if warningCount > 0 {
-		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s) ", warningCount, _strings.Plural("warning", "warnings", warningCount))
-		if probCount > 0 {
-			totalProblemsString += colors.ORANGE.Sprintf(", ")
-		}
-	}
+	// Example combinations:
+	// -- Passed -- // No error or warning
+	// -- Passed with N warnings -- // No error, just N warnings
+	// -- Failed with N errors -- // No warning, just N errors
+	// -- Passed with N warnings and M errors -- // N warnings, M errors
 
-	//errCode := 0
-
-	if probCount > 0 {
-		//errCode = -1
-		totalProblemsString += colorMap[NORMAL_ERROR].Sprintf("%d %s", probCount, _strings.Plural("error", "errors", probCount))
+	if warningCount > 0 && probCount == 0 {
+		totalProblemsString = fmt.Sprintf("with %d %s ", warningCount, _strings.Plural("warning", "warnings", warningCount))
+	} else if probCount > 0 && warningCount == 0 {
+		totalProblemsString = fmt.Sprintf("with %d %s ", probCount, _strings.Plural("error", "errors", probCount))
+	} else if probCount > 0 && warningCount > 0 {
+		totalProblemsString = fmt.Sprintf("with %d %s and %d %s ", warningCount, _strings.Plural("warning", "warnings", warningCount), probCount, _strings.Plural("error", "errors", probCount))
 	}
 
 	messageColor.Print(totalProblemsString)

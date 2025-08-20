@@ -22,14 +22,11 @@ func CompileForLSP(filePath string, isDebugEnabled bool) *CompilerResult {
 		}
 	}()
 
-	// Try single-file analysis
-	if IsSingleFileCandidate(filePath) {
-		context = CompileSingleFile(filePath, isDebugEnabled)
-		if context != nil {
-			return &CompilerResult{
-				Reports: context.Reports,
-				Success: !context.Reports.HasErrors(),
-			}
+	context = CompileSingleFile(filePath, isDebugEnabled)
+	if context != nil {
+		return &CompilerResult{
+			Reports: context.Reports,
+			Success: !context.Reports.HasErrors(),
 		}
 	}
 

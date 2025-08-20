@@ -37,17 +37,17 @@ func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResoluti
 	symbolTable, err := cm.SymbolTable.GetImportedModule(res.Module.Name)
 	if err != nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), err.Error(), report.RESOLVER_PHASE)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	resIdentifier, found := symbolTable.Lookup(res.Identifier.Name)
 	if !found {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol %q not found in module %q", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
-		return nil
+		return &stype.Invalid{}
 	}
 	if resIdentifier.Type == nil {
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol %q has no type defined", res.Identifier.Name), report.RESOLVER_PHASE)
-		return nil
+		return &stype.Invalid{}
 	}
 	if r.Debug {
 		//print symbol X found in module Y imported from Z

@@ -18,7 +18,7 @@ import (
 func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Module) stype.Type {
 
 	if expr == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	var resultType stype.Type
@@ -81,7 +81,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 	// Get the type of the function being called
 	functionType := evaluateExpressionType(r, *call.Caller, cm)
 	if functionType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Verify it's a function type
@@ -93,7 +93,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 			fmt.Sprintf("cannot call non-function type: %s", functionType),
 			report.TYPECHECK_PHASE,
 		)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Check argument count
@@ -146,13 +146,13 @@ func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccess
 			"Invalid field access expression",
 			report.TYPECHECK_PHASE,
 		)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Evaluate the object being accessed
 	objectType := evaluateExpressionType(r, *fieldAccess.Object, cm)
 	if objectType == nil {
-		return nil // Error already reported
+		return &stype.Invalid{} // Error already reported
 	}
 
 	fieldName := fieldAccess.Field.Name
@@ -178,7 +178,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			fmt.Sprintf("Struct has no field named %q", propName),
 			report.TYPECHECK_PHASE,
 		)
-		return nil // Field not found
+		return &stype.Invalid{} // Field not found
 	}
 
 	if interfaceType, ok := unwrapped.(*stype.InterfaceType); ok {
@@ -192,7 +192,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			fmt.Sprintf("Interface has no method named %q", propName),
 			report.TYPECHECK_PHASE,
 		)
-		return nil // Method not found
+		return &stype.Invalid{} // Method not found
 	}
 
 	// Check for user-defined type methods
@@ -206,7 +206,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 				fmt.Sprintf("Unknown user type %q", userType.Name),
 				report.TYPECHECK_PHASE,
 			)
-			return nil // User type not found
+			return &stype.Invalid{} // User type not found
 		}
 
 		prop, found := userSymbol.SelfScope.Lookup(propName)
@@ -217,13 +217,13 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 				fmt.Sprintf("User type %q has no method or field named %q", userType.Name, propName),
 				report.TYPECHECK_PHASE,
 			)
-			return nil // Method/field not found
+			return &stype.Invalid{} // Method/field not found
 		}
 
 		return prop.Type // Return the method/field type
 	}
 
-	return nil
+	return &stype.Invalid{}
 }
 
 // findStructField looks for a field in the struct type definition
@@ -231,7 +231,7 @@ func findStructField(structType *stype.StructType, fieldName string) stype.Type 
 	if fieldType, exists := structType.Fields[fieldName]; exists {
 		return fieldType
 	}
-	return nil
+	return &stype.Invalid{}
 }
 
 // checkStructLiteralType handles struct literal expressions like Person{name: "Alice", age: 30} or struct{x: 10, y: 20}

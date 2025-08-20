@@ -17,7 +17,7 @@ func checkIdentifierType(e *ast.IdentifierExpr, cm *modules.Module) stype.Type {
 	if sym, found := cm.SymbolTable.Lookup(e.Name); found {
 		return sym.Type
 	}
-	return nil
+	return &stype.Invalid{}
 }
 
 // checkBinaryExprType infers the result type of binary expressions
@@ -26,7 +26,7 @@ func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *module
 	rightType := evaluateExpressionType(r, *e.Right, cm)
 
 	if leftType == nil || rightType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	leftType = semantic.UnwrapType(leftType)   // Unwrap any type aliases
@@ -57,7 +57,7 @@ func getBinaryOperationResultType(operator string, left, right stype.Type) stype
 	case "&", "|", "^", "<<", ">>":
 		return getBitwiseResultType(left, right)
 	default:
-		return nil
+		return &stype.Invalid{}
 	}
 }
 
@@ -73,7 +73,7 @@ func getArithmeticResultType(operator string, left, right stype.Type) stype.Type
 		return getCommonNumericType(left, right)
 	}
 
-	return nil
+	return &stype.Invalid{}
 }
 
 // getComparisonResultType handles comparison operations
@@ -86,7 +86,7 @@ func getComparisonResultType(left, right stype.Type) stype.Type {
 		return &stype.PrimitiveType{TypeName: types.BOOL}
 	}
 
-	return nil
+	return &stype.Invalid{}
 }
 
 // getLogicalResultType handles logical operations
@@ -94,7 +94,7 @@ func getLogicalResultType(left, right stype.Type) stype.Type {
 	if semantic.IsBoolType(left) && semantic.IsBoolType(right) {
 		return &stype.PrimitiveType{TypeName: types.BOOL}
 	}
-	return nil
+	return &stype.Invalid{}
 }
 
 // getBitwiseResultType handles bitwise operations
@@ -102,7 +102,7 @@ func getBitwiseResultType(left, right stype.Type) stype.Type {
 	if semantic.IsIntegerType(left) && semantic.IsIntegerType(right) {
 		return getCommonNumericType(left, right)
 	}
-	return nil
+	return &stype.Invalid{}
 }
 
 // getCommonNumericType finds the common type for numeric operations
@@ -112,7 +112,7 @@ func getCommonNumericType(left, right stype.Type) stype.Type {
 	rightPrim, rightOk := right.(*stype.PrimitiveType)
 
 	if !leftOk || !rightOk {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Promotion hierarchy: higher numbers win
@@ -128,7 +128,7 @@ func getCommonNumericType(left, right stype.Type) stype.Type {
 	rightLevel, rightExists := hierarchy[rightPrim.TypeName]
 
 	if !leftExists || !rightExists {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	if leftLevel >= rightLevel {
@@ -146,13 +146,13 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 			"cannot infer array type from empty array literal",
 			report.TYPECHECK_PHASE,
 		)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Get type from first element
 	elementType := evaluateExpressionType(r, e.Elements[0], cm)
 	if elementType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Verify all elements are compatible
@@ -175,7 +175,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 				semanticError.AddHint(msg.CastHint(elementType))
 			}
 
-			return nil
+			return &stype.Invalid{}
 		}
 	}
 
@@ -186,12 +186,12 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modules.Module) stype.Type {
 	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
 	if indexableType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	indexType := evaluateExpressionType(r, *e.Index, cm)
 	if indexType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	if !semantic.IsIntegerType(indexType) {
@@ -201,7 +201,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 			"array index must be an integer type",
 			report.TYPECHECK_PHASE,
 		)
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Check if it's an array
@@ -220,13 +220,13 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 		fmt.Sprintf("type %q is not indexable", indexableType),
 		report.TYPECHECK_PHASE,
 	)
-	return nil
+	return &stype.Invalid{}
 }
 
 func checkUnaryExprType(r *analyzer.AnalyzerNode, e *ast.UnaryExpr, cm *modules.Module) stype.Type {
 	operandType := evaluateExpressionType(r, *e.Operand, cm)
 	if operandType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Handle specific unary operations
@@ -248,14 +248,14 @@ func checkUnaryExprType(r *analyzer.AnalyzerNode, e *ast.UnaryExpr, cm *modules.
 		)
 	}
 
-	return nil
+	return &stype.Invalid{}
 }
 
 // checkPrefixExprType handles prefix increment/decrement operations (++x, --x)
 func checkPrefixExprType(r *analyzer.AnalyzerNode, e *ast.PrefixExpr, cm *modules.Module) stype.Type {
 	operandType := evaluateExpressionType(r, *e.Operand, cm)
 	if operandType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Handle prefix operations
@@ -279,14 +279,14 @@ func checkPrefixExprType(r *analyzer.AnalyzerNode, e *ast.PrefixExpr, cm *module
 		)
 	}
 
-	return nil
+	return &stype.Invalid{}
 }
 
 // checkPostfixExprType handles postfix increment/decrement operations (x++, x--)
 func checkPostfixExprType(r *analyzer.AnalyzerNode, e *ast.PostfixExpr, cm *modules.Module) stype.Type {
 	operandType := evaluateExpressionType(r, *e.Operand, cm)
 	if operandType == nil {
-		return nil
+		return &stype.Invalid{}
 	}
 
 	// Handle postfix operations
@@ -310,5 +310,5 @@ func checkPostfixExprType(r *analyzer.AnalyzerNode, e *ast.PostfixExpr, cm *modu
 		)
 	}
 
-	return nil
+	return &stype.Invalid{}
 }

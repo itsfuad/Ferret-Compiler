@@ -107,7 +107,7 @@ func DeriveSemanticType(astType ast.DataType, module *modules.Module) (stype.Typ
 	case *ast.UserDefinedType:
 		return resolveUserDefinedType(t, module)
 	default:
-		return nil, fmt.Errorf("unsupported AST type: %T", t)
+		return &stype.Invalid{}, fmt.Errorf("unsupported AST type: %T", t)
 	}
 }
 
@@ -234,4 +234,13 @@ func deriveSemanticArrayType(array *ast.ArrayType, module *modules.Module) (styp
 	return &stype.ArrayType{
 		ElementType: elementType,
 	}, nil
+}
+
+func IsInvalidType(typ stype.Type) bool {
+	switch typ.(type) {
+	case *stype.Invalid:
+		return true
+	default:
+		return false
+	}
 }

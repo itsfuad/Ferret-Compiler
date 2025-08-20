@@ -116,18 +116,3 @@ func createSingleFileContext(projectConfig *config.ProjectConfig) *ctx.CompilerC
 		ProjectRootFullPath: projectConfig.ProjectRoot,
 	}
 }
-
-// IsSingleFileCandidate checks if a file should be analyzed in single-file mode
-func IsSingleFileCandidate(filePath string) bool {
-	// Check if file has .fer extension
-	if filepath.Ext(filePath) != ".fer" {
-		return false
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(filePath); err != nil {
-		return false
-	}
-
-	return true
-}
