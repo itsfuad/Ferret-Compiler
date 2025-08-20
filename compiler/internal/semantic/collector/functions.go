@@ -24,7 +24,9 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 
 func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 
-	colors.AQUA.Printf("Collecting function literal %q at %s\n", fn.ID, fn.Loc())
+	if c.Debug {
+		colors.AQUA.Printf("Collecting function literal %q at %s\n", fn.ID, fn.Loc())
+	}
 
 	functionScope := declareFunctionSymbol(c, fn, cm.SymbolTable, symbol.SymbolFunc)
 	if functionScope == nil {
@@ -139,7 +141,9 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 		return
 	}
 
-	colors.GREEN.Printf("Declared receiver symbol %q (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
+	if c.Debug {
+		colors.GREEN.Printf("Declared receiver symbol %q (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
+	}
 
 	collectFunctionParameters(c, method.Function, methodScope)
 	collectFunctionBody(c, method.Function, cm, methodScope)

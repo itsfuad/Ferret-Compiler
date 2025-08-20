@@ -11,9 +11,9 @@ output = "bin"
 path = ".ferret"
 
 [external]
+allow-neighbor-import = true
 allow-sharing = false
 allow-remote-import = true
-allow-neighbor-import = true
 
 [neighbors]
 neighbor = "../app2"

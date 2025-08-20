@@ -119,8 +119,6 @@ func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *mo
 }
 
 func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *modules.Module) {
-	colors.ORANGE.Printf("Resolving method declaration %q at %s\n", method.Method.Name, method.Loc())
-
 	//get the receiver symbol
 	receiverSymbol, found := cm.SymbolTable.Lookup(method.Receiver.Type.Type().String())
 	if !found {
@@ -146,8 +144,6 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
-
-	colors.PINK.Printf("Resolving method %q on receiver type %q at %s\n", method.Method.Name, receiverSymbol.Type, method.Method.Loc())
 
 	receiverSymbol.Type = receiverType // Update receiver type
 	receiverParam, found := methodSymbol.SelfScope.Lookup(method.Receiver.Identifier.Name)
@@ -180,9 +176,7 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 		castedReceiverSymbol.Methods = make(map[string]*stype.FunctionType)
 	}
 	// store function type in the method type
-	fmt.Printf("Before add: %v\n", castedReceiverSymbol.Methods)
 	castedReceiverSymbol.Methods[method.Method.Name] = methodSymbol.Type.(*stype.FunctionType)
-	fmt.Printf("After add: %v\n", castedReceiverSymbol.Methods)
 }
 
 func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {

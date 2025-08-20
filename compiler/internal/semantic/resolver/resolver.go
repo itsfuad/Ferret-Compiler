@@ -82,24 +82,17 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 
 // checkUnusedImports compares imported modules vs used modules and reports warnings
 func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module) {
-	if r.Debug {
-		colors.YELLOW.Printf("Checking unused imports. Used imports: %v\n", currentModule.UsedImports)
-	}
-
 	// Collect all imports from the AST
 	for _, node := range r.Program.Nodes {
 		if importStmt, ok := node.(*ast.ImportStmt); ok {
 			alias := importStmt.Alias
-			if r.Debug {
-				colors.YELLOW.Printf("Found import %q (alias: %s), used: %t\n", importStmt.ImportPath.Value, alias, currentModule.UsedImports[alias])
-			}
 			if !currentModule.UsedImports[alias] {
 				r.Ctx.Reports.AddWarning(
 					r.Program.FullPath,
 					importStmt.Loc(),
 					fmt.Sprintf("Unused import: %q", importStmt.ImportPath.Value),
 					report.RESOLVER_PHASE,
-				).AddHint("Remove the import or use symbols from this module")
+				).AddHint("Remove this import or use symbols from this module")
 			}
 		}
 	}

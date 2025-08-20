@@ -66,7 +66,6 @@ func (c *CompilerContext) ResolveImportPath(importPath string) (*config.ProjectC
 		return nil, "", modType, err
 	}
 
-	fmt.Printf("Resolved Path: %s\n", finalPath)
 	return projectConfig, finalPath, modType, nil
 }
 
@@ -104,9 +103,6 @@ func (c *CompilerContext) resolveRemoteModule(importPath string, currentProjectC
 	if err != nil {
 		return nil, "", modules.REMOTE, err
 	}
-
-	fmt.Printf("Extracted repo path: %s\n", repoPath)
-
 	// Check if module is in dependencies
 	version, found := currentProjectConfig.Dependencies.Packages[repoPath]
 	if !found {
@@ -130,8 +126,6 @@ func (c *CompilerContext) resolveRemoteModule(importPath string, currentProjectC
 
 	resolvedPath := filepath.Join(c.RemoteCachePath, host, owner, modules.BuildPackageSpec(repo, version), modulename)
 
-	fmt.Printf("Using remote module: %s (%s)\n", repoPath, resolvedPath)
-
 	return currentProjectConfig, resolvedPath, modules.REMOTE, nil
 }
 
@@ -153,7 +147,6 @@ func (c *CompilerContext) resolveBuiltinModule(path, cleanPath, packageName stri
 		return nil, "", modules.BUILTIN, err
 	}
 
-	fmt.Printf("Using built-in module: %s (%s)\n", packageName, path)
 	resolvedPath := filepath.Join(builtinProject.ProjectRoot, cleanPath)
 	return builtinProject, resolvedPath, modules.BUILTIN, nil
 }

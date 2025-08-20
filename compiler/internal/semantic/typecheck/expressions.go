@@ -1,7 +1,6 @@
 package typecheck
 
 import (
-	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/semantic"
@@ -139,8 +138,6 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 
 // checkFieldAccessType handles struct field access and method access
 func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccessExpr, cm *modules.Module) stype.Type {
-
-	colors.PINK.Printf("Checking field access on field %q at %s\n", fieldAccess.Field.Name, fieldAccess.Loc())
 
 	if fieldAccess.Object == nil || fieldAccess.Field == nil {
 		r.Ctx.Reports.AddSemanticError(

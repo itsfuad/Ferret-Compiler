@@ -228,8 +228,6 @@ func isStructCompatible(target, source stype.Type, isImplicit bool) (bool, error
 		checkExplicitFields(targetStruct, sourceStruct, problems)
 	}
 
-	fmt.Printf("Struct compatibility check: target=%s, source=%s, problems=%v\n", targetStruct, sourceStruct, problems)
-
 	if len(*problems) > 0 {
 		return false, fmt.Errorf("\n- %s", strings.Join(*problems, "\n- "))
 	}
@@ -287,9 +285,7 @@ func isInterfaceCompatible(target, source stype.Type) (bool, error) {
 		if !sourceStructOk {
 			return false, fmt.Errorf("type %s is neither an interface nor a user defined type", source)
 		}
-		fmt.Printf("set methods for user type %s\n", sourceUser.Name)
 		sourceMethods = sourceUser.Methods
-		fmt.Printf("sourceMethods: %v\n", sourceMethods)
 	} else {
 		sourceMethods = sourceInterface.Methods
 	}

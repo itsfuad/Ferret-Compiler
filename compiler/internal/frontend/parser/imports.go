@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"compiler/colors"
 	"compiler/config"
-
-	//"compiler/config"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/modules"
@@ -52,8 +49,6 @@ func parseImport(p *Parser) ast.Node {
 		p.ctx.Reports.AddError(p.fullPath, &loc, err.Error(), report.PARSING_PHASE)
 		skip = true
 	}
-
-	colors.BOLD_PURPLE.Printf("Import module path %q from import path %q\n", moduleFullPath, importpath)
 
 	if !skip {
 		skip = shouldSkip(p, &loc, config, importpath, modType)
