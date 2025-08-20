@@ -121,7 +121,7 @@ func printReport(r *Report) {
 
 	//numlen is the length of the line number
 	numlen := len(fmt.Sprint(r.Location.Start.Line))
-	
+
 	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
 	// The code snippet and underline are printed in the same color.
 	fmt.Print(snippet)
