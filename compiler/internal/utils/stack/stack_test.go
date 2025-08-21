@@ -99,7 +99,7 @@ func BenchmarkStackPop(b *testing.B) {
 	for i := 0; b.Loop(); i++ {
 		stack.Push(i)
 	}
-	
+
 	for b.Loop() {
 		stack.Pop()
 	}

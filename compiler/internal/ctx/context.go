@@ -164,7 +164,6 @@ func (c *CompilerContext) validateResolvedPath(resolvedPath, importPath string) 
 	return finalPath, nil
 }
 
-
 // CachePathToImportPath converts a remote module file path back to its import path
 func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 	// Convert: D:\...\cache\github.com\itsfuad\ferret-mod\data\bigint.fer
