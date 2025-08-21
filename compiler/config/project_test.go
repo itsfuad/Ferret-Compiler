@@ -11,7 +11,7 @@ import (
 
 const (
 	testProjectName     = "test-project"
-	testCachePath       = ".ferret/cache"
+	testCachePath       = ".ferret"
 	testTempDirErrMsg   = "Failed to create temp dir: %v"
 	testCompilerVersion = "0.1.0"
 	testProjectVersion  = "1.0.0"

@@ -8,7 +8,6 @@ import (
 	"compiler/internal/semantic/stype"
 	"compiler/internal/types"
 	"compiler/internal/utils"
-	str "compiler/internal/utils/strings"
 	"compiler/report"
 	"fmt"
 	"slices"
@@ -217,7 +216,7 @@ func isStructCompatible(target, source stype.Type, isImplicit bool) (bool, error
 	sourceStruct, sourceOk := semantic.UnwrapType(source).(*stype.StructType)
 
 	if !targetStructOk || !sourceOk {
-		return false, fmt.Errorf("%s cast not possible between non-struct types: %s to %s", str.Ternary(isImplicit, "implicit", "explicit"), target, source)
+		return false, fmt.Errorf("%s cast not possible between non-struct types: %s to %s", utils.Ternary(isImplicit, "implicit", "explicit"), target, source)
 	}
 
 	problems := &[]string{}

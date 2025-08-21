@@ -7,7 +7,7 @@ import "std/io";
 import "github.com/itsfuad/ferret-mod/data/bigint";
 import "github.com/itsfuad/ferret-mod/external/importer";
 
-let outvar: i32 = 10.7 as i32;
+let outvar: i32 = 10;
 
 fn add(x: i32, y: i32) -> i32 {
     let invar = 8;

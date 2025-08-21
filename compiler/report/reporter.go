@@ -9,8 +9,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/source"
 
-	//"compiler/internal/symboltable"
-	_strings "compiler/internal/utils/strings"
+	"compiler/internal/utils"
 )
 
 type PROBLEM_TYPE string
@@ -360,11 +359,11 @@ func (r Reports) ShowStatus() {
 	// -- Passed with N warnings and M errors -- // N warnings, M errors
 
 	if warningCount > 0 && probCount == 0 {
-		totalProblemsString = fmt.Sprintf("with %d %s ", warningCount, _strings.Plural("warning", "warnings", warningCount))
+		totalProblemsString = fmt.Sprintf("with %d %s ", warningCount, utils.Ternary(warningCount == 1, "warning", "warnings"))
 	} else if probCount > 0 && warningCount == 0 {
-		totalProblemsString = fmt.Sprintf("with %d %s ", probCount, _strings.Plural("error", "errors", probCount))
+		totalProblemsString = fmt.Sprintf("with %d %s ", probCount, utils.Ternary(probCount == 1, "error", "errors"))
 	} else if probCount > 0 && warningCount > 0 {
-		totalProblemsString = fmt.Sprintf("with %d %s and %d %s ", warningCount, _strings.Plural("warning", "warnings", warningCount), probCount, _strings.Plural("error", "errors", probCount))
+		totalProblemsString = fmt.Sprintf("with %d %s and %d %s ", warningCount, utils.Ternary(warningCount == 1, "warning", "warnings"), probCount, utils.Ternary(probCount == 1, "error", "errors"))
 	}
 
 	messageColor.Print(totalProblemsString)

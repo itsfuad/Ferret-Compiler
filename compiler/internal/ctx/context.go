@@ -14,6 +14,7 @@ import (
 	"compiler/internal/modules"
 	"compiler/internal/symbol"
 	"compiler/internal/utils/fs"
+	"compiler/internal/utils/stack"
 	"compiler/report"
 )
 
@@ -28,7 +29,7 @@ type CompilerContext struct {
 	Reports    report.Reports
 	// Project configuration
 	ProjectConfig       *config.ProjectConfig
-	ProjectStack        []*config.ProjectConfig
+	ProjectStack        *stack.Stack[*config.ProjectConfig] // Stack of project configurations for nested imports
 	ProjectRootFullPath string
 	BuiltinModules      map[string]string // key: projectname, value: path
 
@@ -37,11 +38,6 @@ type CompilerContext struct {
 
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
-
-	// Track modules that are currently being parsed to prevent infinite recursion
-	_parsingModules map[string]bool
-	// Keep track of the parsing stack to show cycle paths
-	_parsingStack []string
 }
 
 // ResolveImportPath categorizes an import path with proper neighbor package name resolution
@@ -51,7 +47,7 @@ func (c *CompilerContext) ResolveImportPath(importPath string) (*config.ProjectC
 	}
 
 	packageName := fs.FirstPart(importPath)
-	currentProjectConfig := c.PeekProjectConfigStack()
+	currentProjectConfig := c.ProjectStack.Peek()
 	cleanPath := strings.TrimPrefix(importPath, packageName+"/")
 
 	// Determine module type and resolve path
@@ -168,30 +164,6 @@ func (c *CompilerContext) validateResolvedPath(resolvedPath, importPath string) 
 	return finalPath, nil
 }
 
-func (c *CompilerContext) PeekProjectConfigStack() *config.ProjectConfig {
-	if len(c.ProjectStack) == 0 {
-		return nil
-	}
-	return c.ProjectStack[len(c.ProjectStack)-1]
-}
-
-func (c *CompilerContext) PushProjectStack(projectConfig *config.ProjectConfig) {
-	if c.ProjectStack == nil {
-		c.ProjectStack = make([]*config.ProjectConfig, 0)
-	}
-
-	c.ProjectStack = append(c.ProjectStack, projectConfig)
-}
-
-func (c *CompilerContext) PopProjectStack() *config.ProjectConfig {
-	if len(c.ProjectStack) == 0 {
-		return nil
-	}
-	projectConfig := c.PeekProjectConfigStack()
-	c.ProjectStack = c.ProjectStack[:len(c.ProjectStack)-1]
-
-	return projectConfig
-}
 
 // CachePathToImportPath converts a remote module file path back to its import path
 func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
@@ -433,31 +405,6 @@ func (c *CompilerContext) findCyclePath(start, target string, visited map[string
 	return nil
 }
 
-// MarkParseStart marks a module as currently being parsed
-func (c *CompilerContext) MarkParseStart(importPath string) {
-	if c._parsingModules == nil {
-		c._parsingModules = make(map[string]bool)
-	}
-	if c._parsingStack == nil {
-		c._parsingStack = make([]string, 0)
-	}
-
-	c._parsingModules[importPath] = true
-	c._parsingStack = append(c._parsingStack, importPath)
-}
-
-// MarkParseFinish marks a module as no longer being parsed
-func (c *CompilerContext) MarkParseFinish(importPath string) {
-	if c._parsingModules != nil {
-		delete(c._parsingModules, importPath)
-	}
-
-	// Remove from stack (should be the last element)
-	if len(c._parsingStack) > 0 && c._parsingStack[len(c._parsingStack)-1] == importPath {
-		c._parsingStack = c._parsingStack[:len(c._parsingStack)-1]
-	}
-}
-
 func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
@@ -498,7 +445,7 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 		Modules:             make(map[string]*modules.Module),
 		Reports:             report.Reports{},
 		ProjectConfig:       projectConfig,
-		ProjectStack:        []*config.ProjectConfig{},
+		ProjectStack:        stack.New[*config.ProjectConfig](),
 		RemoteCachePath:     remoteCachePath,
 		BuiltinModules:      BuiltinModules,
 		ProjectRootFullPath: projectConfig.ProjectRoot,
@@ -516,6 +463,4 @@ func (c *CompilerContext) Destroy() {
 	c.DepGraph = nil
 	c.BuiltinModules = nil
 	c.ProjectStack = nil
-	c._parsingModules = nil
-	c._parsingStack = nil
 }

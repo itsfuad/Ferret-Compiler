@@ -88,7 +88,7 @@ func parseImport(p *Parser) ast.Node {
 
 func shouldSkip(p *Parser, loc *source.Location, config *config.ProjectConfig, importPath string, modType modules.ModuleType) bool {
 	if modType != modules.LOCAL && modType != modules.BUILTIN {
-		con := p.ctx.PeekProjectConfigStack()
+		con := p.ctx.ProjectStack.Peek()
 		if modType == modules.NEIGHBOR && !con.External.AllowExternalImport {
 			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import neighbor module %q as your project disabled neighbor project access", importPath), report.PARSING_PHASE).AddHint("Enable allow-external-import=true in <project_root>/fer.ret")
 			return true

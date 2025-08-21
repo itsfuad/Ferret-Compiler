@@ -14,6 +14,7 @@ import (
 	"compiler/internal/semantic/resolver"
 	"compiler/internal/semantic/typecheck"
 	"compiler/internal/symbol"
+	"compiler/internal/utils/stack"
 	"compiler/report"
 )
 
@@ -110,7 +111,7 @@ func createSingleFileContext(projectConfig *config.ProjectConfig) *ctx.CompilerC
 		Modules:             make(map[string]*modules.Module),
 		Reports:             report.Reports{},
 		ProjectConfig:       projectConfig,
-		ProjectStack:        []*config.ProjectConfig{},
+		ProjectStack:        stack.New[*config.ProjectConfig](),
 		RemoteCachePath:     remoteCachePath,
 		BuiltinModules:      builtinModules,
 		ProjectRootFullPath: projectConfig.ProjectRoot,

@@ -218,10 +218,10 @@ func (p *Parser) Parse() *ast.Program {
 
 	config, _ := config.LoadProjectConfig(projectRoot)
 
-	p.ctx.PushProjectStack(config)
-	p.ctx.MarkParseStart(p.fullPath)
-	defer p.ctx.MarkParseFinish(p.fullPath)
-	defer p.ctx.PopProjectStack()
+	p.ctx.ProjectStack.Push(config)
+	//p.ctx.MarkParseStart(p.fullPath)
+	//defer p.ctx.MarkParseFinish(p.fullPath)
+	defer p.ctx.ProjectStack.Pop()
 
 	for !p.isAtEnd() {
 		// Parse the statement

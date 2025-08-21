@@ -79,7 +79,7 @@ Source Code → Lexer → Parser → AST → Collector → Resolver → TypeChec
 - `fer.ret`: Project root indicator and configuration
 - Remote dependencies: GitHub repos stored in config
 - Local imports: Relative path-based, no config needed
-- Cache management: `.ferret/modules` directory
+- Cache management: `.ferret` directory
 
 ## Coding Standards
 

@@ -89,7 +89,7 @@ entry = "path/to/your/entry.fer"
 output = "bin"
 
 [cache]
-path = ".ferret/cache"
+path = ".ferret"
 
 [remote]
 enabled = true
@@ -221,7 +221,6 @@ myproject/
 ├── fer.ret          # Project configuration
 ├── ferret.lock      # Dependency lockfile (auto-generated)
 ├── .ferret/         # Cache directory
-│   └── modules/     # Downloaded dependencies
 └── src/             # Your Ferret source files
 ```
 

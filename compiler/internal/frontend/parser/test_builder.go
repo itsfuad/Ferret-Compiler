@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"path/filepath"
+	//"runtime/debug"
 	"testing"
 
 	"compiler/config"
@@ -11,6 +12,7 @@ import (
 	"compiler/internal/modules"
 	"compiler/internal/symbol"
 	"compiler/internal/testutil"
+	"compiler/internal/utils/stack"
 	"compiler/report"
 )
 
@@ -25,7 +27,7 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 			Version: "0.1.0-test",
 		},
 		Cache: config.CacheConfig{
-			Path: ".ferret/modules",
+			Path: ".ferret",
 		},
 		Dependencies: config.DependencyConfig{
 			Packages: make(map[string]string),
@@ -47,6 +49,7 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 		Modules:             make(map[string]*modules.Module),
 		Reports:             report.Reports{},
 		ProjectConfig:       projectConfig,
+		ProjectStack:        stack.New[*config.ProjectConfig](),
 		ProjectRootFullPath: tempDir,
 	}
 }
@@ -88,6 +91,7 @@ func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) {
 	nodes := []ast.Node{}
 
 	defer func() {
+
 		evaluateTestResult(t, recover(), nodes, desc, isValid)
 	}()
 
