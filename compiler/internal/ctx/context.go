@@ -208,7 +208,7 @@ func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
 }
 
 func (c *CompilerContext) FullPathToAlias(fullPath string) string {
-	filename := filepath.Base(fullPath)
+	filename := fs.LastPart(fullPath)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
