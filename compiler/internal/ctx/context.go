@@ -85,7 +85,7 @@ func (c *CompilerContext) resolveByType(packageName, cleanPath, importPath strin
 
 	// Builtin module
 	if path, found := c.BuiltinModules[packageName]; found {
-		return c.resolveBuiltinModule(path, cleanPath, packageName)
+		return c.resolveBuiltinModule(path, cleanPath)
 	}
 
 	// Unknown module type
@@ -137,7 +137,7 @@ func (c *CompilerContext) resolveNeighborModule(rel, cleanPath string, currentPr
 }
 
 // resolveBuiltinModule handles builtin module resolution
-func (c *CompilerContext) resolveBuiltinModule(path, cleanPath, packageName string) (*config.ProjectConfig, string, modules.ModuleType, error) {
+func (c *CompilerContext) resolveBuiltinModule(path, cleanPath string) (*config.ProjectConfig, string, modules.ModuleType, error) {
 	builtinProject, err := config.LoadProjectConfig(path)
 	if err != nil {
 		return nil, "", modules.BUILTIN, err

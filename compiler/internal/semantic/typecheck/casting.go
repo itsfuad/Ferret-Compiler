@@ -93,8 +93,19 @@ func isImplicitCastable(target, source stype.Type) (bool, error) {
 		return isStructCompatible(target, source, true)
 	}
 
+	return handleDefaultImplicitCasting(target, source)
+}
+
+func handleDefaultImplicitCasting(target, source stype.Type) (bool, error) {
 	//if target or source user type, unwrap
 	if a, ok := target.(*stype.UserType); ok {
+
+		// if unwrapped target is interface, allow all source types
+		if i, ok := semantic.UnwrapType(a).(*stype.InterfaceType); ok && len(i.Methods) == 0 {
+			return true, nil
+		}
+
+		// otherwise, check if user types match
 		if b, ok := source.(*stype.UserType); ok {
 			if a.Name == b.Name {
 				return true, nil
@@ -272,6 +283,11 @@ func isInterfaceCompatible(target, source stype.Type) (bool, error) {
 	targetInterface, targetOk := target.(*stype.InterfaceType)
 	if !targetOk {
 		return false, fmt.Errorf("type %s is not an interface type", target)
+	}
+
+	// if target interface is empty, it can accept any source type
+	if len(targetInterface.Methods) == 0 {
+		return true, nil
 	}
 
 	var problems []string

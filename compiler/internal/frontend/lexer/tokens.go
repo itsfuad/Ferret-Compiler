@@ -35,6 +35,8 @@ const (
 	FUNCTION_TOKEN  TOKEN = TOKEN(types.FUNCTION)
 	INTERFACE_TOKEN TOKEN = TOKEN(types.INTERFACE)
 
+	THREE_DOT_TOKEN TOKEN = "..."
+
 	//array range operator
 	RANGE_TOKEN TOKEN = ".."
 	//increment and decrement

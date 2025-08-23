@@ -68,6 +68,8 @@ func (r *Reports) HasWarnings() bool {
 }
 func (r *Reports) DisplayAll() {
 
+	fmt.Println()
+
 	ln := len(*r) - 1
 	for i, report := range *r {
 		printReport(report)
@@ -126,7 +128,7 @@ func printReport(r *Report) {
 
 	// The error message type and the message itself are printed in the same color.
 	reportColor.Print(reportMsgType)
-	colors.WHITE.Println(r.Message)
+	reportColor.Println(r.Message)
 	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
 	// The code snippet and underline are printed in the same color.
 	fmt.Print(snippet)
