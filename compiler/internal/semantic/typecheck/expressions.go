@@ -141,7 +141,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 		}
 
 		expectedParam := funcType.Parameters[i]
-		
+
 		if ok, err := isImplicitCastable(expectedParam.Type, argType); !ok {
 			rp := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
