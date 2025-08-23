@@ -90,3 +90,12 @@ type CastExpr struct {
 func (c *CastExpr) INode()                {} // Impliments Node interface
 func (c *CastExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (c *CastExpr) Loc() *source.Location { return &c.Location }
+
+type SpreadExpr struct {
+	Expression *Expression
+	source.Location
+}
+
+func (s *SpreadExpr) INode()                {} // Impliments Node interface
+func (s *SpreadExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (s *SpreadExpr) Loc() *source.Location { return &s.Location }

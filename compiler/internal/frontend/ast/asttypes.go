@@ -120,6 +120,7 @@ func (t *ArrayType) Loc() *source.Location {
 type Parameter struct {
 	Identifier *IdentifierExpr
 	Type       DataType
+	IsVariadic bool
 }
 
 type StructField struct {

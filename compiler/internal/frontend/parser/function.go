@@ -49,6 +49,13 @@ func parseParameters(p *Parser) []ast.Parameter {
 
 	for !p.match(lexer.CLOSE_PAREN) {
 
+		isVariadic := false
+
+		if p.match(lexer.THREE_DOT_TOKEN) {
+			isVariadic = true
+			p.advance()
+		}
+
 		identifier := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PARAMETER_NAME)
 
 		location := *source.NewLocation(&identifier.Start, &identifier.End)
@@ -67,6 +74,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		param := ast.Parameter{
 			Identifier: paramName,
 			Type:       paramType,
+			IsVariadic: isVariadic,
 		}
 
 		//check if the parameter is already defined
