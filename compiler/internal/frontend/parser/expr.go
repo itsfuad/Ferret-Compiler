@@ -233,54 +233,82 @@ func parseMultiplicative(p *Parser) ast.Expression {
 	return expr
 }
 
-// parseUnary handles unary operators (!, -, ++, --)
+// parseUnary handles unary operators (!, -, ++, --, ...)
 func parseUnary(p *Parser) ast.Expression {
+	// Handle spread operator (...)
+	if p.match(lexer.THREE_DOT_TOKEN) {
+		return handleSpread(p)
+	}
+
 	if p.match(lexer.NOT_TOKEN, lexer.MINUS_TOKEN) {
-		operator := p.advance()
-		right := parseUnary(p)
-		return &ast.UnaryExpr{
-			Operator: operator,
-			Operand:  &right,
-			Location: *source.NewLocation(&operator.Start, right.Loc().End),
-		}
+		return handleNotNegative(p)
 	}
 
 	// Handle prefix operators (++, --)
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-		operator := p.advance()
-		// Check for consecutive operators
-		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-			errMsg := report.INVALID_CONSECUTIVE_INCREMENT
-			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
-				errMsg = report.INVALID_CONSECUTIVE_DECREMENT
-			}
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
-			return nil
-		}
-		operand := parseUnary(p)
-		if operand == nil {
-			errMsg := report.INVALID_INCREMENT_OPERAND
-			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
-				errMsg = report.INVALID_DECREMENT_OPERAND
-			}
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
-			return nil
-		}
-
-		// Check if operand already has a postfix operator
-		if _, ok := operand.(*ast.PostfixExpr); ok {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE)
-			return nil
-		}
-
-		return &ast.PrefixExpr{
-			Operator: operator,
-			Operand:  &operand,
-			Location: *source.NewLocation(&operator.Start, operand.Loc().End),
-		}
+		return handlePlusMinus(p)
 	}
 
 	return parseCast(p)
+}
+
+func handleNotNegative(p *Parser) ast.Expression {
+	operator := p.advance()
+	right := parseUnary(p)
+	return &ast.UnaryExpr{
+		Operator: operator,
+		Operand:  &right,
+		Location: *source.NewLocation(&operator.Start, right.Loc().End),
+	}
+}
+
+func handlePlusMinus(p *Parser) ast.Expression {
+	operator := p.advance()
+	// Check for consecutive operators
+	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+		errMsg := report.INVALID_CONSECUTIVE_INCREMENT
+		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
+			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+		}
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
+		return nil
+	}
+	operand := parseUnary(p)
+	if operand == nil {
+		errMsg := report.INVALID_INCREMENT_OPERAND
+		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
+			errMsg = report.INVALID_DECREMENT_OPERAND
+		}
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
+		return nil
+	}
+
+	// Check if operand already has a postfix operator
+	if _, ok := operand.(*ast.PostfixExpr); ok {
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE)
+		return nil
+	}
+
+	return &ast.PrefixExpr{
+		Operator: operator,
+		Operand:  &operand,
+		Location: *source.NewLocation(&operator.Start, operand.Loc().End),
+	}
+}
+
+func handleSpread(p *Parser) ast.Expression {
+
+	operator := p.advance()
+	right := parseUnary(p)
+	if right == nil {
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "Expected expression after spread operator", report.PARSING_PHASE)
+		return nil
+	}
+
+	return &ast.SpreadExpr{
+		Expression: &right,
+		Location:   *source.NewLocation(&operator.Start, right.Loc().End),
+	}
 }
 
 // parseCast handles type cast expressions (value as Type)
@@ -459,6 +487,6 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.IDENTIFIER_TOKEN:
 		return parseIdentifier(p)
 	}
-	handleUnexpectedToken(p)
+	handleUnexpectedToken(p, "expression")
 	return nil
 }

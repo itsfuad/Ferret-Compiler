@@ -63,6 +63,8 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 		resultType = checkFieldAccessType(r, e, cm)
 	case *ast.StructLiteralExpr:
 		resultType = checkStructLiteralType(r, e, cm)
+	case *ast.SpreadExpr:
+		resultType = checkSpreadExprType(r, e, cm)
 	default:
 		// Unknown expression type
 		resultType = &stype.Invalid{}
@@ -75,6 +77,27 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 	}
 
 	return resultType
+}
+
+func checkSpreadExprType(r *analyzer.AnalyzerNode, expr *ast.SpreadExpr, cm *modules.Module) stype.Type {
+	// expr should be array
+	eType := evaluateExpressionType(r, *expr.Expression, cm)
+	if eType == nil {
+		return &stype.Invalid{}
+	}
+
+	switch t := eType.(type) {
+	case *stype.ArrayType:
+		return t.ElementType
+	default:
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			expr.Loc(),
+			fmt.Sprintf("cannot spread type %q", eType),
+			report.TYPECHECK_PHASE,
+		)
+		return &stype.Invalid{}
+	}
 }
 
 func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *modules.Module) stype.Type {
@@ -118,6 +141,7 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 		}
 
 		expectedParam := funcType.Parameters[i]
+		
 		if ok, err := isImplicitCastable(expectedParam.Type, argType); !ok {
 			rp := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,

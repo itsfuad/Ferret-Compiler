@@ -7,5 +7,5 @@ import (
 )
 
 func CastHint(toType stype.Type) string {
-	return fmt.Sprintf("Want to cast😐 ? Write `as %s` after the expression", toType)
+	return fmt.Sprintf("You can explicitly cast by writing `as %s` after the expression", toType)
 }

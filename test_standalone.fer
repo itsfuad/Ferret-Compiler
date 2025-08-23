@@ -1,5 +1,0 @@
-// Test standalone file for LSP
-fn main() {
-    let x: i32 = "hello"; // This should cause a type error
-    print(x);
-}

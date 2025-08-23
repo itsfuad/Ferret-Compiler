@@ -134,10 +134,10 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 }
 
 // handleUnexpectedToken reports an error for unexpected token and advances
-func handleUnexpectedToken(p *Parser) ast.Statement {
+func handleUnexpectedToken(p *Parser, expected string) ast.Statement {
 	token := p.peek()
 	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End),
-		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", token.Value), report.PARSING_PHASE)
+		fmt.Sprintf("expected %s, found unexpected token `%s`", expected, token.Value), report.PARSING_PHASE)
 
 	p.advance() // skip the invalid token
 
@@ -178,14 +178,11 @@ func parseNode(p *Parser) ast.Node {
 		if expr != nil {
 			// if the expression is valid, parse it as an expression statement
 			node = parseExpressionStatement(p, expr)
-		} else {
-			fmt.Printf("Invalid expression: %+v\n", expr)
-			// if the expression is invalid, report an error
-			node = handleUnexpectedToken(p)
 		}
-	default:
-		fmt.Printf("Invalid token: %+v\n", p.peek())
-		node = handleUnexpectedToken(p)
+	}
+
+	if node == nil {
+		node = handleUnexpectedToken(p, "statement")
 	}
 
 	// Handle statement termination and update locations
@@ -228,11 +225,11 @@ func (p *Parser) Parse() *ast.Program {
 		node := parseNode(p)
 		if node != nil {
 			nodes = append(nodes, node)
-		} else {
-			fmt.Printf("Failed to parse node at %s: %+v\n", p.fullPath, p.peek())
-			handleUnexpectedToken(p)
-			break
+			continue
 		}
+
+		handleUnexpectedToken(p, "statement")
+		break
 	}
 
 	if len(nodes) == 0 {

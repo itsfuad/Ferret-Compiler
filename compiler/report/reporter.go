@@ -220,7 +220,7 @@ func (r *Report) AddHint(msg string) *Report {
 		return r
 	}
 
-	r.Hints.hint = msg
+	r.Hints.hint = "💡 " + msg
 	r.Hints.col = r.Location.Start.Column
 
 	return r

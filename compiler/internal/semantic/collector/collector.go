@@ -6,6 +6,7 @@ import (
 	"compiler/internal/modules"
 	"compiler/internal/semantic/analyzer"
 	"compiler/report"
+	"fmt"
 )
 
 func CollectSymbols(c *analyzer.AnalyzerNode) {
@@ -69,6 +70,9 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		collectCall(c, n, cm)
 	case *ast.ExpressionStmt:
 		collectExprStmt(c, n, cm)
+	case *ast.SpreadExpr:
+		fmt.Printf("Collecting symbols from spread expression: %v\n", n)
+		collectSymbols(c, *n.Expression, cm)
 	case *ast.ReturnStmt:
 		collectSymbols(c, *n.Value, cm)
 	case *ast.BinaryExpr:

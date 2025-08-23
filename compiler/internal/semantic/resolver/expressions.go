@@ -4,12 +4,13 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/semantic/analyzer"
-	symbolpkg "compiler/internal/symbol"
+	"compiler/internal/symbol"
 	"compiler/report"
 	"fmt"
 )
 
 func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Module) {
+	fmt.Printf("Resolving expression of type: %T\n", expr)
 	if expr == nil {
 		panic("resolveExpr called with nil expression")
 	}
@@ -36,6 +37,8 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 		resolveExpr(r, *e.Object, cm)
 	case *ast.VarScopeResolution:
 		resolveImportedSymbol(r, e, cm)
+	case *ast.SpreadExpr:
+		resolveExpr(r, *e.Expression, cm)
 	// Literal expressions - no resolution needed, just validate they exist
 	case *ast.StringLiteral:
 		// String literals don't need resolution
@@ -48,35 +51,45 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 	case *ast.ByteLiteral:
 		// Byte literals don't need resolution
 	case *ast.ArrayLiteralExpr:
-		//add later
+		resolveArrayLiteral(r, e, cm)
 	case *ast.StructLiteralExpr:
-		//add later
+		resolveStructLiteral(r, e, cm)
 	case *ast.FunctionLiteral:
 		resolveFunctionLiteral(r, e, cm)
 	case *ast.IndexableExpr:
 		resolveExpr(r, *e.Indexable, cm)
 		resolveExpr(r, *e.Index, cm)
 	case *ast.CastExpr:
-		// Resolve the value being cast
 		resolveExpr(r, *e.Value, cm)
-		// Target type doesn't need resolution as it's a type declaration
 	default:
 		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, expr.Loc(), fmt.Sprintf("Expression <%T> is not implemented yet", e), report.RESOLVER_PHASE)
 	}
 }
 
+func resolveStructLiteral(r *analyzer.AnalyzerNode, structLit *ast.StructLiteralExpr, cm *modules.Module) {
+	for _, field := range structLit.Fields {
+		resolveExpr(r, *field.FieldValue, cm)
+	}
+}
+
+func resolveArrayLiteral(r *analyzer.AnalyzerNode, arrLit *ast.ArrayLiteralExpr, cm *modules.Module) {
+	for _, elem := range arrLit.Elements {
+		resolveExpr(r, elem, cm)
+	}
+}
+
 func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *modules.Module) {
-	symbol, found := cm.SymbolTable.Lookup(id.Name)
+	sm, found := cm.SymbolTable.Lookup(id.Name)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE).AddHint("Did you forget to declare it or import the module where it's declared?")
 		return
 	}
 
 	// For variables: check if they're used before declaration (forward reference)
 	// For functions: allow forward references
-	if symbol.Kind == symbolpkg.SymbolVar && symbol.Location != nil {
+	if sm.Kind == symbol.SymbolVar && sm.Location != nil {
 		usagePos := id.Loc().Start
-		declarationPos := symbol.Location.Start
+		declarationPos := sm.Location.Start
 
 		// If variable is used before it's declared, that's an error
 		if usagePos.Line < declarationPos.Line ||

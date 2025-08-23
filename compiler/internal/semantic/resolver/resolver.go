@@ -50,6 +50,7 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 
 // resolveNode dispatches resolution to the appropriate handler based on node type
 func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
+	fmt.Printf("Resolving node of type: %T\n", node)
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)

@@ -21,6 +21,14 @@ fn AddNumbers(...nums: []i32) -> i32 {
     return 0;
 }
 
+
+
+let array1 = [1, 2, 3];
+//...array1;
+let array2 = [10, 23, ...array1];
+
+// let dynamicSum = AddNumbers(0); // not implemented yet
+
 //ido::print("");
 
 type Point struct {

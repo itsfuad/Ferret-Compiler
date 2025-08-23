@@ -171,7 +171,7 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 				report.TYPECHECK_PHASE,
 			)
 
-			if ok, _ := isExplicitCastable(elemType, elementType); !ok {
+			if ok, _ := isExplicitCastable(elemType, elementType); ok {
 				semanticError.AddHint(msg.CastHint(elementType))
 			}
 
