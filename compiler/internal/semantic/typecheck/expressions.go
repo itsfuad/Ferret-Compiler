@@ -124,18 +124,25 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 	expectedCount := len(funcType.Parameters)
 	actualCount := len(call.Arguments)
 
-	if slices.ContainsFunc(funcType.Parameters, func(param stype.ParamsType) bool {
+	var hasMinimumArgs bool
+
+	isVariadic := slices.ContainsFunc(funcType.Parameters, func(param stype.ParamsType) bool {
 		return param.IsVariadic
-	}) {
+	})
+
+	if isVariadic {
 		// at least expected - 1 arg is required
 		expectedCount--
+		hasMinimumArgs = actualCount >= expectedCount
+	} else {
+		hasMinimumArgs = actualCount == expectedCount
 	}
 
-	if expectedCount > actualCount {
+	if !hasMinimumArgs {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			call.Loc(),
-			fmt.Sprintf("function expects at least %d arguments, but %d were provided", expectedCount, actualCount),
+			fmt.Sprintf("function expects %s %d arguments, but %d were provided", utils.Ternary(isVariadic, "at least", "exactly"), expectedCount, actualCount),
 			report.TYPECHECK_PHASE,
 		)
 		return funcType.ReturnType // Return the expected return type even with wrong arg count
