@@ -41,7 +41,7 @@ func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 // declareFunctionSymbol declares the function symbol in the module's symbol table
 func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, parentScope *symbol.SymbolTable, kind symbol.SymbolKind) *symbol.SymbolTable {
 	if fn.ID == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "identifier cannot be empty", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, fn.Loc(), "identifier cannot be empty", report.COLLECTOR_PHASE)
 		return nil
 	}
 
@@ -63,10 +63,18 @@ func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral
 		return
 	}
 
-	for _, param := range fn.Params {
+	for i, param := range fn.Params {
 		if param.Identifier == nil {
 			continue
 		}
+
+		// if variadic but not last
+		if param.IsVariadic && i != len(fn.Params)-1 {
+			c.Ctx.Reports.AddSemanticError(c.Program.FullPath, param.Identifier.Loc(), "variadic parameter must be the last parameter", report.COLLECTOR_PHASE)
+			continue
+		}
+
+		// Declare parameter symbol with placeholder type (to be resolved later)
 
 		paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, nil, param.Identifier.Loc())
 		paramErr := functionScope.Declare(param.Identifier.Name, paramSymbol)
@@ -98,7 +106,7 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 
 	//collect reciever
 	if method.Receiver == nil {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, method.Loc(), "Method receiver cannot be nil", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, method.Loc(), "Method receiver cannot be nil", report.COLLECTOR_PHASE)
 		return
 	}
 

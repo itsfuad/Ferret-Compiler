@@ -14,20 +14,19 @@ fn add(x: i32, y: i32) -> i32 {
     return x + y + outvar * invar;
 }
 
-add(1, 3);
+add(1, 2);
 
 // // variable number of args
-fn AddNumbers(...nums: []i32) -> i32 {
+fn AddNumbers(first: i32, ...nums: []i32) -> i32 {
     return 0;
 }
-
 
 
 let array1 = [1, 2, 3];
 //...array1;
 let array2 = [10, 23, ...array1];
 
-// let dynamicSum = AddNumbers(0); // not implemented yet
+let dynamicSum = AddNumbers(1, 2, 4, 3, 9);
 
 //ido::print("");
 

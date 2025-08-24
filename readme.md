@@ -329,6 +329,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
     - [x] Array indexing
     - [x] Array assignment
     - [x] String indexing
+    - [x] Array spreading
 - [x] Structs
     - [x] Anonymous structs
     - [x] Struct literals
@@ -340,6 +341,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
     - [x] Dead code elimination
     - [x] Function calls
     - [x] Function parameters
+    - [x] Variadic parameters
     - [x] Function return values
     - [x] Annonymous functions
     - [x] Closures

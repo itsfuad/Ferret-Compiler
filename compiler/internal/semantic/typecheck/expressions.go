@@ -12,6 +12,7 @@ import (
 	"compiler/internal/utils/msg"
 	"compiler/report"
 	"fmt"
+	"slices"
 )
 
 // evaluateExpressionType infers the semantic type from an AST expression
@@ -123,26 +124,57 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 	expectedCount := len(funcType.Parameters)
 	actualCount := len(call.Arguments)
 
-	if expectedCount != actualCount {
+	if slices.ContainsFunc(funcType.Parameters, func(param stype.ParamsType) bool {
+		return param.IsVariadic
+	}) {
+		// at least expected - 1 arg is required
+		expectedCount--
+	}
+
+	if expectedCount > actualCount {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			call.Loc(),
-			fmt.Sprintf("function expects %d arguments, but %d were provided", expectedCount, actualCount),
+			fmt.Sprintf("function expects at least %d arguments, but %d were provided", expectedCount, actualCount),
 			report.TYPECHECK_PHASE,
 		)
 		return funcType.ReturnType // Return the expected return type even with wrong arg count
 	}
 
 	// Check argument types
+	checkArgs(r, call, funcType, cm)
+
+	// Return the function's return type (single return type now)
+	return funcType.ReturnType
+}
+
+func checkArgs(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, funcType *stype.FunctionType, cm *modules.Module) {
+
 	for i, arg := range call.Arguments {
+
 		argType := evaluateExpressionType(r, arg, cm)
+
 		if argType == nil {
 			continue // Skip if we can't determine argument type
 		}
 
-		expectedParam := funcType.Parameters[i]
+		// Pick the expected parameter
+		var expectedParam stype.ParamsType
+		if i < len(funcType.Parameters) {
+			expectedParam = funcType.Parameters[i]
+		} else {
+			// Extra arguments → must map to the last (variadic) parameter
+			expectedParam = funcType.Parameters[len(funcType.Parameters)-1]
+		}
 
-		if ok, err := isImplicitCastable(expectedParam.Type, argType); !ok {
+		expectedType := expectedParam.Type
+
+		if expectedParam.IsVariadic {
+			expectedType = expectedParam.Type.(*stype.ArrayType).ElementType
+		}
+
+		// Type check
+		if ok, err := isImplicitCastable(expectedType, argType); !ok {
 			rp := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				arg.Loc(),
@@ -150,14 +182,11 @@ func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr,
 					utils.NumericToOrdinal(i+1), err.Error()),
 				report.TYPECHECK_PHASE,
 			)
-			if ok, _ := isExplicitCastable(expectedParam.Type, argType); ok {
-				rp.AddHint(msg.CastHint(expectedParam.Type))
+			if ok, _ := isExplicitCastable(expectedType, argType); ok {
+				rp.AddHint(msg.CastHint(expectedType))
 			}
 		}
 	}
-
-	// Return the function's return type (single return type now)
-	return funcType.ReturnType
 }
 
 // checkFieldAccessType handles struct field access and method access

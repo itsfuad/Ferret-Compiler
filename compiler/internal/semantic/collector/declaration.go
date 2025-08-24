@@ -12,7 +12,7 @@ import (
 func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
 	for _, variable := range decl.Variables {
 		if variable.Identifier.Name == "" {
-			c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, variable.Identifier.Loc(), "Variable identifier cannot be empty", report.COLLECTOR_PHASE)
+			c.Ctx.Reports.AddSemanticError(c.Program.FullPath, variable.Identifier.Loc(), "Variable identifier cannot be empty", report.COLLECTOR_PHASE)
 			continue
 		}
 
@@ -42,7 +42,7 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *modules.Module) {
 	aliasName := decl.Alias.Name
 	if aliasName == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.COLLECTOR_PHASE)
 		return
 	}
 

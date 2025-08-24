@@ -73,8 +73,9 @@ func (a *ArrayType) String() string {
 }
 
 type ParamsType struct {
-	Name string
-	Type Type
+	Name       string
+	Type       Type
+	IsVariadic bool
 }
 
 // FunctionType represents function types with parameters and return type

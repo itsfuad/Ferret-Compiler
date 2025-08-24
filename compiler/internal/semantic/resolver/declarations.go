@@ -75,7 +75,7 @@ func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm
 			return nil // Return nil to indicate error
 		}
 
-		paramTypes = append(paramTypes, stype.ParamsType{Name: param.Identifier.Name, Type: paramType})
+		paramTypes = append(paramTypes, stype.ParamsType{Name: param.Identifier.Name, Type: paramType, IsVariadic: param.IsVariadic})
 
 		// Try to update parameter symbol first (for function declarations)
 		// If it doesn't exist, create it (for function literals)
