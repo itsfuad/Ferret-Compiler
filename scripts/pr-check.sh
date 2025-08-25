@@ -35,12 +35,13 @@ echo "✅ Dependencies downloaded"
 
 echo ""
 echo "🎨 Step 3: Checking code formatting..."
+cd "$COMPILER_DIR"
 if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
     echo "❌ The following files are not formatted correctly:"
     gofmt -s -l .
     echo ""
     echo "Please run the following command to fix formatting issues:"
-    echo "cd compiler && gofmt -s -w ."
+    echo "gofmt -s -w ."
     exit 1
 else
     echo "✅ All Go files are properly formatted"
@@ -48,60 +49,61 @@ fi
 
 echo ""
 echo "🔍 Step 4: Running go vet..."
+cd "$COMPILER_DIR"
 go vet ./...
 echo "✅ go vet passed"
 
 echo ""
 echo "🧪 Step 5: Running tests..."
+cd "$COMPILER_DIR"
 go test -v ./...
 echo "✅ All tests passed"
 
 echo ""
 echo "🔨 Step 6: Building compiler..."
 mkdir -p "$BIN_DIR"
-cd cmd
-go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v
+cd "$COMPILER_DIR"
+go build -o "$BIN_DIR/ferret" -ldflags "-s -w" -trimpath -v .
+chmod +x "$BIN_DIR/ferret"
 echo "✅ Compiler built successfully"
 
 echo ""
 echo "🚀 Step 7: Testing CLI functionality..."
 cd "$ROOT_DIR"
-FERRET_BIN="$BIN_DIR/ferret"
+cd $BIN_DIR
 
 # Test help message
-if ! $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
+if ! "./ferret" 2>&1 | grep -q "Ferret"; then
     echo "❌ CLI help message test failed"
     exit 1
 fi
 
 # Test init command
-rm -rf test-project
-mkdir -p test-project
-if ! $FERRET_BIN init test-project 2>&1 | grep -q "Project configuration initialized"; then
-    echo "❌ CLI init command test failed"
+if ! (echo -e "myapp\ntrue\ntrue" | ./ferret init) | grep -q "Project configuration initialized"; then
+    echo -e "${RED}❌ CLI init command test failed${NC}"
     exit 1
 fi
 
 # Verify config file was created
-if [ ! -f "test-project/.ferret.json" ]; then
-    echo "❌ Config file was not created"
+if [ ! -f "fer.ret" ]; then
+    echo -e "${RED}❌ Config file was not created${NC}"
     exit 1
 fi
 
 echo "✅ CLI functionality tests passed"
 
 # Cleanup
-rm -rf test-project
+rm -rf fer.ret
 
 echo ""
 echo "🔒 Step 8: Security scan (gosec)..."
 
 # Check if gosec is installed
 if ! command -v gosec &> /dev/null; then
-    echo "⚠️  gosec not installed. Installing..."
+    echo "⚠️   gosec not installed. Installing..."
     if ! go install github.com/securego/gosec/v2/cmd/gosec@latest; then
         echo "❌ Failed to install gosec, skipping security scan"
-        echo "ℹ️  You can install gosec manually: go install github.com/securego/gosec/v2/cmd/gosec@latest"
+        echo "⚠️   You can install gosec manually: go install github.com/securego/gosec/v2/cmd/gosec@latest"
         echo "✅ All other PR workflow checks passed!"
         exit 0
     fi

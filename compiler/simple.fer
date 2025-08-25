@@ -1,4 +1,0 @@
-// Simple test for code generation
-let x: i32 = 42;
-let y: i32 = 10;
-let sum: i32 = x + y;

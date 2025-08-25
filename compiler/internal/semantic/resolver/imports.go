@@ -2,47 +2,81 @@ package resolver
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
+	"compiler/internal/modules"
 	"compiler/internal/semantic/analyzer"
+	"compiler/internal/symbol"
+	"compiler/report"
 	"fmt"
 )
 
-func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Module) {
+func getImportKeys(imports map[string]*symbol.SymbolTable) []string {
+	keys := make([]string, 0, len(imports))
+	for k := range imports {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.Module) {
 	if imp.ImportPath.Value == "" {
-		r.Ctx.Reports.AddSyntaxError(r.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.COLLECTOR_PHASE)
 		return
 	}
 
+	if r.Debug {
+		colors.YELLOW.Printf("Resolving import %q as %q in module %q\n", imp.ImportPath.Value, imp.Alias, cm.AST.Alias)
+	}
+
+	// Resolve the import path based on context
+	// For local imports within remote modules, convert to full GitHub path
+	moduleKey := imp.ImportPath.Value
+
 	//module must be parses and stored already
-	module, err := r.Ctx.GetModule(imp.ImportPath.Value)
+	module, err := r.Ctx.GetModule(moduleKey)
 	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
 	// collect functions from the imported module
 	anz := analyzer.NewAnalyzerNode(module.AST, r.Ctx, r.Debug)
 	ResolveProgram(anz)
-	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
+	cm.SymbolTable.Imports[imp.Alias] = module.SymbolTable
+
+	if r.Debug {
+		colors.GREEN.Printf("Successfully stored import %q in module %q\n", imp.Alias, cm.AST.Alias)
+	}
 }
 
-func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *ctx.Module) {
+func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) {
 
-	symbolTable, ok := cm.SymbolTable.Imports[res.Module.Name]
-	if !ok {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Module '%s' is not imported", res.Module.Name), report.RESOLVER_PHASE)
+	if r.Debug {
+		colors.CYAN.Printf("Looking for module %q in imports of %q\n", res.Module.Name, cm.AST.Alias)
+	}
+
+	symbolTable, err := cm.SymbolTable.GetImportedModule(res.Module.Name)
+	if err != nil {
+		if r.Debug {
+			colors.RED.Printf("Available imports in %q: %v\n", cm.AST.Alias, getImportKeys(cm.SymbolTable.Imports))
+		}
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
 	if _, found := symbolTable.Lookup(res.Identifier.Name); !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol '%s' not found in module '%s'", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol %q not found in module %q", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
 		return
 	}
 
+	// Mark the import as used when successfully resolving a symbol from it
+	if cm.UsedImports == nil {
+		cm.UsedImports = make(map[string]bool)
+	}
+
+	cm.UsedImports[res.Module.Name] = true
+
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
-		colors.TEAL.Printf("Resolved imported symbol '%s' from module '%s' imported from '%s'\n", res.Identifier.Name, res.Module.Name, cm.AST.Modulename)
+		colors.TEAL.Printf("Resolved imported symbol %q from module %q imported from %q\n", res.Identifier.Name, res.Module.Name, cm.AST.Alias)
 	}
 }

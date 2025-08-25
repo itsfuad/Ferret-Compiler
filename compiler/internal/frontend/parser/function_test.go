@@ -24,8 +24,16 @@ func TestFunctionParsing(t *testing.T) {
 			input: `fn div(a: i32, b: i32) -> (i32, bool) {
 				return a / b, true;
 			}`,
-			isValid: true,
-			desc:    "Function with multiple return types in parentheses",
+			isValid: false,
+			desc:    "Function with multiple return types should fail",
+		},
+		{
+			name: "Function with 2 return types in parentheses",
+			input: `fn calculate(a: i32, b: i32) -> (i32, f32) {
+				return a + b, float32(a + b);
+			}`,
+			isValid: false,
+			desc:    "Function with 2 return types in parentheses should fail",
 		},
 		{
 			name: "Anonymous function assignment",
@@ -66,8 +74,8 @@ func TestFunctionParsing(t *testing.T) {
 		{
 			name:    "Invalid return type syntax",
 			input:   "fn add(a: i32, b: i32) -> (i32,) { return 0; }",
-			isValid: true,
-			desc:    "Function with trailing comma in return type list should pass with a warning",
+			isValid: false,
+			desc:    "Function with parentheses around return type should fail",
 		},
 		{
 			name:    "Missing function body",
@@ -80,8 +88,8 @@ func TestFunctionParsing(t *testing.T) {
 			input: `fn process(data: []i32) -> ([]i32, str, bool) {
 				return data, "ok", true;
 			}`,
-			isValid: true,
-			desc:    "Function with multiple complex return types",
+			isValid: false,
+			desc:    "Function with multiple complex return types should fail",
 		},
 		{
 			name: "Nested function declaration",
@@ -102,8 +110,8 @@ func TestFunctionParsing(t *testing.T) {
 		{
 			name:    "Trailing comma in function return type",
 			input:   "fn add(a: i32, b: i32) -> (i32, f32,) { return a + b, 1.0; }",
-			isValid: true,
-			desc:    "Function with trailing comma in return type should pass with a warning",
+			isValid: false,
+			desc:    "Function with multiple return types should fail",
 		},
 		{
 			name:    "Function call with no arguments",

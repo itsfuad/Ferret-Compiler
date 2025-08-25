@@ -11,7 +11,7 @@ import (
 type Program struct {
 	FullPath   string // the physical full path to the file
 	ImportPath string // the logical path to the module
-	Modulename string // the module name derived from the full path
+	Alias      string
 	Nodes      []Node
 	source.Location
 }
@@ -75,7 +75,7 @@ func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
-	Values *ExpressionList
+	Value *Expression
 	source.Location
 }
 
@@ -85,10 +85,9 @@ func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 
 // ImportStmt represents an import statement
 type ImportStmt struct {
-	ImportPath *StringLiteral // The import path as written in source (e.g., "code/data")
-	ModuleName string         // The alias or last part of the import path (e.g., "data")
-	FullPath   string         // The fully resolved, normalized file path (always with .fer)
-
+	ImportPath     *StringLiteral // The import path as written in source (e.g., "code/data")
+	Alias          string         // The alias or last part of the import path (e.g., "data")
+	LocationOnDisk string         // The fully resolved, normalized file path (always with .fer)
 	source.Location
 }
 

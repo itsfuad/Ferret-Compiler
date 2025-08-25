@@ -69,8 +69,7 @@ jobs:
       run: |
         echo "🔨 Building compiler..."
         mkdir -p ../bin
-        cd cmd
-        go build -o ../../bin/ferret -ldflags "-s -w" -trimpath -v
+        go build -o ../bin/ferret -ldflags "-s -w" -trimpath -v
         echo "✅ Compiler built successfully"
     
     - name: Test CLI functionality
@@ -82,7 +81,7 @@ jobs:
         FERRET_BIN="../bin/ferret"
         
         # Test help message
-        if ! $FERRET_BIN 2>&1 | grep -q "Usage: ferret"; then
+        if ! $FERRET_BIN 2>&1 | grep -q "Ferret"; then
           echo "❌ CLI help message test failed"
           exit 1
         fi
@@ -95,7 +94,7 @@ jobs:
         fi
         
         # Verify config file was created
-        if [ ! -f "test-project/.ferret.json" ]; then
+        if [ ! -f "test-project/fer.ret" ]; then
           echo "❌ Config file was not created"
           exit 1
         fi

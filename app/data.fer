@@ -1,8 +1,0 @@
-import "app/maths/math";
-//import "app/cmd/main"; // should error because it's a circular dependency
-
-let myData = "Fuad";
-
-let kk = 10;
-
-type MyType i32;

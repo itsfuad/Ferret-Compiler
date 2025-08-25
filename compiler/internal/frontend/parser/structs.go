@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/report"
 )
 
 // validateStructType validates the struct type and returns the type name

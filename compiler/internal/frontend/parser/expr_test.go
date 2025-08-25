@@ -48,14 +48,19 @@ func TestExpressionParsing(t *testing.T) {
 		{"let x = arr[];", false, "Missing index expression"},
 		{"let x = arr[;", false, "Unclosed array index"},
 		{"let x = arr[1 + ];", false, "Invalid index expression"},
+		{"let x = [...arr];", true, "Spread expression"},
+		{"let x = [...func()];", true, "Spread function call"},
+		{"let x = [...(a + b)];", true, "Spread parenthesized expression"},
+		{"let x = [...];", false, "Missing operand for spread"},
 		{"arr[0] = 42;", true, "Array element assignment"},
 		{"arr[i + 1] = x;", true, "Array assignment with expression index"},
 		{"arr[0][1] = 42;", true, "Nested array element assignment"},
 		{"return a + b;", true, "Return statement with expression"},
 		{"return;", true, "Return statement with no expression"},
-		{"return a, b;", true, "Return statement with multiple expressions"},
+		{"return a, b;", false, "Return statement with multiple expressions should fail"},
 		{"return;", true, "Return statement with no expression"},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)

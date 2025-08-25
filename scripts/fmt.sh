@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# Change to compiler directory (we're in scripts, so go up one level then into compiler)
-cd ../compiler
-
 # Clear the screen
 clear
+
+cd ../compiler
 
 echo "Cleaning up imports..."
 # Remove unused imports

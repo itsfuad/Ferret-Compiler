@@ -21,6 +21,9 @@ func (t *UserDefinedType) INode() {} // Impliments Node interface
 func (t *UserDefinedType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
+func (t *UserDefinedType) String() string {
+	return string(t.TypeName)
+}
 func (t *UserDefinedType) Loc() *source.Location {
 	return &t.Location
 }
@@ -117,6 +120,7 @@ func (t *ArrayType) Loc() *source.Location {
 type Parameter struct {
 	Identifier *IdentifierExpr
 	Type       DataType
+	IsVariadic bool
 }
 
 type StructField struct {
@@ -138,9 +142,8 @@ func (s *StructType) Type() types.TYPE_NAME { return s.TypeName }
 func (s *StructType) Loc() *source.Location { return &s.Location }
 
 type InterfaceMethod struct {
-	Name       *IdentifierExpr
-	Params     []Parameter
-	ReturnType []DataType
+	Name   *IdentifierExpr
+	Method *FunctionType // Function type for the method
 	source.Location
 }
 
@@ -156,9 +159,9 @@ func (i *InterfaceType) Type() types.TYPE_NAME { return i.TypeName }
 func (i *InterfaceType) Loc() *source.Location { return &i.Location }
 
 type FunctionType struct {
-	Parameters  []DataType
-	ReturnTypes []DataType
-	TypeName    types.TYPE_NAME
+	Parameters []Parameter
+	ReturnType DataType
+	TypeName   types.TYPE_NAME
 	source.Location
 }
 

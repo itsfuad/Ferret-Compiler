@@ -6,7 +6,7 @@ set "passed=0"
 set "failed=0"
 set "skipped=0"
 
-:: Run go test and parse each output line
+::ԚϮ뎚ؠҺӻ⪆ۡ Run go test and parse each output line
 for /f "delims=" %%A in ('go test ./... -v 2^>nul') do (
     set "line=%%A"
     call :CheckLine

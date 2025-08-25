@@ -2,16 +2,19 @@ package parser
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"compiler/colors"
+	"compiler/config"
 	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
 	"compiler/internal/source"
 	"compiler/internal/utils/fs"
+	"compiler/report"
 )
 
 type Parser struct {
@@ -19,12 +22,26 @@ type Parser struct {
 	tokenNo    int
 	fullPath   string
 	importPath string
-	modulename string // module name derived from full path
+	alias      string
 	ctx        *ctx.CompilerContext
 	debug      bool // debug mode for additional logging
 }
 
 func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
+
+	rel, err := filepath.Rel(ctxx.ProjectRootFullPath, filePath)
+	if err != nil {
+		return nil
+	}
+
+	rel = strings.TrimSuffix(rel, filepath.Ext(rel))
+	rel = filepath.Join(ctxx.ProjectConfig.Name, rel) // Prepend project name
+	importPath := filepath.ToSlash(rel)
+
+	return NewParserWithImportPath(filePath, importPath, ctxx, debug)
+}
+
+func NewParserWithImportPath(filePath string, importPath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 
 	if ctxx == nil {
 		panic("Cannot create parser: Compiler context is nil")
@@ -39,19 +56,17 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
 	}
 
-	//relative path to the file
-	importPath := ctxx.FullPathToImportPath(filePath)
-	modulename := ctxx.FullPathToModuleName(filePath)
+	alias := ctxx.FullPathToAlias(filePath)
 
 	tokens := lexer.Tokenize(filePath, false)
 
 	return &Parser{
 		tokens:     tokens,
 		tokenNo:    0,
-		ctx:        ctxx,
 		fullPath:   filePath,
 		importPath: importPath,
-		modulename: modulename,
+		alias:      alias,
+		ctx:        ctxx,
 		debug:      debug,
 	}
 }
@@ -118,89 +133,15 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 	return p.peek()
 }
 
-// parseExpressionList parses a comma-separated list of expressions
-func parseExpressionList(p *Parser, first ast.Expression) ast.ExpressionList {
-	exprs := ast.ExpressionList{first}
-	for p.match(lexer.COMMA_TOKEN) {
-		p.advance() // consume comma
-		next := parseExpression(p)
-		if next == nil {
-			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE)
-			break
-		}
-		exprs = append(exprs, next)
-	}
-	return exprs
-}
-
-// parseExpressionStatement parses an expression statement
-func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
-	exprs := parseExpressionList(p, first)
-
-	// Check for assignment
-	if p.match(lexer.EQUALS_TOKEN) {
-		return parseAssignment(p, exprs...)
-	}
-
-	return &ast.ExpressionStmt{
-		Expressions: &exprs,
-		Location:    *source.NewLocation(first.Loc().Start, exprs[len(exprs)-1].Loc().End),
-	}
-}
-
 // handleUnexpectedToken reports an error for unexpected token and advances
-func handleUnexpectedToken(p *Parser) ast.Statement {
+func handleUnexpectedToken(p *Parser, expected string) ast.Statement {
 	token := p.peek()
 	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End),
-		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", token.Value), report.PARSING_PHASE)
+		fmt.Sprintf("expected %s, found unexpected token `%s`", expected, token.Value), report.PARSING_PHASE)
 
 	p.advance() // skip the invalid token
 
 	return nil
-}
-
-// parseBlock parses a block of statements
-func parseBlock(p *Parser) *ast.Block {
-	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
-
-	nodes := make([]ast.Node, 0)
-
-	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
-		node := parseNode(p)
-		if node != nil {
-			nodes = append(nodes, node)
-		}
-	}
-
-	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
-
-	return &ast.Block{
-		Nodes:    nodes,
-		Location: *source.NewLocation(&start, &end),
-	}
-}
-
-// parseReturnStmt parses a return statement
-func parseReturnStmt(p *Parser) ast.Statement {
-
-	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
-	end := start
-	// Check if there's a values to return
-	var values ast.ExpressionList
-	if !p.match(lexer.SEMICOLON_TOKEN) {
-		values = parseExpressionList(p, parseExpression(p))
-		if values == nil {
-			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION, report.PARSING_PHASE).AddHint("Add an expression after the return keyword")
-		}
-		end = *values.Loc().End
-	}
-
-	return &ast.ReturnStmt{
-		Values:   &values,
-		Location: *source.NewLocation(&start, &end),
-	}
 }
 
 // parseNode parses a single statement or expression
@@ -217,6 +158,16 @@ func parseNode(p *Parser) ast.Node {
 		node = parseReturnStmt(p)
 	case lexer.FUNCTION_TOKEN:
 		node = parseFunctionLike(p)
+		// Check if this is a function literal that should be treated as an expression (IIFE)
+		if funcLit, ok := node.(*ast.FunctionLiteral); ok {
+			// If followed by '(', treat as an expression statement for IIFE
+			if p.peek().Kind == lexer.OPEN_PAREN {
+				// Create a function call expression with the literal as the callee
+				callExpr, _ := parseFunctionCall(p, funcLit)
+				node = parseExpressionStatement(p, callExpr)
+			}
+			// Otherwise, it's a standalone function literal at top level (unusual but valid)
+		}
 	case lexer.IF_TOKEN:
 		node = parseIfStatement(p)
 	case lexer.AT_TOKEN:
@@ -227,14 +178,11 @@ func parseNode(p *Parser) ast.Node {
 		if expr != nil {
 			// if the expression is valid, parse it as an expression statement
 			node = parseExpressionStatement(p, expr)
-		} else {
-			fmt.Printf("Invalid expression: %+v\n", expr)
-			// if the expression is invalid, report an error
-			node = handleUnexpectedToken(p)
 		}
-	default:
-		fmt.Printf("Invalid token: %+v\n", p.peek())
-		node = handleUnexpectedToken(p)
+	}
+
+	if node == nil {
+		node = handleUnexpectedToken(p, "statement")
 	}
 
 	// Handle statement termination and update locations
@@ -259,20 +207,29 @@ func parseNode(p *Parser) ast.Node {
 func (p *Parser) Parse() *ast.Program {
 	var nodes []ast.Node
 
-	// Start tracking the entry point parsing
-	p.ctx.StartParsing(p.fullPath)
-	// Finish tracking the entry point parsing
-	defer p.ctx.FinishParsing(p.fullPath)
+	projectRoot, err := config.GetProjectRoot(p.fullPath)
+	if err != nil {
+		colors.RED.Println("❌ Error getting project root:", err)
+		os.Exit(1)
+	}
+
+	config, _ := config.LoadProjectConfig(projectRoot)
+
+	p.ctx.ProjectStack.Push(config)
+	//p.ctx.MarkParseStart(p.fullPath)
+	//defer p.ctx.MarkParseFinish(p.fullPath)
+	defer p.ctx.ProjectStack.Pop()
 
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
 		if node != nil {
 			nodes = append(nodes, node)
-		} else {
-			handleUnexpectedToken(p)
-			break
+			continue
 		}
+
+		handleUnexpectedToken(p, "statement")
+		break
 	}
 
 	if len(nodes) == 0 {
@@ -280,24 +237,22 @@ func (p *Parser) Parse() *ast.Program {
 	}
 
 	if p.debug {
-		colors.BLUE.Printf("Parsed '%s'\n", p.fullPath)
+		colors.BLUE.Printf("Parsed %q\n", p.fullPath)
+	}
+
+	if p.alias == "" {
+		panic("Module name cannot be empty, please check the file path: " + p.fullPath)
 	}
 
 	program := &ast.Program{
 		Nodes:      nodes,
 		FullPath:   p.fullPath,
 		ImportPath: p.importPath,
-		Modulename: p.modulename,
+		Alias:      p.alias,
 		Location:   *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
 
-	// Add the module to the context
 	p.ctx.AddModule(p.importPath, program)
-
-	//show the ast
-	if p.debug {
-		program.SaveAST()
-	}
 
 	return program
 }

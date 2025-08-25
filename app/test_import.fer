@@ -1,6 +1,0 @@
-// Test file with import and debug output
-import "app/maths/math";
-
-const pi: f64 = 3.14159;
-let radius: i32 = 7;
-let area: f64 = pi * radius * radius;

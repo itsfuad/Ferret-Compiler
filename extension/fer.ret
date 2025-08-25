@@ -1,0 +1,17 @@
+name = "ferret_test_app"
+version = "0.1.0"
+optimize = false
+
+[compiler]
+version = "0.1.0"
+
+[cache]
+path = ".ferret"
+
+[remote]
+enabled = false
+share = false
+
+[dependencies]
+# Add your dependencies here
+# example_lib = "1.0.0"

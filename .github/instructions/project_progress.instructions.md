@@ -48,23 +48,6 @@ Source Code → Lexer → Parser → AST → Collector → Resolver → TypeChec
 
 ## Development Guidelines
 
-### Code Organization
-```
-compiler/
-├── cmd/                  # CLI entry point and main compilation driver
-├── colors/              # Terminal output formatting utilities
-├── internal/            # Internal compiler packages (not public API)
-│   ├── config/         # Project configuration (.ferret.json handling)
-│   ├── ctx/            # Compiler context and state management
-│   ├── frontend/       # Frontend compilation pipeline
-│   ├── semantic/       # Semantic analysis pipeline
-│   ├── backend/        # Code generation (low priority)
-│   ├── source/         # Source location and position tracking
-│   ├── report/         # Error reporting and diagnostics
-│   ├── types/          # Type system definitions
-│   └── utils/          # Shared utilities
-```
-
 ### Language Feature Priorities
 
 **Core Features (Implement First)**
@@ -93,10 +76,10 @@ compiler/
 - **Memory Efficiency**: Efficient AST and symbol table representations
 
 ### Module System Design
-- `.ferret.json`: Project root indicator and configuration
+- `fer.ret`: Project root indicator and configuration
 - Remote dependencies: GitHub repos stored in config
 - Local imports: Relative path-based, no config needed
-- Cache management: `.ferret/modules` directory
+- Cache management: `.ferret` directory
 
 ## Coding Standards
 
@@ -165,6 +148,38 @@ func TestParserFeature(t *testing.T) {
 }
 ```
 
+### Ferret Language Syntax
+#### Variable Declaration
+```ferret
+let x = 10; // type inferred
+let y: i32 = 20; // explicit type declaration
+let z: str; // string type
+```
+#### Array
+```ferret
+let arr: []i32 = [1, 2, 3]; // array of integers
+let arr2: [3]i32 = [1, 2, 3]; // fixed-size array not supported yet
+```
+
+#### Types
+```ferret
+// any types can be declared
+type MyType OtherType;
+
+type MyStruct struct {
+    field1: i32,
+    field2: str
+};
+
+type MyInterface interface {
+    method1(param: i32) -> str;
+    method2() -> void;
+}
+
+// struct literals
+let myStruct = @MyStruct{field1: 10, field2: "hello"}; // Literals has @ prefix
+```
+
 ## Development Workflow
 
 ### Before Starting Work
@@ -185,6 +200,20 @@ func TestParserFeature(t *testing.T) {
 - Maintain backward compatibility in AST structures
 - Document any new compiler phases or major changes
 
+### Code Testing while developing
+- To compile or build the compiler, use:
+```bash
+./build.sh        # Unix
+.\build.bat       # Windows
+```
+From `scripts/` directory. (Mandatory)
+
+Then go to the `app/` directory and run:
+```bash
+ferret filename.fer --debug
+```
+Make sure you add the `bin` directory to your `PATH` environment variable to run the `ferret` command from anywhere.
+
 ### Available Scripts
 ```bash
 # Build compiler
@@ -202,6 +231,14 @@ func TestParserFeature(t *testing.T) {
 # Quick development test
 ./scripts/run.sh          # Unix
 .\scripts\run.bat         # Windows
+
+# Build the LSP server
+./scripts/lsp.sh     # Unix
+.\scripts\lsp.bat    # Windows
+
+# Build the LSP server + package the vscode extension
+./scripts/pack.sh     # Unix
+.\scripts\pack.bat    # Windows
 
 # Full CI validation
 ./scripts/ci-check.sh     # Unix

@@ -1,0 +1,22 @@
+[default]
+name = "math"
+version = "1.0.0"
+
+[compiler]
+version = "0.0.1"
+
+[build]
+entry = ""
+output = "bin"
+
+[cache]
+path = ".ferret"
+
+[external]
+allow-sharing = true
+allow-remote-import = false
+allow-neighbor-import = false
+
+[neighbors]
+
+[dependencies]

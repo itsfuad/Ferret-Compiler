@@ -2,10 +2,10 @@ package resolver
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
+	"compiler/internal/modules"
 	"compiler/internal/semantic/analyzer"
+	"compiler/report"
 	"fmt"
 )
 
@@ -14,12 +14,12 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	importPath := r.Program.ImportPath
 
 	// Check if this module can be processed for resolution phase
-	if !r.Ctx.CanProcessPhase(importPath, ctx.PhaseResolved) {
+	if !r.Ctx.CanProcessPhase(importPath, modules.PHASE_RESOLVED) {
 		currentPhase := r.Ctx.GetModulePhase(importPath)
-		if currentPhase >= ctx.PhaseResolved {
+		if currentPhase >= modules.PHASE_RESOLVED {
 			// Already processed or in a later phase, skip
 			if r.Debug {
-				colors.GREEN.Printf("Skipping resolution for '%s' (already in phase: %s)\n", r.Program.FullPath, currentPhase.String())
+				colors.TEAL.Printf("Skipping resolution for %q (already in phase: %s)\n", r.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -37,32 +37,70 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		resolveNode(r, node, currentModule)
 	}
 
+	// Check for unused imports and report warnings
+	checkUnusedImports(r, currentModule)
+
 	// Mark module as resolved
-	r.Ctx.SetModulePhase(importPath, ctx.PhaseResolved)
+	r.Ctx.SetModulePhase(importPath, modules.PHASE_RESOLVED)
 
 	if r.Debug {
-		colors.GREEN.Printf("Resolved '%s'\n", r.Program.FullPath)
+		colors.GREEN.Printf("Resolved %q\n", r.Program.FullPath)
 	}
 }
 
 // resolveNode dispatches resolution to the appropriate handler based on node type
-func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
-	colors.BRIGHT_BROWN.Printf("Resolving node of type <%T>\n", node)
+func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
+	fmt.Printf("Resolving node of type: %T\n", node)
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
 	case *ast.FunctionDecl:
 		resolveFunctionDecl(r, n, cm)
+	case *ast.MethodDecl:
+		resolveMethodDecl(r, n, cm)
 	case *ast.VarDeclStmt:
 		resolveVariableDeclaration(r, n, cm)
 	case *ast.TypeDeclStmt:
 		resolveTypeDeclaration(r, n, cm)
 	case *ast.AssignmentStmt:
 		resolveAssignmentStmt(r, n, cm)
+	case *ast.IfStmt:
+		resolveIfStmt(r, n, cm)
+	case *ast.Block:
+		resolveBlock(r, n, cm)
+	case *ast.ReturnStmt:
+		resolveReturnStmt(r, n, cm)
+	case *ast.ExpressionList:
+		resolveExpressionList(r, n, cm)
 	case *ast.ExpressionStmt:
-		colors.CYAN.Printf("Resolving expression statement: %v\n", n.Expressions)
-		panic(":)")
+		resolveExpressionStmt(r, n, cm)
+	case *ast.FunctionLiteral:
+		resolveFunctionLiteral(r, n, cm)
 	default:
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for resolution", n), report.RESOLVER_PHASE)
+	}
+}
+
+// checkUnusedImports compares imported modules vs used modules and reports warnings
+func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module) {
+	// Collect all imports from the AST
+	for _, node := range r.Program.Nodes {
+		if importStmt, ok := node.(*ast.ImportStmt); ok {
+			alias := importStmt.Alias
+			if !currentModule.UsedImports[alias] {
+				r.Ctx.Reports.AddWarning(
+					r.Program.FullPath,
+					importStmt.Loc(),
+					fmt.Sprintf("Unused import: %q", importStmt.ImportPath.Value),
+					report.RESOLVER_PHASE,
+				).AddHint("Remove this import or use symbols from this module")
+			}
+		}
+	}
+}
+
+func resolveExpressionStmt(r *analyzer.AnalyzerNode, n *ast.ExpressionStmt, cm *modules.Module) {
+	for _, expr := range *n.Expressions {
+		resolveExpr(r, expr, cm)
 	}
 }

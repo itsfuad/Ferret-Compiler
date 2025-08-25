@@ -1,109 +1,117 @@
-/*
-Language Core Principles
+import "demo-app/cmd/expr";
+//import "demo-app/cmd/expr";
+import "neighbor/file2/types";
 
-1. Simplicity: The language should be easy to learn and use, with a clear and concise syntax.
-2. It must work as it looks. No hidden magic, no implicit behavior.
-3. Safety: The language should prevent common programming errors, such as null pointer dereferences and buffer overflows at compile time.
-*/
+import "std/io";
 
-import "app/data";
-//import "std/fmt";
-//import "std/io";
-//import "std/math";
-//import "github.com/user/repo/file";
+import "github.com/itsfuad/ferret-mod/data/bigint";
+import "github.com/itsfuad/ferret-mod/external/importer";
 
-// Examples of the new explicit import system:
-// - All local imports must include the root folder name (e.g., "code/data", not just "data")
-// - No relative paths (./ or ../) allowed
-// - Standard library imports use "std/" prefix
-// - External libraries use "github.com/user/repo/path" format
-// - .fer extension is automatically added by the resolver
+let outvar: i32 = 10;
 
-// Test numeric operations (should return largest type)
-let x: i32 = 42;
-let y: i64 = 100;
-let z: i64 = x + y; // i32 + i64 should result in i64
-
-// Test string concatenation (should only work with str + str)
-let str1: str = "Hello ";
-let str2: str = "World";
-let greeting: str = str1 + str2; // str + str should work
-
-// This should cause an error (str + non-str)
-// let invalid: str = str1 + x;
-
-let a = 5;
-let b = 10;
-let sum = 1+3;
-
-let name, age : str, i32 = "John", 30;
-
-let importedData = data::myData;
-
-//supports different numeric types and formatting
-let pi : f64 = 3.14159;
-//for larger numbers, use _ as a separator
-let largeNumber : i32 = 1_000_000;
-//octals, hexadecimals, and binary literals are supported
-let octal : i32 = 0o755; // octal representation
-let hex : i32 = 0xFF; // hexadecimal representation
-let binary : i32 = 0b101010; // binary representation
-//support scientific notation
-let scientific : f64 = 1.23e4; // 1.23 * 10^4
-
-// type MyType = i32 | str | null;
-
-// let a : i32 = 10;
-// let b : MyType = "Hello"; // or we could use let b : i32 | str | null = 20;
-
-// if when b { is i32 => true, _ false } {
-
-// }
-
-// fn add(a: i32, b: MyType) -> i32 {
-//     return a + when b {
-//         is i32 => b,
-//         is str => 0, // or some other logic
-//         is null => 0,
-//         _ => 0, // default case for all other types. though in this case, it would never reach here
-//     };
-// }
-
-
-type Int i32;
-
-let cxx : data::MyType = data::kk;
-
-//let someValue = laterDeclaredValue;
-let laterDeclaredValue = "This value is declared later in the code.";
-
-// type Car struct {
-//     make: str,
-//     model: str,
-//     year: i32
-// };
-
-// let myCar = @Car {
-//     make: "Toyota",
-//     model: "Corolla",
-//     year: 2020
-// };
-
-// myCar.make = "Honda"; // Update the make of the car
-//notAnObject.notAField = "This will cause a compile-time error"; // This will cause an error since notAField does not exist in Car struct
-
-//array 
-//let numbers = [1, 2, 3, 4, 5]; // Array of integers
-// let mixedArray = [1, "two", 3.0]; // Array
-
-//function
-fn nothing() {
-    // This function does nothing
+fn add(x: i32, y: i32) -> i32 {
+    let invar = 8;
+    return x + y + outvar * invar;
 }
 
-fn withParam(param: str) {
-    // This function takes a string parameter and does nothing with it
-    // fmt.println(param); // Uncomment to print the parameter
+add(1, 2);
+
+// // variable number of args
+fn AddNumbers(first: i32, ...nums: []i32) -> i32 {
+    return 0;
 }
 
-cxx(); // Call the function
+
+let array1 = [1, 2, 3];
+//...array1;
+let array2 = [10, 23, ...array1];
+
+let dynamicSum = AddNumbers(1, 2, 4, 3, 9);
+
+//ido::print("");
+
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+type Point3D struct {
+    x: i32,
+    y: i32,
+    z: i32
+};
+
+fn (p: Point3D) abs() -> i32 {
+    return p.x * p.x + p.y * p.y + p.z * p.z;
+}
+
+fn (p: Point3D) coordinateX() -> i32 {
+    return p.x;
+}
+
+let plainInt8: i8 = 12 as i8; //error without as i8
+let plainInt64: i64 = 123;
+
+//plainInt8 = plainInt64; // error
+type Integer16 i16;
+
+fn (i: Integer16) toString() -> str {
+    return "integer";
+}
+
+let typedInteger16: Integer16 = plainInt8 as Integer16; // implicit cast
+let typedInteger16_2: Integer16 = 10 as Integer16;
+
+let myval = typedInteger16.toString();
+
+let namedPoint2d: Point = @struct{x: 12, y: 22} as Point;
+
+namedPoint2d.x;
+
+//namedPoint2d.z;
+
+let namedPoint3d = @Point3D{x: 1, y: 2, z: 3};
+namedPoint3d.z;
+
+namedPoint2d = namedPoint3d as Point;
+//namedPoint3d.coordinates();
+
+type I interface {
+    fn abs() -> i32,
+    fn coordinateX() -> i32
+};
+
+type II I;
+
+// fn (i: II) IIAbs() -> i32 {
+//     return i.abs();
+// }
+
+fn getAbs(i: I) -> i32 {
+    return i.abs();
+}
+
+let iPoint: I = namedPoint3d as I;
+
+fn(xw: i32) -> i32 {
+    return xw * 2;
+}(23); // IIFE
+
+fn outer() -> fn(x: i32) -> i32 {
+    return fn(x: i32) -> i32 {
+        return x * 2;
+    };
+}
+
+let innerFn = outer();
+let result = innerFn(10.2 as i32);
+
+let doubleCall = outer()(2);
+
+type any interface{};
+
+fn printAny(value: any) {
+    
+}
+
+printAny("hello");

@@ -1,0 +1,19 @@
+title = "Benchmark Test"
+version = 1.0
+debug = true
+
+[database]
+host = "localhost"
+port = 5432
+user = "admin"
+password = "secret"
+
+[logging]
+level = "info"
+file = "/var/log/app.log"
+max_size = 100
+
+[features]
+feature1 = true
+feature2 = false
+feature3 = true

@@ -2,22 +2,23 @@ package collector
 
 import (
 	"compiler/colors"
-	"compiler/internal/ctx"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
+	"compiler/internal/modules"
 	"compiler/internal/semantic/analyzer"
+	"compiler/report"
+	"fmt"
 )
 
 func CollectSymbols(c *analyzer.AnalyzerNode) {
 	importPath := c.Program.ImportPath
 
 	// Check if this module can be processed for collection phase
-	if !c.Ctx.CanProcessPhase(importPath, ctx.PhaseCollected) {
+	if !c.Ctx.CanProcessPhase(importPath, modules.PHASE_COLLECTED) {
 		currentPhase := c.Ctx.GetModulePhase(importPath)
-		if currentPhase >= ctx.PhaseCollected {
+		if currentPhase >= modules.PHASE_COLLECTED {
 			// Already processed or in a later phase, skip
 			if c.Debug {
-				colors.BLUE.Printf("Skipping collection for '%s' (already in phase: %s)\n", c.Program.FullPath, currentPhase.String())
+				colors.BLUE.Printf("Skipping collection for %q (already in phase: %s)\n", c.Program.FullPath, currentPhase)
 			}
 			return
 		}
@@ -36,56 +37,82 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	}
 
 	// Mark module as collected
-	c.Ctx.SetModulePhase(importPath, ctx.PhaseCollected)
+	c.Ctx.SetModulePhase(importPath, modules.PHASE_COLLECTED)
 
 	if c.Debug {
-		colors.BLUE.Printf("Collected symbols for '%s'\n", c.Program.FullPath)
+		colors.BLUE.Printf("Collected symbols for %q\n", c.Program.FullPath)
 	}
 }
 
-func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *ctx.Module) {
+func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
+	if node == nil {
+		return
+	}
 	// collect functions for forward declarations
 	switch n := node.(type) {
 	case *ast.ImportStmt:
-		collectSymbolsFromImport(c, n, cm)
+		collectSymbolsFromImport(c, n)
 	case *ast.FunctionDecl:
 		collectFunctionSymbol(c, n, cm)
+	case *ast.MethodDecl:
+		collectMethodSymbol(c, n, cm)
+	case *ast.FunctionLiteral:
+		collectFunctionLiteral(c, n, cm)
+	case *ast.VarDeclStmt:
+		collectVariableSymbols(c, n, cm)
+	case *ast.TypeDeclStmt:
+		collectTypeSymbol(c, n, cm)
+	case *ast.IfStmt:
+		collectSymbolsFromIfStmt(c, n, cm)
+	case *ast.Block:
+		collectSymbolsFromBlock(c, n, cm)
+	case *ast.FunctionCallExpr:
+		collectCall(c, n, cm)
+	case *ast.ExpressionStmt:
+		collectExprStmt(c, n, cm)
+	case *ast.SpreadExpr:
+		fmt.Printf("Collecting symbols from spread expression: %v\n", n)
+		collectSymbols(c, *n.Expression, cm)
+	case *ast.ReturnStmt:
+		collectSymbols(c, *n.Value, cm)
+	case *ast.BinaryExpr:
+		// Recursively collect from both operands
+		if n.Left != nil {
+			collectSymbols(c, *n.Left, cm)
+		}
+		if n.Right != nil {
+			collectSymbols(c, *n.Right, cm)
+		}
+	case *ast.PrefixExpr:
+		// Recursively collect from the operand
+		if n.Operand != nil {
+			collectSymbols(c, *n.Operand, cm)
+		}
+	case *ast.PostfixExpr:
+		// Recursively collect from the operand
+		if n.Operand != nil {
+			collectSymbols(c, *n.Operand, cm)
+		}
+		// For other expressions and nodes, we don't need to collect symbols
+		// (literals, identifiers, etc. don't contain nested function literals)
 	}
 }
 
-func collectSymbolsFromImport(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *ctx.Module) {
-	if imp.ImportPath.Value == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, imp.Loc(), "Import module name cannot be empty", report.COLLECTOR_PHASE)
-		return
+func collectCall(c *analyzer.AnalyzerNode, callExpr *ast.FunctionCallExpr, cm *modules.Module) {
+	// Recursively collect from the caller (might be a function literal)
+	if callExpr.Caller != nil {
+		collectSymbols(c, *callExpr.Caller, cm)
 	}
-
-	//module must be parses and stored already
-	module, err := c.Ctx.GetModule(imp.ImportPath.Value)
-	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.COLLECTOR_PHASE)
-		return
+	// Recursively collect from arguments (might contain function literals)
+	for _, arg := range callExpr.Arguments {
+		collectSymbols(c, arg, cm)
 	}
-
-	// collect functions from the imported module
-	anz := analyzer.NewAnalyzerNode(module.AST, c.Ctx, c.Debug)
-	CollectSymbols(anz)
-	cm.SymbolTable.Imports[imp.ModuleName] = module.SymbolTable
 }
 
-func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *ctx.Module) {
-	if fn.Identifier.Name == "" {
-		c.Ctx.Reports.AddSyntaxError(c.Program.FullPath, fn.Loc(), "Function identifier cannot be empty", report.COLLECTOR_PHASE)
-		return
-	}
-
-	// declare the function symbol
-	symbol := ctx.NewSymbolWithLocation(fn.Identifier.Name, ctx.SymbolFunc, nil, fn.Loc())
-	err := cm.SymbolTable.Declare(fn.Identifier.Name, symbol)
-	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare function symbol: "+err.Error(), report.COLLECTOR_PHASE)
-		return
-	}
-	if c.Debug {
-		colors.GREEN.Printf("Declared function symbol '%s' at %s\n", fn.Identifier.Name, fn.Loc().String())
+func collectExprStmt(c *analyzer.AnalyzerNode, exprStmt *ast.ExpressionStmt, cm *modules.Module) {
+	if exprStmt.Expressions != nil {
+		for _, expr := range *exprStmt.Expressions {
+			collectSymbols(c, expr, cm)
+		}
 	}
 }

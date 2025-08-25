@@ -3,9 +3,10 @@ package parser
 import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/internal/utils"
 	"compiler/internal/utils/lists"
+	"compiler/report"
 )
 
 // detect if it's a function or a method
@@ -19,12 +20,12 @@ import (
 // method: fn (r Receiver, others...) NAME (PARAMS) {BODY} // invalid, but we can still parse it and report an error
 func parseFunctionLike(p *Parser) ast.Node {
 
-	start := p.peek()
+	start := p.peek() // the fn token
 
 	var params []ast.Parameter
 
 	if p.next().Kind == lexer.OPEN_PAREN {
-		p.advance()
+		p.advance() // consume the fn token
 		// either a method or anonymous function
 		// fn (PARAMS) {BODY} // anonymous
 		// fn (PARAMS) NAME (PARAMS) {BODY} // method
@@ -34,11 +35,10 @@ func parseFunctionLike(p *Parser) ast.Node {
 			return parseMethodDeclaration(p, &start.Start, params)
 		}
 		// anonymous function
-		return parseFunctionLiteral(p, &start.Start, true, false, params...)
-	} else {
-		// named function
-		return parseFunctionDecl(p)
+		return parseFunctionLiteral(p, &start.Start, false, params...)
 	}
+	// named function
+	return parseFunctionDecl(p)
 }
 
 func parseParameters(p *Parser) []ast.Parameter {
@@ -48,6 +48,13 @@ func parseParameters(p *Parser) []ast.Parameter {
 	p.consume(lexer.OPEN_PAREN, report.EXPECTED_OPEN_PAREN)
 
 	for !p.match(lexer.CLOSE_PAREN) {
+
+		isVariadic := false
+
+		if p.match(lexer.THREE_DOT_TOKEN) {
+			isVariadic = true
+			p.advance()
+		}
 
 		identifier := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PARAMETER_NAME)
 
@@ -67,6 +74,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		param := ast.Parameter{
 			Identifier: paramName,
 			Type:       paramType,
+			IsVariadic: isVariadic,
 		}
 
 		//check if the parameter is already defined
@@ -99,73 +107,65 @@ func parseParameters(p *Parser) []ast.Parameter {
 	return params
 }
 
-func parseReturnTypes(p *Parser) []ast.DataType {
+func parseReturnType(p *Parser) ast.DataType {
 	p.advance()
-	// Check for multiple return types in parentheses
-	if p.peek().Kind != lexer.OPEN_PAREN {
-		// Single return type
-		returnType, ok := parseType(p)
-		if !ok {
-			token := p.previous()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
-			return nil
-		}
-		return []ast.DataType{returnType}
-	}
 
-	p.advance() // consume '('
-	returnTypes := make([]ast.DataType, 0)
-
-	for !p.match(lexer.CLOSE_PAREN) {
-		returnType, ok := parseType(p)
-		if !ok {
-			token := p.previous()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
-			return nil
-		}
-		returnTypes = append(returnTypes, returnType)
-
-		if p.match(lexer.CLOSE_PAREN) {
-			break
-		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
-			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma")
-				break
+	// Check if user is trying to use multiple return types (parentheses)
+	if p.peek().Kind == lexer.OPEN_PAREN {
+		token := p.peek()
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Multiple return types are not supported", report.PARSING_PHASE).AddHint("Functions can only return a single type")
+		// Skip the entire parentheses expression to continue parsing
+		p.advance() // consume '('
+		parenCount := 1
+		for parenCount > 0 && !p.isAtEnd() {
+			if p.peek().Kind == lexer.OPEN_PAREN {
+				parenCount++
+			} else if p.peek().Kind == lexer.CLOSE_PAREN {
+				parenCount--
 			}
+			p.advance()
 		}
+		return nil
 	}
 
-	p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
-	return returnTypes
+	// Parse single return type
+	returnType, ok := parseType(p)
+	if !ok {
+		token := p.previous()
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
+		return nil
+	}
+
+	return returnType
 }
 
-func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
+func parseSignature(p *Parser, paramNotParsedYet bool, params ...ast.Parameter) ([]ast.Parameter, ast.DataType) {
 
-	if len(params) == 0 && parseNewParams {
+	if len(params) == 0 && paramNotParsedYet {
 		params = parseParameters(p)
 	}
 
 	// Parse return type if present
 	if p.match(lexer.ARROW_TOKEN) {
-		returnTypes := parseReturnTypes(p)
-		return params, returnTypes
+		returnType := parseReturnType(p)
+		return params, returnType
 	}
 
 	return params, nil
 }
 
-func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
+func parseFunctionLiteral(p *Parser, start *source.Position, paramNotParsedYet bool, params ...ast.Parameter) *ast.FunctionLiteral {
 
-	params, returnTypes := parseSignature(p, parseNewParams, params...)
+	params, returnType := parseSignature(p, paramNotParsedYet, params...)
 
 	block := parseBlock(p)
 
 	location := *source.NewLocation(start, block.Loc().End)
 
 	return &ast.FunctionLiteral{
+		ID:         utils.GenerateFunctionLiteralID(),
 		Params:     params,
-		ReturnType: returnTypes,
+		ReturnType: returnType,
 		Body:       block,
 		Location:   location,
 	}
@@ -194,7 +194,9 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 
 	name := declareFunction(p)
 
-	function := parseFunctionLiteral(p, &start.Start, false, true)
+	function := parseFunctionLiteral(p, &start.Start, true)
+
+	function.ID = name.Name // Set the function ID to the declared name
 
 	return &ast.FunctionDecl{
 		Identifier: name,

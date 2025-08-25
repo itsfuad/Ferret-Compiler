@@ -34,10 +34,6 @@ func (lex *Lexer) push(token Token) {
 	lex.Tokens = append(lex.Tokens, token)
 }
 
-func (lex *Lexer) at() byte {
-	return lex.sourceCode[lex.Position.Index]
-}
-
 func (lex *Lexer) remainder() string {
 	return string(lex.sourceCode)[lex.Position.Index:]
 }
@@ -85,6 +81,7 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`%=`), defaultHandler(MOD_EQUALS_TOKEN)},
 			{regexp.MustCompile(`\^=`), defaultHandler(EXP_EQUALS_TOKEN)},
 			{regexp.MustCompile(`\*\*`), defaultHandler(EXP_TOKEN)},
+			{regexp.MustCompile(`\.\.\.`), defaultHandler(THREE_DOT_TOKEN)},
 			{regexp.MustCompile(`\.\.`), defaultHandler(RANGE_TOKEN)},
 			{regexp.MustCompile(`&&`), defaultHandler(AND_TOKEN)},
 			{regexp.MustCompile(`\|\|`), defaultHandler(OR_TOKEN)},

@@ -1,179 +1,234 @@
 package ctx
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"compiler/colors"
-	"compiler/internal/config"
+	"compiler/config"
+	"compiler/constants"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/report"
+	"compiler/internal/modules"
+	"compiler/internal/symbol"
+	"compiler/internal/utils/fs"
+	"compiler/internal/utils/stack"
+	"compiler/report"
 )
 
 var contextCreated = false
 
-// ModulePhase represents the current processing phase of a module
-type ModulePhase int
-
-const (
-	PhaseNotStarted  ModulePhase = iota
-	PhaseParsed                  // Module has been parsed into AST
-	PhaseCollected               // Symbols have been collected
-	PhaseResolved                // Symbols have been resolved
-	PhaseTypeChecked             // Type checking completed
-)
-
-func (p ModulePhase) String() string {
-	switch p {
-	case PhaseNotStarted:
-		return "Not Started"
-	case PhaseParsed:
-		return "Parsed"
-	case PhaseCollected:
-		return "Collected"
-	case PhaseResolved:
-		return "Resolved"
-	case PhaseTypeChecked:
-		return "Type Checked"
-	default:
-		return "Unknown"
-	}
-}
-
-type Module struct {
-	AST         *ast.Program
-	SymbolTable *SymbolTable
-	Phase       ModulePhase // Current processing phase
-}
+const BUILTIN_DIR = "../modules"
 
 type CompilerContext struct {
-	EntryPoint string             // Entry point file
-	Builtins   *SymbolTable       // Built-in symbols, e.g., "i32", "f64", "str", etc.
-	Modules    map[string]*Module // key: import path
+	EntryPoint string                     // Entry point file
+	Builtins   *symbol.SymbolTable        // Built-in symbols, e.g., "i32", "f64", "str", etc.
+	Modules    map[string]*modules.Module // key: import path
 	Reports    report.Reports
-	CachePath  string
 	// Project configuration
-	ProjectConfig *config.ProjectConfig
-	ProjectRoot   string
+	ProjectConfig       *config.ProjectConfig
+	ProjectStack        *stack.Stack[*config.ProjectConfig] // Stack of project configurations for nested imports
+	ProjectRootFullPath string
+	BuiltinModules      map[string]string // key: projectname, value: path
 
-	remoteConfigs map[string]bool
+	// Remote module cache path (.ferret)
+	RemoteCachePath string
 
 	// Dependency graph: key is importer, value is list of imported module keys (as strings)
 	DepGraph map[string][]string
-
-	// Track modules that are currently being parsed to prevent infinite recursion
-	_parsingModules map[string]bool
-	// Keep track of the parsing stack to show cycle paths
-	_parsingStack []string
 }
 
-func (c *CompilerContext) FullPathToImportPath(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
+// ResolveImportPath categorizes an import path with proper neighbor package name resolution
+func (c *CompilerContext) ResolveImportPath(importPath string) (*config.ProjectConfig, string, modules.ModuleType, error) {
+	if importPath == "" {
+		return nil, "", modules.UNKNOWN, fmt.Errorf("empty import path")
+	}
+
+	packageName := fs.FirstPart(importPath)
+	currentProjectConfig := c.ProjectStack.Peek()
+	cleanPath := strings.TrimPrefix(importPath, packageName+"/")
+
+	// Determine module type and resolve path
+	projectConfig, resolvedPath, modType, err := c.resolveByType(packageName, cleanPath, importPath, currentProjectConfig)
+	if err != nil {
+		return nil, "", modType, err
+	}
+
+	// Validate the resolved path
+	finalPath, err := c.validateResolvedPath(resolvedPath, importPath)
+	if err != nil {
+		return nil, "", modType, err
+	}
+
+	return projectConfig, finalPath, modType, nil
+}
+
+// resolveByType determines the module type and resolves the path accordingly
+func (c *CompilerContext) resolveByType(packageName, cleanPath, importPath string, currentProjectConfig *config.ProjectConfig) (*config.ProjectConfig, string, modules.ModuleType, error) {
+	// Local module
+	if packageName == currentProjectConfig.Name {
+		resolvedPath := filepath.Join(currentProjectConfig.ProjectRoot, cleanPath)
+		return currentProjectConfig, resolvedPath, modules.LOCAL, nil
+	}
+
+	// Remote module
+	if c.IsRemoteImport(importPath) {
+		return c.resolveRemoteModule(importPath, currentProjectConfig)
+	}
+
+	// Neighbor module
+	if rel, found := currentProjectConfig.Neighbors.Projects[packageName]; found {
+		return c.resolveNeighborModule(rel, cleanPath, currentProjectConfig)
+	}
+
+	// Builtin module
+	if path, found := c.BuiltinModules[packageName]; found {
+		return c.resolveBuiltinModule(path, cleanPath)
+	}
+
+	// Unknown module type
+	return nil, "", modules.UNKNOWN, nil
+}
+
+// resolveRemoteModule handles remote module resolution
+func (c *CompilerContext) resolveRemoteModule(importPath string, currentProjectConfig *config.ProjectConfig) (*config.ProjectConfig, string, modules.ModuleType, error) {
+
+	repoPath, err := modules.ExtractRepoPathFromImport(importPath)
+	if err != nil {
+		return nil, "", modules.REMOTE, err
+	}
+	// Check if module is in dependencies
+	version, found := currentProjectConfig.Dependencies.Packages[repoPath]
+	if !found {
+		return nil, "", modules.REMOTE, fmt.Errorf("remote module %q is not installed\nRun `ferret get %s` to install it", repoPath, repoPath)
+	}
+
+	host, owner, repo, _, err := modules.SplitRepo(repoPath)
+	if err != nil {
+		return nil, "", modules.REMOTE, err
+	}
+
+	// Check if module is cached
+	if !modules.IsModuleCached(c.RemoteCachePath, repoPath, version) {
+		return nil, "", modules.REMOTE, fmt.Errorf("module %q is not cached\nRun `ferret get` to install it", repoPath)
+	}
+
+	modulename, err := modules.ExtractModuleFromImport(importPath)
+	if err != nil {
+		return nil, "", modules.REMOTE, err
+	}
+
+	resolvedPath := filepath.Join(c.RemoteCachePath, host, owner, modules.BuildPackageSpec(repo, version), modulename)
+
+	return currentProjectConfig, resolvedPath, modules.REMOTE, nil
+}
+
+// resolveNeighborModule handles neighbor module resolution
+func (c *CompilerContext) resolveNeighborModule(rel, cleanPath string, currentProjectConfig *config.ProjectConfig) (*config.ProjectConfig, string, modules.ModuleType, error) {
+	neighborProject, err := config.LoadProjectConfig(filepath.Join(currentProjectConfig.ProjectRoot, rel))
+	if err != nil {
+		return nil, "", modules.NEIGHBOR, err
+	}
+
+	resolvedPath := filepath.Join(neighborProject.ProjectRoot, cleanPath)
+	return neighborProject, resolvedPath, modules.NEIGHBOR, nil
+}
+
+// resolveBuiltinModule handles builtin module resolution
+func (c *CompilerContext) resolveBuiltinModule(path, cleanPath string) (*config.ProjectConfig, string, modules.ModuleType, error) {
+	builtinProject, err := config.LoadProjectConfig(path)
+	if err != nil {
+		return nil, "", modules.BUILTIN, err
+	}
+
+	resolvedPath := filepath.Join(builtinProject.ProjectRoot, cleanPath)
+	return builtinProject, resolvedPath, modules.BUILTIN, nil
+}
+
+// validateResolvedPath validates the final resolved path
+func (c *CompilerContext) validateResolvedPath(resolvedPath, importPath string) (string, error) {
+	// Check if it's a directory (not allowed)
+	if fs.IsDir(resolvedPath) {
+		return "", fmt.Errorf("%q is not a module", importPath)
+	}
+
+	// Add extension and check if file exists
+	finalPath := resolvedPath + constants.EXT
+	if !fs.IsValidFile(finalPath) {
+		fmt.Printf("Final path: %s\n", finalPath)
+		return "", fmt.Errorf("module %q does not exist", importPath)
+	}
+
+	return finalPath, nil
+}
+
+// CachePathToImportPath converts a remote module file path back to its import path
+func (c *CompilerContext) CachePathToImportPath(fullPath string) string {
+	// Convert: D:\...\cache\github.com\itsfuad\ferret-mod\data\bigint.fer
+	// To: github.com/itsfuad/ferret-mod/data/bigint
+
+	absRemotePath, err := filepath.Abs(c.RemoteCachePath)
+	if err != nil {
 		return ""
 	}
+	absFullPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return ""
+	}
+
+	// Get relative path within cache
+	relPath, err := filepath.Rel(absRemotePath, absFullPath)
+	if err != nil {
+		return ""
+	}
+
+	// Normalize to forward slashes
 	relPath = filepath.ToSlash(relPath)
-	moduleName := strings.TrimSuffix(relPath, filepath.Ext(relPath))
-	rootName := filepath.Base(c.ProjectRoot)
-	return rootName + "/" + moduleName
+
+	// Remove file extension
+	relPath = strings.TrimSuffix(relPath, filepath.Ext(relPath))
+
+	// Since we now store with full github.com path, we can use it directly
+	// Just remove any version suffixes from parts
+	parts := strings.Split(relPath, "/")
+	var result []string
+	for _, part := range parts {
+		if strings.Contains(part, "@") {
+			// Remove version from repo name
+			repoName := strings.Split(part, "@")[0]
+			result = append(result, repoName)
+		} else {
+			result = append(result, part)
+		}
+	}
+
+	return strings.Join(result, "/")
 }
 
-func (c *CompilerContext) FullPathToModuleName(fullPath string) string {
-	relPath, err := filepath.Rel(c.ProjectRoot, fullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return ""
-	}
-	filename := filepath.Base(fullPath)
+func (c *CompilerContext) FullPathToAlias(fullPath string) string {
+	filename := fs.LastPart(fullPath)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
-func (c *CompilerContext) GetConfigFile(configFilepath string) *config.ProjectConfig {
-	if c.remoteConfigs == nil {
-		return nil
-	}
-	_, exists := c.remoteConfigs[configFilepath]
-	if !exists {
-		return nil
-	}
-	cacheFile, err := os.ReadFile(filepath.FromSlash(configFilepath))
-	if err != nil {
-		return nil
-	}
-	var projectConfig config.ProjectConfig
-	if err := json.Unmarshal(cacheFile, &projectConfig); err != nil {
-		return nil
-	}
-	return &projectConfig
+// IsRemoteImport checks if an import path is a remote module (github.com/*, gitlab.com/*, etc.)
+func (c *CompilerContext) IsRemoteImport(importPath string) bool {
+	return strings.HasPrefix(importPath, "github.com/") ||
+		strings.HasPrefix(importPath, "gitlab.com/") ||
+		strings.HasPrefix(importPath, "bitbucket.org/")
 }
 
-func (c *CompilerContext) SetRemoteConfig(configFilepath string, data []byte) error {
-	if c.remoteConfigs == nil {
-		c.remoteConfigs = make(map[string]bool)
-	}
-	c.remoteConfigs[configFilepath] = true
-	err := os.MkdirAll(filepath.Dir(configFilepath), 0755)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(configFilepath, data, 0644)
-	if err != nil {
-		return err
-	}
-	colors.GREEN.Printf("Cached remote config for %s\n", configFilepath)
-	return nil
-}
-
-func (c *CompilerContext) FindNearestRemoteConfig(logicalPath string) *config.ProjectConfig {
-
-	logicalPath = filepath.ToSlash(logicalPath)
-
-	if c.remoteConfigs == nil {
-		return nil
-	}
-
-	logicalPath = filepath.ToSlash(logicalPath)
-	parts := strings.Split(logicalPath, "/")
-
-	// Start from full path, walk up to github.com/user/repo
-	for i := len(parts); i >= 3; i-- {
-		prefix := strings.Join(parts[:i], "/")
-		if _, exists := c.remoteConfigs[prefix]; exists {
-			data, err := os.ReadFile(filepath.FromSlash(prefix))
-			if err != nil {
-				continue
-			}
-			var cfg config.ProjectConfig
-			if err := json.Unmarshal(data, &cfg); err != nil {
-				continue
-			}
-			return &cfg
-		}
-	}
-	return nil
-}
-
-func (c *CompilerContext) GetModule(importPath string) (*Module, error) {
+func (c *CompilerContext) GetModule(importPath string) (*modules.Module, error) {
 	if c.Modules == nil {
-		return nil, fmt.Errorf("module '%s' not found in context", importPath)
+		return nil, fmt.Errorf("module context is empty")
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return nil, fmt.Errorf("module '%s' not found in context", importPath)
+		return nil, fmt.Errorf("module %q not found in context: %#v", importPath, c.Modules)
 	}
-	return module, nil
-}
 
-func (c *CompilerContext) RemoveModule(importPath string) {
-	if c.Modules == nil {
-		return
-	}
-	if _, exists := c.Modules[importPath]; !exists {
-		return
-	}
-	delete(c.Modules, importPath)
+	return module, nil
 }
 
 func (c *CompilerContext) ModuleCount() int {
@@ -188,15 +243,27 @@ func (c *CompilerContext) PrintModules() {
 		colors.YELLOW.Println("No modules in cache (context is nil)")
 		return
 	}
-	modules := c.ModuleNames()
-	if len(modules) == 0 {
+	modulesStr := c.ModuleNames()
+	if len(modulesStr) == 0 {
 		colors.YELLOW.Println("No modules in cache")
 		return
 	}
+
+	//sort
+	sort.Strings(modulesStr)
+
 	colors.BLUE.Println("Modules in cache:")
-	for _, name := range modules {
-		colors.PURPLE.Printf("- %s\n", name)
+	for _, name := range modulesStr {
+		_, exists := c.Modules[name]
+		if exists {
+			colors.PURPLE.Printf("- %s ", name)
+			fmt.Println() // New line
+		} else {
+			colors.PURPLE.Printf("- %s\n", name)
+		}
 	}
+	//show the project entrypoint
+	colors.CYAN.Printf("Project Entry Point: %s\n", c.EntryPoint)
 }
 
 func (c *CompilerContext) ModuleNames() []string {
@@ -224,23 +291,23 @@ func (c *CompilerContext) IsModuleParsed(importPath string) bool {
 		return false
 	}
 	module, exists := c.Modules[importPath]
-	return exists && module.Phase >= PhaseParsed
+	return exists && module.Phase >= modules.PHASE_PARSED
 }
 
 // GetModulePhase returns the current processing phase of a module
-func (c *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+func (c *CompilerContext) GetModulePhase(importPath string) modules.ModulePhase {
 	if c.Modules == nil {
-		return PhaseNotStarted
+		return modules.PHASE_NOT_STARTED
 	}
 	module, exists := c.Modules[importPath]
 	if !exists {
-		return PhaseNotStarted
+		return modules.PHASE_NOT_STARTED
 	}
 	return module.Phase
 }
 
 // SetModulePhase updates the processing phase of a module
-func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+func (c *CompilerContext) SetModulePhase(importPath string, phase modules.ModulePhase) {
 	if c.Modules == nil {
 		return
 	}
@@ -252,7 +319,7 @@ func (c *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
 }
 
 // CanProcessPhase checks if a module is ready for a specific phase
-func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase modules.ModulePhase) bool {
 	currentPhase := c.GetModulePhase(importPath)
 	// Can only process the next phase in sequence
 	return currentPhase == requiredPhase-1
@@ -260,27 +327,20 @@ func (c *CompilerContext) CanProcessPhase(importPath string, requiredPhase Modul
 
 func (c *CompilerContext) AddModule(importPath string, module *ast.Program) {
 	if c.Modules == nil {
-		c.Modules = make(map[string]*Module)
+		c.Modules = make(map[string]*modules.Module)
 	}
 	if _, exists := c.Modules[importPath]; exists {
 		return
 	}
 	if module == nil {
-		panic(fmt.Sprintf("Cannot add nil module for '%s'\n", importPath))
+		panic(fmt.Sprintf("Cannot add nil module for %q\n", importPath))
 	}
-	c.Modules[importPath] = &Module{
-		AST:         module,
-		SymbolTable: NewSymbolTable(c.Builtins),
-		Phase:       PhaseParsed, // Module is parsed when added
-	}
-}
 
-// isModuleParsing checks if a module is currently being parsed
-func (c *CompilerContext) isModuleParsing(importPath string) bool {
-	if c._parsingModules == nil {
-		return false
+	c.Modules[importPath] = &modules.Module{
+		AST:         module,
+		SymbolTable: symbol.NewSymbolTable(c.Builtins),
+		Phase:       modules.PHASE_PARSED, // Module is parsed when added
 	}
-	return c._parsingModules[importPath]
 }
 
 // DetectCycle detects if adding an edge from 'from' to 'to' would create a cycle
@@ -289,8 +349,6 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 	// Normalize paths to handle forward/backward slash inconsistency
 	from = filepath.ToSlash(from)
 	to = filepath.ToSlash(to)
-
-	colors.CYAN.Printf("DetectCycle: %s → %s\n", filepath.Base(from), filepath.Base(to))
 
 	// Initialize DepGraph if needed
 	if c.DepGraph == nil {
@@ -303,15 +361,16 @@ func (c *CompilerContext) DetectCycle(from, to string) ([]string, bool) {
 
 	if cycle := c.findCyclePath(to, from, visited, path); cycle != nil {
 		// Found a cycle, return it WITHOUT adding the edge
-		colors.RED.Printf("CYCLE DETECTED: %v\n", cycle)
 		return cycle, true
 	}
 
 	// No cycle found, add the edge (with normalized paths)
 	c.DepGraph[from] = append(c.DepGraph[from], to)
-	colors.GREEN.Printf("Edge added: %s → %s\n", filepath.Base(from), filepath.Base(to))
+
 	return nil, false
-} // findCyclePath uses DFS to find if there's a path from 'start' to 'target'
+}
+
+// findCyclePath uses DFS to find if there's a path from 'start' to 'target'
 // If found, returns the complete cycle path
 func (c *CompilerContext) findCyclePath(start, target string, visited map[string]bool, path []string) []string {
 	// Normalize paths
@@ -345,68 +404,50 @@ func (c *CompilerContext) findCyclePath(start, target string, visited map[string
 	return nil
 }
 
-// StartParsing marks a module as currently being parsed
-func (c *CompilerContext) StartParsing(importPath string) {
-	if c._parsingModules == nil {
-		c._parsingModules = make(map[string]bool)
-	}
-	if c._parsingStack == nil {
-		c._parsingStack = make([]string, 0)
-	}
-
-	c._parsingModules[importPath] = true
-	c._parsingStack = append(c._parsingStack, importPath)
-}
-
-// FinishParsing marks a module as no longer being parsed
-func (c *CompilerContext) FinishParsing(importPath string) {
-	if c._parsingModules != nil {
-		delete(c._parsingModules, importPath)
-	}
-
-	// Remove from stack (should be the last element)
-	if len(c._parsingStack) > 0 && c._parsingStack[len(c._parsingStack)-1] == importPath {
-		c._parsingStack = c._parsingStack[:len(c._parsingStack)-1]
-	}
-}
-
-func NewCompilerContext(entrypointFullpath string) *CompilerContext {
+func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 	if contextCreated {
 		panic("CompilerContext already created, cannot create a new one")
 	}
 	contextCreated = true
 
-	// Load project configuration
-	root, err := config.FindProjectRoot(entrypointFullpath)
-	if err != nil {
-		panic(err)
+	if err := config.ValidateProjectConfig(projectConfig); err != nil {
+		colors.RED.Printf("Invalid project configuration: %s\n", err)
+		os.Exit(1)
 	}
 
-	projectConfig, err := config.LoadProjectConfig(root)
-	if err != nil {
-		panic(fmt.Errorf("failed to load project config: %w", err))
-	}
+	//join entry point with project root
+	entryPoint := filepath.Join(projectConfig.ProjectRoot, projectConfig.Build.Entry)
 
-	//get the entry point relative to the project root
-	entryPoint, err := filepath.Rel(root, entrypointFullpath)
-	if err != nil {
-		panic(fmt.Errorf("failed to get relative path for entry point: %w", err))
-	}
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
-	// Use cache path from project config
-	cachePath := filepath.Join(root, projectConfig.Cache.Path)
-	cachePath = filepath.ToSlash(cachePath)
-	os.MkdirAll(cachePath, 0755)
+	// Set up remote module cache path
+	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, constants.CACHE_DIR)
+	remoteCachePath = filepath.ToSlash(remoteCachePath)
+	os.MkdirAll(remoteCachePath, 0755)
+
+	execPath, err := os.Executable()
+	if err != nil {
+		colors.RED.Printf("Error getting executable path: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize built-in modules
+	BuiltinModules, err := fs.DirectChilds(filepath.Join(filepath.Dir(execPath), BUILTIN_DIR))
+	if err != nil {
+		colors.RED.Printf("Error reading built-in modules: %s\n", err)
+		os.Exit(1)
+	}
 
 	return &CompilerContext{
-		EntryPoint:    entryPoint,
-		Builtins:      AddPreludeSymbols(NewSymbolTable(nil)), // Initialize built-in symbols
-		Modules:       make(map[string]*Module),
-		Reports:       report.Reports{},
-		CachePath:     cachePath,
-		ProjectConfig: projectConfig,
-		ProjectRoot:   root,
+		EntryPoint:          entryPoint,
+		Builtins:            symbol.AddPreludeSymbols(symbol.NewSymbolTable(nil)), // Initialize built-in symbols
+		Modules:             make(map[string]*modules.Module),
+		Reports:             report.Reports{},
+		ProjectConfig:       projectConfig,
+		ProjectStack:        stack.New[*config.ProjectConfig](),
+		RemoteCachePath:     remoteCachePath,
+		BuiltinModules:      BuiltinModules,
+		ProjectRootFullPath: projectConfig.ProjectRoot,
 	}
 }
 
@@ -419,9 +460,6 @@ func (c *CompilerContext) Destroy() {
 	c.Modules = nil
 	c.Reports = nil
 	c.DepGraph = nil
-
-	// Optionally, clear the cache directory
-	if c.CachePath != "" {
-		os.RemoveAll(c.CachePath)
-	}
+	c.BuiltinModules = nil
+	c.ProjectStack = nil
 }

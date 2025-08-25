@@ -1,15 +1,14 @@
 package parser
 
 import (
-	"compiler/colors"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/report"
 	"compiler/internal/source"
+	"compiler/report"
 )
 
 func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {
-	colors.BLUE.Println("Parsing ")
+
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_METHOD_NAME)
 
 	iden := ast.IdentifierExpr{
@@ -29,7 +28,8 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 
 	receiver := receivers[0]
 
-	funcLit := parseFunctionLiteral(p, &name.Start, false, true)
+	funcLit := parseFunctionLiteral(p, &name.Start, true)
+	funcLit.ID = iden.Name
 
 	return &ast.MethodDecl{
 		Method:   &iden,

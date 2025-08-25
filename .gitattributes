@@ -1,0 +1,2 @@
+*.fer linguist-language=Rust
+fer.ret linguist-language=TOML
