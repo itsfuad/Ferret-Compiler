@@ -9,11 +9,9 @@ const (
 	INVALID_IMPORT_PATH      = "Invalid import path"
 )
 
-// general error messages
+// var declaration errors
 const (
-	MISSING_NAME      = "Expected variable name"
-	MISSING_TYPE_NAME = "Expected type name"
-	INVALID_TYPE_NAME = "Invalid type name"
+	MISSING_NAME = "Expected variable name"
 )
 
 // Error messages for number literals
@@ -93,10 +91,10 @@ const (
 
 // Error messages for type declarations
 const (
-	EXPECTED_TYPE_NAME = "Expected type name"
-	EXPECTED_TYPE      = "Expected type after type name"
-	EXPECTED_VALUE     = "Expected value"
-	UNEXPECTED_TOKEN   = "Unexpected token"
+	EXPECTED_TYPE      	= "Expected type"
+	INVALID_TYPE_NAME   = "Invalid type name"
+	EXPECTED_VALUE      = "Expected value"
+	UNEXPECTED_TOKEN    = "Unexpected token"
 )
 
 // Error messages for object/struct operations

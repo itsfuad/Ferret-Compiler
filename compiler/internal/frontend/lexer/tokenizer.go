@@ -99,6 +99,7 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`>=`), defaultHandler(GREATER_EQUAL_TOKEN)},
 			{regexp.MustCompile(`>`), defaultHandler(GREATER_TOKEN)},
 			{regexp.MustCompile(`==`), defaultHandler(DOUBLE_EQUAL_TOKEN)},
+			{regexp.MustCompile(`:=`), defaultHandler(WALRUS_TOKEN)},
 			{regexp.MustCompile(`=`), defaultHandler(EQUALS_TOKEN)},
 			{regexp.MustCompile(`:`), defaultHandler(COLON_TOKEN)},
 			{regexp.MustCompile(`;`), defaultHandler(SEMICOLON_TOKEN)},

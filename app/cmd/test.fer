@@ -1,0 +1,6 @@
+
+//let a := 10;  // This should be an error now
+
+let p, q, r := 10, 12, 34;     // Type inference with :=
+let x, y: i32 = 100, 200;     // Explicit types with =
+let z: str;                    // Declaration only (no initialization)

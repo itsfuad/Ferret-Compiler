@@ -10,8 +10,8 @@ func TestParserBasics(t *testing.T) {
 		isValid bool
 		desc    string
 	}{
-		{"let x = 42;", true, "Variable declaration with initialization"},
-		{"const y = true;", true, "Constant declaration"},
+		{"let x := 42;", true, "Variable declaration with initialization"},
+		{"const y := true;", true, "Constant declaration"},
 		{"x = 42; y = 10;", true, "Multiple statements"},
 		{"let x;", false, "Declaration without initialization"},
 		{"let x: i32; x = 42;", true, "Declaration followed by assignment"},
@@ -23,7 +23,7 @@ func TestParserBasics(t *testing.T) {
 		{"let", false, "Incomplete declaration"},
 		{"x =", false, "Incomplete assignment"},
 		{"let x = ;", false, "Missing expression in declaration"},
-		{"let x = 42; x = ;", false, "Missing expression in assignment"},
+		{"let x := 42; x = ;", false, "Missing expression in assignment"},
 	}
 
 	for _, tt := range tests {

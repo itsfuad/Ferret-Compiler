@@ -67,6 +67,7 @@ const (
 	GREATER_TOKEN       TOKEN = ">"
 	//assignment
 	SCOPE_TOKEN        TOKEN = "::"
+	WALRUS_TOKEN	   TOKEN = ":="
 	COLON_TOKEN        TOKEN = ":"
 	EQUALS_TOKEN       TOKEN = "="
 	PLUS_EQUALS_TOKEN  TOKEN = "+="

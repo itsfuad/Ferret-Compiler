@@ -58,7 +58,7 @@ func NewParserWithImportPath(filePath string, importPath string, ctxx *ctx.Compi
 
 	alias := ctxx.FullPathToAlias(filePath)
 
-	tokens := lexer.Tokenize(filePath, false)
+	tokens := lexer.Tokenize(filePath, debug)
 
 	return &Parser{
 		tokens:     tokens,

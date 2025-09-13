@@ -37,7 +37,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Anonymous function assignment",
-			input: `const add = fn(a: i32, b: i32) -> i32 {
+			input: `const add := fn(a: i32, b: i32) -> i32 {
 				return a + b;
 			};`,
 			isValid: true,

@@ -305,7 +305,7 @@ func parseType(p *Parser) (ast.DataType, bool) {
 func parseTypeDecl(p *Parser) ast.Statement {
 	start := p.advance() // consume the 'type' token
 
-	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
+	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE)
 
 	// Parse the underlying type
 	underlyingType, ok := parseType(p)
