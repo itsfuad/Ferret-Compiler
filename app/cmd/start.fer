@@ -11,7 +11,7 @@ import "app/cmd/arrays"; // unused import
 
 import "app2/file2/types";
 
-let valueOfPi = cc::PI;
+let valueOfPi := cc::PI;
 
 fn voidfn() {
 
@@ -21,10 +21,10 @@ fn nonVoidfn() -> i32 {
     return 42;
 }
 
-// let vx :void = voidfn();
-// let vv = voidfn();
+// let vx : void = voidfn();
+// let vv := voidfn();
 
-// vv = 10;
+// vv := 10;
 
 nonVoidfn();
 io::print("Hello, Ferret!");
@@ -38,8 +38,8 @@ fn add(a: i32, b: i32) -> i32 {
     return a + b;
 }
 
-let value = 10;
+let value := 10;
 
 
-let myname = "Ferret";
-let byt = myname[0];
+let myname := "Ferret";
+let byt := myname[0];

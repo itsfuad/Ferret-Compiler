@@ -1,7 +1,7 @@
 //import "app/cmd/types";
 
 //arrays
-let arrWithoutType = [1, 2, 3, 4]; // array without explicit type
+let arrWithoutType := [1, 2, 3, 4]; // array without explicit type
 
 //let arrWithType: []types::Int = [1, 2, 3, 4, 3] as []types::Int; // array with explicit type
 

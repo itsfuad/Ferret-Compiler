@@ -13,7 +13,7 @@ import { read } from "io"; // imports read function from io module
 let a : int = 1 + 5 * 4;
 let b : bool = a > 9;
 
-export let c := 8; // export variable
+let c := 8; // export variable
 
 let arr : []int = 0;
 

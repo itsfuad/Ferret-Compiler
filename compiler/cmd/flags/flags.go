@@ -9,7 +9,7 @@ import (
 	"compiler/colors"
 )
 
-const FERRET_VERSION = "0.0.1"
+const FERRET_VERSION = "0.0.2"
 
 // Args holds the parsed command line arguments
 type Args struct {

@@ -11,7 +11,7 @@ import (
 func validateStructType(p *Parser) (*ast.IdentifierExpr, bool) {
 	if !p.match(lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN) {
 		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_TYPE_NAME, report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_TYPE, report.PARSING_PHASE)
 		return nil, false
 	}
 

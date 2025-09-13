@@ -2,7 +2,7 @@
 import "math/constants";
 // import "github.com/itsfuad/ferret-mod/data/bigint"; // unused import;
 
-const doublepi = constants::PI * 2.0;
+const doublepi := constants::PI * 2.0;
 
 fn print(message: str) {
     // Built-in print function implementation
