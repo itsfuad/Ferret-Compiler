@@ -91,10 +91,10 @@ const (
 
 // Error messages for type declarations
 const (
-	EXPECTED_TYPE      	= "Expected type"
-	INVALID_TYPE_NAME   = "Invalid type name"
-	EXPECTED_VALUE      = "Expected value"
-	UNEXPECTED_TOKEN    = "Unexpected token"
+	EXPECTED_TYPE     = "Expected type"
+	INVALID_TYPE_NAME = "Invalid type name"
+	EXPECTED_VALUE    = "Expected value"
+	UNEXPECTED_TOKEN  = "Unexpected token"
 )
 
 // Error messages for object/struct operations
