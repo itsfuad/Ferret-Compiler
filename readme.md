@@ -384,6 +384,7 @@ The Ferret compiler follows a multi-stage compilation pipeline designed for main
 - [x] Auto update
 - [x] Detect orphans
 - [x] Delete orphans
+- [ ] Compiler version check for all modules
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
