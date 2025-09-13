@@ -50,6 +50,11 @@ func main() {
 		return
 	}
 
+	if args.ListCommand {
+		cli.HandleListCommand()
+		return
+	}
+
 	if args.ListOrphan {
 		cli.HandleOrphansCommand()
 		return

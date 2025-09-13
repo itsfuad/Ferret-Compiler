@@ -16,10 +16,19 @@ type DependencyManager struct {
 	configfile  *config.ProjectConfig
 }
 
-type ModuleUpdateInfo struct {
-	Name           string
+type Dependency struct {
+	Name      string
+	Version   string
+	IsDirect  bool
+	IsCached  bool
+	CachePath string
+	HasConfig bool
+	// For update operations
 	CurrentVersion string
 	LatestVersion  string
+	// For removal operations
+	LockfileKey   string
+	LockfileEntry LockfileEntry
 }
 
 // NewDependencyManager creates a new dependency manager for the given project
@@ -95,21 +104,15 @@ func (dm *DependencyManager) RemoveDependency(packageName string) error {
 	delete(dm.configfile.Dependencies.Packages, packageName)
 
 	// Handle the removal based on usage
-	if len(packageInfo.lockfileEntry.UsedBy) > 0 {
-		return dm.convertToIndirect(packageName, packageInfo.lockfileKey)
+	if len(packageInfo.LockfileEntry.UsedBy) > 0 {
+		return dm.convertToIndirect(packageName, packageInfo.LockfileKey)
 	}
 
 	return dm.completelyRemovePackage(packageName, packageInfo)
 }
 
-// packageRemovalInfo holds information about a package being removed
-type packageRemovalInfo struct {
-	lockfileKey   string
-	lockfileEntry LockfileEntry
-}
-
 // findPackageForRemoval locates package in fer.ret and lockfile, returns error for invalid states
-func (dm *DependencyManager) findPackageForRemoval(packageName string) (*packageRemovalInfo, error) {
+func (dm *DependencyManager) findPackageForRemoval(packageName string) (*Dependency, error) {
 	version, inFerRet := dm.configfile.Dependencies.Packages[packageName]
 
 	var lockfileKey string
@@ -137,7 +140,7 @@ func (dm *DependencyManager) findPackageInLockfile(packageName string) (string, 
 }
 
 // validatePackageRemovalState checks package state and returns appropriate errors
-func (dm *DependencyManager) validatePackageRemovalState(packageName string, inFerRet, inLockfile bool, lockfileKey string, lockfileEntry LockfileEntry) (*packageRemovalInfo, error) {
+func (dm *DependencyManager) validatePackageRemovalState(packageName string, inFerRet, inLockfile bool, lockfileKey string, lockfileEntry LockfileEntry) (*Dependency, error) {
 	if !inFerRet && !inLockfile {
 		return nil, fmt.Errorf("📦 Package %s is not installed", packageName)
 	}
@@ -152,9 +155,9 @@ func (dm *DependencyManager) validatePackageRemovalState(packageName string, inF
 		return nil, fmt.Errorf("⚠️  Package %s was in fer.ret but not in lockfile, removed from fer.ret", packageName)
 	}
 
-	return &packageRemovalInfo{
-		lockfileKey:   lockfileKey,
-		lockfileEntry: lockfileEntry,
+	return &Dependency{
+		LockfileKey:   lockfileKey,
+		LockfileEntry: lockfileEntry,
 	}, nil
 }
 
@@ -167,12 +170,12 @@ func (dm *DependencyManager) convertToIndirect(packageName, lockfileKey string) 
 }
 
 // completelyRemovePackage removes package and its unused transitive dependencies
-func (dm *DependencyManager) completelyRemovePackage(packageName string, info *packageRemovalInfo) error {
+func (dm *DependencyManager) completelyRemovePackage(packageName string, info *Dependency) error {
 	cachesToDelete := dm.findCachesToDelete(info)
 
 	colors.GREEN.Printf("🗑️  Removing package %s\n", packageName)
 
-	if err := dm.deleteCachesAndShowMessages(packageName, info.lockfileKey, cachesToDelete); err != nil {
+	if err := dm.deleteCachesAndShowMessages(packageName, info.LockfileKey, cachesToDelete); err != nil {
 		return err
 	}
 
@@ -182,11 +185,11 @@ func (dm *DependencyManager) completelyRemovePackage(packageName string, info *p
 }
 
 // findCachesToDelete identifies all caches that should be deleted
-func (dm *DependencyManager) findCachesToDelete(info *packageRemovalInfo) []string {
-	cachesToDelete := []string{info.lockfileKey}
+func (dm *DependencyManager) findCachesToDelete(info *Dependency) []string {
+	cachesToDelete := []string{info.LockfileKey}
 
-	for _, dep := range info.lockfileEntry.Dependencies {
-		dm.lockfile.RemoveUsedBy(dep, info.lockfileKey)
+	for _, dep := range info.LockfileEntry.Dependencies {
+		dm.lockfile.RemoveUsedBy(dep, info.LockfileKey)
 		if len(dm.lockfile.Dependencies[dep].UsedBy) == 0 {
 			cachesToDelete = append(cachesToDelete, dep)
 		}
@@ -246,6 +249,64 @@ func (dm *DependencyManager) Save() error {
 	return nil
 }
 
+// ListDependencies returns detailed information about all dependencies
+func (dm *DependencyManager) ListDependencies() ([]Dependency, error) {
+	var dependencies []Dependency
+
+	// Process all dependencies from lockfile (this includes both direct and transitive)
+	for depKey, entry := range dm.lockfile.Dependencies {
+		// Parse dependency key format: "host/owner/repo@version"
+		parts := strings.Split(depKey, "@")
+		if len(parts) != 2 {
+			continue // Skip malformed entries
+		}
+
+		repoPath := parts[0]
+		version := parts[1]
+
+		// Split repo path to get name
+		repoParts := strings.Split(repoPath, "/")
+		var name string
+		if len(repoParts) >= 3 {
+			name = repoParts[2] // Use repo name as dependency name
+		} else {
+			name = repoPath // Fallback to full path
+		}
+
+		// Construct cache path
+		cachePath := filepath.Join(dm.projectRoot, dm.configfile.Cache.Path, repoPath+"@"+version)
+
+		// Check if cached and has config
+		isCached := dm.isModuleCached(cachePath)
+		hasConfig := false
+		if isCached {
+			configPath := filepath.Join(cachePath, "fer.ret")
+			if _, err := os.Stat(configPath); err == nil {
+				hasConfig = true
+			}
+		}
+
+		dependencies = append(dependencies, Dependency{
+			Name:      name,
+			Version:   version,
+			IsDirect:  entry.Direct,
+			IsCached:  isCached,
+			CachePath: cachePath,
+			HasConfig: hasConfig,
+		})
+	}
+
+	return dependencies, nil
+}
+
+// isModuleCached checks if a module is cached locally
+func (dm *DependencyManager) isModuleCached(cachePath string) bool {
+	if _, err := os.Stat(cachePath); err == nil {
+		return true
+	}
+	return false
+}
+
 func (dm *DependencyManager) cleanupEmptyDirectories() {
 	// walk all dir and clean up empty ones
 	err := filepath.Walk(filepath.Join(dm.projectRoot, dm.configfile.Cache.Path), func(path string, info os.FileInfo, err error) error {
@@ -270,9 +331,9 @@ func (dm *DependencyManager) cleanupEmptyDirectories() {
 	}
 }
 
-func (dm *DependencyManager) CheckForAvailableUpdates(packagename string) []ModuleUpdateInfo {
+func (dm *DependencyManager) CheckForAvailableUpdates(packagename string) []Dependency {
 
-	var updates []ModuleUpdateInfo
+	var updates []Dependency
 
 	colors.BLUE.Println("🔍 Sniffing for module updates...")
 
@@ -294,9 +355,9 @@ func (dm *DependencyManager) CheckForAvailableUpdates(packagename string) []Modu
 	return updates
 }
 
-func checkUpdateForPackage(dm *DependencyManager, packagename string) []ModuleUpdateInfo {
+func checkUpdateForPackage(dm *DependencyManager, packagename string) []Dependency {
 
-	var updates []ModuleUpdateInfo
+	var updates []Dependency
 	// get the installed version from the config file
 	version, ok := dm.configfile.Dependencies.Packages[packagename]
 	if !ok {
@@ -317,7 +378,7 @@ func checkUpdateForPackage(dm *DependencyManager, packagename string) []ModuleUp
 
 	if hasUpdate(version, latestVersion) {
 		// check if has cache
-		updates = append(updates, ModuleUpdateInfo{
+		updates = append(updates, Dependency{
 			Name:           packagename,
 			CurrentVersion: version,
 			LatestVersion:  latestVersion,
@@ -326,8 +387,8 @@ func checkUpdateForPackage(dm *DependencyManager, packagename string) []ModuleUp
 	return updates
 }
 
-func checkAllUpdates(dm *DependencyManager) []ModuleUpdateInfo {
-	var updates []ModuleUpdateInfo
+func checkAllUpdates(dm *DependencyManager) []Dependency {
+	var updates []Dependency
 	// check if any direct dependency has a newer version available
 	for dep, version := range dm.configfile.Dependencies.Packages {
 		key := BuildPackageSpec(dep, version)
@@ -345,7 +406,7 @@ func checkAllUpdates(dm *DependencyManager) []ModuleUpdateInfo {
 
 		if hasUpdate(version, latestVersion) {
 			// check if has cache
-			updates = append(updates, ModuleUpdateInfo{
+			updates = append(updates, Dependency{
 				Name:           dep,
 				CurrentVersion: version,
 				LatestVersion:  latestVersion,
