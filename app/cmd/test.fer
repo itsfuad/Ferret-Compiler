@@ -4,3 +4,14 @@
 let p, q, r := 10, 12, 34;     // Type inference with :=
 let x, y: i32 = 100, 200;     // Explicit types with =
 let z: str;                    // Declaration only (no initialization)
+
+fn add() {
+    later();
+    let rad := PI * 2 ** 2;
+}
+
+fn later() {
+    
+}
+
+const PI := 3.1416;

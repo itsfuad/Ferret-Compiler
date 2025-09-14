@@ -154,39 +154,44 @@ func makeParts(r *Report) (snippet, underline string) {
 	}
 
 	lines := strings.Split(string(fileData), "\n")
-	line := lines[r.Location.Start.Line-1]
+	currentLine := lines[r.Location.Start.Line-1]
 
+	// Calculate the maximum line number width we'll need
+	// This includes the current line and any previous lines we might show
+	maxLineNum := r.Location.Start.Line
+	lineNumWidth := len(fmt.Sprint(maxLineNum))
+
+	// Calculate underline length
 	hLen := 0
-
 	if r.Location.Start.Line == r.Location.End.Line {
 		hLen = (r.Location.End.Column - r.Location.Start.Column) - 1
 	} else {
 		//full line
-		hLen = len(line) - 2
+		hLen = len(currentLine) - 2
 	}
 	if hLen < 0 {
 		hLen = 0
 	}
 
-	bar := fmt.Sprintf("%s |", strings.Repeat(" ", len(fmt.Sprint(r.Location.Start.Line))))
-	lineNumber := fmt.Sprintf("%d | ", r.Location.Start.Line)
+	// Create formatted line number and bar using consistent width
+	lineNumberStr := fmt.Sprintf("%*d | ", lineNumWidth, r.Location.Start.Line)
+	barStr := fmt.Sprintf("%s |", strings.Repeat(" ", lineNumWidth))
 
-	padding := strings.Repeat(" ", (((r.Location.Start.Column - 1) + len(lineNumber)) - len(bar)))
+	// Calculate padding for underline
+	padding := strings.Repeat(" ", r.Location.Start.Column-1+len(lineNumberStr))
 
-	snippet += colors.GREY.Sprintln(bar)
-
-	addPrevLines(r, &snippet, lines)
-
-	snippet += colors.WHITE.Sprint(lineNumber) + line + "\n"
-	snippet += colors.GREY.Sprint(bar)
+	// Build snippet
+	snippet += colors.GREY.Sprintln(barStr)
+	addPrevLines(r, &snippet, lines, lineNumWidth)
+	snippet += colors.WHITE.Sprint(lineNumberStr) + currentLine + "\n"
+	snippet += colors.GREY.Sprint(barStr)
 
 	underline = fmt.Sprintf("%s^%s", padding, strings.Repeat("~", hLen))
 
 	return snippet, underline
 }
 
-func addPrevLines(r *Report, snippet *string, lines []string) {
-
+func addPrevLines(r *Report, snippet *string, lines []string, lineNumWidth int) {
 	col := colors.GREY
 
 	// show previous max 2 lines if available
@@ -196,7 +201,7 @@ func addPrevLines(r *Report, snippet *string, lines []string) {
 			line := lines[lineNo]
 			//skip if line is empty
 			if strings.TrimSpace(line) != "" {
-				*snippet += col.Sprint(fmt.Sprintf("%d | %s", lineNo+1, line)) + "\n"
+				*snippet += col.Sprint(fmt.Sprintf("%*d | %s", lineNumWidth, lineNo+1, line)) + "\n"
 			}
 		}
 
@@ -205,9 +210,9 @@ func addPrevLines(r *Report, snippet *string, lines []string) {
 
 		isEmpty := strings.TrimSpace(line) == ""
 		if isEmpty {
-			*snippet += col.Sprintf("%s |\n", strings.Repeat(" ", len(fmt.Sprint(lineNo+1))))
+			*snippet += col.Sprintf("%s |\n", strings.Repeat(" ", lineNumWidth))
 		} else {
-			*snippet += col.Sprint(fmt.Sprintf("%d | %s", lineNo+1, line)) + "\n"
+			*snippet += col.Sprint(fmt.Sprintf("%*d | %s", lineNumWidth, lineNo+1, line)) + "\n"
 		}
 	}
 }

@@ -4,7 +4,7 @@ name = "demo-app"
 version = "0.0.2"
 
 [build]
-entry = "cmd/main.fer"
+entry = "cmd/test.fer"
 output = "bin"
 
 [cache]
