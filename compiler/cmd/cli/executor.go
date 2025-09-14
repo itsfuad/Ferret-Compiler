@@ -5,6 +5,7 @@ import (
 	"compiler/colors"
 	"compiler/constants"
 	"compiler/internal/modules"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -93,6 +94,95 @@ func HandleGetCommand(packageName string) {
 		colors.RED.Printf(err.Error())
 		os.Exit(1)
 	}
+}
+
+func HandleListCommand() {
+
+	projectRoot := getRoot()
+
+	// Create dependency manager
+	dm, err := modules.NewDependencyManager(projectRoot)
+	if err != nil {
+		colors.RED.Printf(DEPENDENCY_ERROR, err)
+		os.Exit(1)
+	}
+
+	dependencies, err := dm.ListDependencies()
+	if err != nil {
+		colors.RED.Printf("❌ Failed to list dependencies: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(dependencies) == 0 {
+		colors.YELLOW.Println("📦 No dependencies found")
+		return
+	}
+
+	showDeps(dependencies)
+}
+
+func showDeps(dependencies []modules.Dependency) {
+	// Separate direct and transitive dependencies
+	var directDeps []modules.Dependency
+	var transitiveDeps []modules.Dependency
+
+	for _, dep := range dependencies {
+		if dep.IsDirect {
+			directDeps = append(directDeps, dep)
+		} else {
+			transitiveDeps = append(transitiveDeps, dep)
+		}
+	}
+
+	// Display direct dependencies
+	if len(directDeps) > 0 {
+		colors.GREEN.Println("📦 Direct Dependencies:")
+		for _, dep := range directDeps {
+			displayDependency(dep)
+		}
+		fmt.Println()
+	}
+
+	// Display transitive dependencies
+	if len(transitiveDeps) > 0 {
+		colors.BLUE.Println("🔗 Transitive Dependencies:")
+		for _, dep := range transitiveDeps {
+			displayDependency(dep)
+		}
+		fmt.Println()
+	}
+
+	// Show summary
+	totalCached := 0
+	totalMissing := 0
+	for _, dep := range dependencies {
+		if dep.IsCached {
+			totalCached++
+		} else {
+			totalMissing++
+		}
+	}
+
+	colors.CYAN.Printf("📊 Summary: %d total, %d cached, %d missing from cache\n",
+		len(dependencies), totalCached, totalMissing)
+
+	if totalMissing > 0 {
+		colors.YELLOW.Println("💡 Run 'ferret get' to download missing dependencies")
+	}
+}
+
+// displayDependency shows information about a single dependency
+func displayDependency(dep modules.Dependency) {
+	status := "❌ Missing"
+	if dep.IsCached {
+		if dep.HasConfig {
+			status = "✅ Cached"
+		} else {
+			status = "⚠️  Cached (no config)"
+		}
+	}
+
+	colors.WHITE.Printf("   • %s@%s - %s\n", dep.Name, dep.Version, status)
 }
 
 func HandleRemoveCommand(packageName string) {

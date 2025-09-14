@@ -113,7 +113,7 @@ func Usage() {
 	fmt.Println()
 
 	colors.YELLOW.Println("MODULE MANAGEMENT:")
-	fmt.Println("  ferret init [path]                   Initialize a new Ferret project")
+	fmt.Println("  ferret init <projectname>            Initialize a new Ferret project with given name (Optional)")
 	fmt.Println("  ferret get <package>                 Install a package dependency")
 	fmt.Println("  ferret update [package]              Update package(s) to latest version")
 	fmt.Println("  ferret remove <package>              Remove a package dependency")

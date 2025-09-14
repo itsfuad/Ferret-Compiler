@@ -233,7 +233,7 @@ func checkNeighborProjectVersion(neighborName, neighborPath, currentVersion stri
 }
 
 func printRequired(pkg VersionCheckResult) {
-	colors.RED.Printf("   • %s requires v%s\n", pkg.PackageName, pkg.RequiredVersion)
+	colors.WHITE.Printf("   • %s@v%s - ❌ Incompatible\n", pkg.PackageName, pkg.RequiredVersion)
 }
 
 // formatVersionCompatibilityError formats a comprehensive error message for version incompatibilities
