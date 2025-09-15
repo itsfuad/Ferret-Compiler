@@ -192,26 +192,22 @@ func printReport(r *Report) {
 func addPrevLines(r *Report, snippet *string, lines []string, lineNumWidth int) {
 	col := colors.GREY
 
-	// show previous max 2 lines if available
-	if r.Location.Start.Line > 1 {
-		if r.Location.Start.Line > 2 {
-			lineNo := r.Location.Start.Line - 3
-			line := lines[lineNo]
-			//skip if line is empty
-			if strings.TrimSpace(line) != "" {
-				*snippet += col.Sprint(fmt.Sprintf("%*d | %s", lineNumWidth, lineNo+1, line)) + "\n"
-			}
-		}
+	// PrevLine1
+	// PrevLine2
+	// MainLine
 
-		lineNo := r.Location.Start.Line - 2
-		line := lines[lineNo]
+	prevLines := []string{}
+	// if pl1 is empty, do nothing
+	if r.Location.Start.Line-2 >= 0 && strings.TrimSpace(lines[r.Location.Start.Line-2]) != "" {
+		prevLines = append(prevLines, lines[r.Location.Start.Line-2])
+	}
+	// if has pl1, add pl2. else skip pl2 if empty
+	if len(prevLines) == 1 && r.Location.Start.Line-3 >= 0 && strings.TrimSpace(lines[r.Location.Start.Line-3]) != "" {
+		prevLines = append([]string{lines[r.Location.Start.Line-3]}, prevLines...)
+	}
 
-		isEmpty := strings.TrimSpace(line) == ""
-		if isEmpty {
-			*snippet += col.Sprintf("%s |\n", strings.Repeat(" ", lineNumWidth))
-		} else {
-			*snippet += col.Sprint(fmt.Sprintf("%*d | %s", lineNumWidth, lineNo+1, line)) + "\n"
-		}
+	for i, pl := range prevLines {
+		*snippet += col.Sprint(fmt.Sprintf("%*d | ", lineNumWidth, r.Location.Start.Line-len(prevLines)+i)) + pl + "\n"
 	}
 }
 

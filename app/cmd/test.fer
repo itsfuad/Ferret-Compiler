@@ -15,5 +15,5 @@ fn later() -> i32 {
     return;
 }
 
-
+// comment
 let x := a + ;
