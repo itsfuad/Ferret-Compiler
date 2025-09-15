@@ -59,12 +59,12 @@ func checkAllPackageVersions(projectConfig *config.ProjectConfig) error {
 	}
 
 	// Check remote dependencies
-	if remoteResults := checkRemoteDependencies(projectConfig, currentVersion); len(remoteResults) > 0 {
+	if remoteResults := checkRemoteDependencies(projectConfig); len(remoteResults) > 0 {
 		incompatiblePackages = append(incompatiblePackages, remoteResults...)
 	}
 
 	// Check neighbor projects
-	if neighborResults := checkNeighborProjects(projectConfig, currentVersion); len(neighborResults) > 0 {
+	if neighborResults := checkNeighborProjects(projectConfig); len(neighborResults) > 0 {
 		incompatiblePackages = append(incompatiblePackages, neighborResults...)
 	}
 
@@ -97,7 +97,7 @@ func checkSinglePackageVersion(projectConfig *config.ProjectConfig, packageType,
 }
 
 // checkRemoteDependencies checks version requirements for all remote dependencies
-func checkRemoteDependencies(projectConfig *config.ProjectConfig, currentVersion string) []VersionCheckResult {
+func checkRemoteDependencies(projectConfig *config.ProjectConfig) []VersionCheckResult {
 	var incompatiblePackages []VersionCheckResult
 
 	// Load the dependency manager to get cached dependencies
@@ -117,7 +117,7 @@ func checkRemoteDependencies(projectConfig *config.ProjectConfig, currentVersion
 	// Check each dependency's config file for version requirements
 	for depKey := range lockfile.Dependencies {
 		if depPath := getRemoteDependencyPath(projectConfig, depKey); depPath != "" {
-			if result := checkRemoteDependencyVersion(depKey, depPath, currentVersion); !result.IsCompatible {
+			if result := checkRemoteDependencyVersion(depKey, depPath); !result.IsCompatible {
 				incompatiblePackages = append(incompatiblePackages, result)
 			}
 		}
@@ -151,7 +151,7 @@ func getRemoteDependencyPath(projectConfig *config.ProjectConfig, depKey string)
 }
 
 // checkRemoteDependencyVersion checks version requirement for a single remote dependency
-func checkRemoteDependencyVersion(depKey, depPath, currentVersion string) VersionCheckResult {
+func checkRemoteDependencyVersion(depKey, depPath string) VersionCheckResult {
 	result := VersionCheckResult{
 		PackageName:  depKey,
 		PackagePath:  depPath,
@@ -181,7 +181,7 @@ func checkRemoteDependencyVersion(depKey, depPath, currentVersion string) Versio
 }
 
 // checkNeighborProjects checks version requirements for all neighbor projects
-func checkNeighborProjects(projectConfig *config.ProjectConfig, currentVersion string) []VersionCheckResult {
+func checkNeighborProjects(projectConfig *config.ProjectConfig) []VersionCheckResult {
 	var incompatiblePackages []VersionCheckResult
 
 	// Check each neighbor project
@@ -194,7 +194,7 @@ func checkNeighborProjects(projectConfig *config.ProjectConfig, currentVersion s
 			absPath = filepath.Join(projectConfig.ProjectRoot, neighborPath)
 		}
 
-		if result := checkNeighborProjectVersion(neighborName, absPath, currentVersion); !result.IsCompatible {
+		if result := checkNeighborProjectVersion(neighborName, absPath); !result.IsCompatible {
 			incompatiblePackages = append(incompatiblePackages, result)
 		}
 	}
@@ -203,7 +203,7 @@ func checkNeighborProjects(projectConfig *config.ProjectConfig, currentVersion s
 }
 
 // checkNeighborProjectVersion checks version requirement for a single neighbor project
-func checkNeighborProjectVersion(neighborName, neighborPath, currentVersion string) VersionCheckResult {
+func checkNeighborProjectVersion(neighborName, neighborPath string) VersionCheckResult {
 	result := VersionCheckResult{
 		PackageName:  neighborName,
 		PackagePath:  neighborPath,
