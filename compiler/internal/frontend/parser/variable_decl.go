@@ -172,7 +172,7 @@ func parseVarDecl(p *Parser) ast.Statement {
 	// Validation: if no types and no values, error
 	if len(parsedTypes) == 0 && len(values) == 0 {
 		token := p.peek()
-		p.ctx.Reports.AddError(p.fullPath, source.NewLocation(&token.Start, &token.End), "cannot infer types without initializers", report.PARSING_PHASE).AddHint("👈😃 Use ':=' to initialize variables for type inference")
+		p.ctx.Reports.AddError(p.fullPath, source.NewLocation(&token.Start, &token.End), "cannot infer types without initializers", report.PARSING_PHASE).AddHint("use ':=' to initialize variables for type inference")
 		return nil
 	}
 

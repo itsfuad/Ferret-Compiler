@@ -81,7 +81,7 @@ func resolveArrayLiteral(r *analyzer.AnalyzerNode, arrLit *ast.ArrayLiteralExpr,
 func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *modules.Module) {
 	sm, found := cm.SymbolTable.Lookup(id.Name)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE).AddHint("Did you forget to declare it or import the module where it's declared?")
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, id.Loc(), "undefined symbol: "+id.Name, report.RESOLVER_PHASE).AddHint("did you forget to declare it or import the module where it's declared?")
 		return
 	}
 
@@ -100,7 +100,7 @@ func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *mod
 				fmt.Sprintf("Cannot use variable %q before it is declared",
 					id.Name),
 				report.RESOLVER_PHASE,
-			)
+			).AddHint("consider declaring the variable before its first use").AddLabel("undefined here")
 		}
 	}
 	// Functions can be called before declaration - no check needed

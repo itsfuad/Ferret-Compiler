@@ -67,7 +67,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		paramType, ok := parseType(p)
 		if !ok {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_PARAMETER_TYPE, report.PARSING_PHASE).AddHint("Add a type after the colon")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_PARAMETER_TYPE, report.PARSING_PHASE).AddHint("add a type after the colon")
 			return nil
 		}
 
@@ -81,7 +81,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		if lists.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
 			return p.Identifier.Name == b.Identifier.Name
 		}) {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &param.Identifier.Location, report.PARAMETER_REDEFINITION, report.PARSING_PHASE).AddHint("Parameter name already used")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &param.Identifier.Location, report.PARAMETER_REDEFINITION, report.PARSING_PHASE).AddHint("parameter name already used")
 			return nil
 		}
 
@@ -96,7 +96,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}
@@ -113,7 +113,7 @@ func parseReturnType(p *Parser) ast.DataType {
 	// Check if user is trying to use multiple return types (parentheses)
 	if p.peek().Kind == lexer.OPEN_PAREN {
 		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Multiple return types are not supported", report.PARSING_PHASE).AddHint("Functions can only return a single type")
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Multiple return types are not supported", report.PARSING_PHASE).AddHint("functions can only return a single type")
 		// Skip the entire parentheses expression to continue parsing
 		p.advance() // consume '('
 		parenCount := 1
@@ -132,7 +132,7 @@ func parseReturnType(p *Parser) ast.DataType {
 	returnType, ok := parseType(p)
 	if !ok {
 		token := p.previous()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("Add a return type after the arrow")
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("add a return type after the arrow")
 		return nil
 	}
 

@@ -193,7 +193,7 @@ func parseNode(p *Parser) ast.Node {
 			loc := source.NewLocation(&token.Start, &token.End)
 			loc.Start.Column += 1
 			loc.End.Column += 1
-			p.ctx.Reports.AddSyntaxError(p.fullPath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("Add a semicolon to the end of the statement")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("add a semicolon to the end of the statement")
 		}
 		end := p.advance()
 		node.Loc().End.Column = end.End.Column

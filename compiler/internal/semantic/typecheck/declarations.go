@@ -35,7 +35,7 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 			initializer.Loc(),
 			fmt.Sprintf("cannot assign void expression to variable %q", variable.Identifier.Name),
 			report.TYPECHECK_PHASE,
-		).AddHint("Void means no type. Not even null. So, a variable cannot be void. It must have a valid type.")
+		).AddHint("void means no type. Not even null. So, a variable cannot be void. It must have a valid type")
 		return
 	}
 

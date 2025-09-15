@@ -366,6 +366,11 @@ func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.Co
 		return context
 	}
 
+	// Check for critical errors after parsing
+	if context.Reports.ShouldStopCompilation() {
+		return context
+	}
+
 	if isDebugEnabled {
 		colors.BLUE.Printf("---------- [Parsing done] ----------\n")
 	}
@@ -376,11 +381,21 @@ func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.Co
 	// Collect symbols
 	collector.CollectSymbols(anz)
 
+	// Check for critical errors after symbol collection
+	if context.Reports.ShouldStopCompilation() {
+		return context
+	}
+
 	if isDebugEnabled {
 		colors.BLUE.Printf("---------- [Symbol Collection done] ----------\n")
 	}
 
 	resolver.ResolveProgram(anz)
+
+	// Check for critical errors after resolution
+	if context.Reports.ShouldStopCompilation() {
+		return context
+	}
 
 	if isDebugEnabled {
 		colors.GREEN.Println("---------- [Resolver done] ----------")
@@ -388,8 +403,9 @@ func Compile(config *config.ProjectConfig, isDebugEnabled bool) (context *ctx.Co
 
 	typecheck.CheckProgram(anz)
 
-	if context.Reports.HasErrors() {
-		panic("Compilation stopped due to type checking errors")
+	// Check for critical errors after type checking
+	if context.Reports.ShouldStopCompilation() {
+		return context
 	}
 
 	if isDebugEnabled {

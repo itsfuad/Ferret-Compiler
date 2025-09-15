@@ -66,6 +66,14 @@ func (r *Reports) HasWarnings() bool {
 	}
 	return false
 }
+func (r *Reports) ShouldStopCompilation() bool {
+	for _, report := range *r {
+		if report.ShouldStop {
+			return true
+		}
+	}
+	return false
+}
 func (r *Reports) DisplayAll() {
 
 	fmt.Println()
@@ -81,72 +89,22 @@ func (r *Reports) DisplayAll() {
 	(*r).ShowStatus()
 }
 
-type HintContainer struct {
-	hint string
-	col  int
-}
-
 // Report represents a diagnostic report used both internally and by LSP.
 type Report struct {
-	FilePath string
-	Location *source.Location
-	Message  string
-	Hints    HintContainer
-	Level    PROBLEM_TYPE
-	Phase    COMPILATION_PHASE
+	FilePath   string
+	Location   *source.Location
+	Message    string
+	Hint       string
+	Label      string
+	Level      PROBLEM_TYPE
+	Phase      COMPILATION_PHASE
+	ShouldStop bool // Flag to indicate if compilation should stop gracefully
 }
 
 // printReport prints a formatted diagnostic report to stdout.
 // It shows file location, a code snippet, underline highlighting, any hints,
 // and panics if the diagnostic level is critical or indicates a syntax error.
 func printReport(r *Report) {
-	// Generate the code snippet and underline.
-	// hLen is the padding length for hint messages.
-	snippet, underline := makeParts(r)
-
-	var reportMsgType string
-
-	switch r.Level {
-	case WARNING:
-		reportMsgType = fmt.Sprintf("[Warning while %s 🚨]: ", r.Phase)
-	case INFO:
-		reportMsgType = fmt.Sprintf("[Info while %s 😓]: ", r.Phase)
-	case CRITICAL_ERROR:
-		reportMsgType = fmt.Sprintf("[Critical Error while %s 💀]: ", r.Phase)
-	case SYNTAX_ERROR:
-		reportMsgType = fmt.Sprintf("[Syntax Error while %s 😑]: ", r.Phase)
-	case NORMAL_ERROR:
-		reportMsgType = fmt.Sprintf("[Error while %s 😨]: ", r.Phase)
-	case SEMANTIC_ERROR:
-		reportMsgType = fmt.Sprintf("[Semantic Error while %s 😱]: ", r.Phase)
-	}
-
-	reportColor := colorMap[r.Level]
-
-	//numlen is the length of the line number
-	numlen := len(fmt.Sprint(r.Location.Start.Line))
-
-	// The error message type and the message itself are printed in the same color.
-	reportColor.Print(reportMsgType)
-	reportColor.Println(r.Message)
-	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
-	// The code snippet and underline are printed in the same color.
-	fmt.Print(snippet)
-
-	if r.Hints.hint != "" {
-		reportColor.Print(underline)
-		colors.YELLOW.Printf(" %s%s\n", r.Hints.hint, strings.Repeat(" ", r.Location.Start.Column-r.Hints.col))
-	} else {
-		reportColor.Println(underline)
-	}
-
-	colors.GREY.Println(strings.Repeat("-", numlen+2))
-}
-
-// makeParts reads the source file and generates a code snippet and underline
-// indicating the location of the diagnostic. It returns the snippet, underline,
-// and a padding value.
-func makeParts(r *Report) (snippet, underline string) {
 	fileData, err := os.ReadFile(filepath.FromSlash(r.FilePath))
 
 	if os.IsNotExist(err) {
@@ -178,17 +136,57 @@ func makeParts(r *Report) (snippet, underline string) {
 	barStr := fmt.Sprintf("%s |", strings.Repeat(" ", lineNumWidth))
 
 	// Calculate padding for underline
-	padding := strings.Repeat(" ", r.Location.Start.Column-1+len(lineNumberStr))
+	padding := strings.Repeat(" ", r.Location.Start.Column)
+
+	var reportMsgType string
+
+	switch r.Level {
+	case WARNING:
+		reportMsgType = fmt.Sprintf("[Warning while %s 🚨]: ", r.Phase)
+	case INFO:
+		reportMsgType = fmt.Sprintf("[Info while %s 😓]: ", r.Phase)
+	case CRITICAL_ERROR:
+		reportMsgType = fmt.Sprintf("[Critical Error while %s 💀]: ", r.Phase)
+	case SYNTAX_ERROR:
+		reportMsgType = fmt.Sprintf("[Syntax Error while %s 😑]: ", r.Phase)
+	case NORMAL_ERROR:
+		reportMsgType = fmt.Sprintf("[Error while %s 😨]: ", r.Phase)
+	case SEMANTIC_ERROR:
+		reportMsgType = fmt.Sprintf("[Semantic Error while %s 😱]: ", r.Phase)
+	}
 
 	// Build snippet
-	snippet += colors.GREY.Sprintln(barStr)
+	snippet := colors.GREY.Sprintln(barStr)
 	addPrevLines(r, &snippet, lines, lineNumWidth)
 	snippet += colors.WHITE.Sprint(lineNumberStr) + currentLine + "\n"
 	snippet += colors.GREY.Sprint(barStr)
 
-	underline = fmt.Sprintf("%s^%s", padding, strings.Repeat("~", hLen))
+	reportColor := colorMap[r.Level]
 
-	return snippet, underline
+	//numlen is the length of the line number
+	numlen := len(fmt.Sprint(r.Location.Start.Line))
+
+	// The error message type and the message itself are printed in the same color.
+	reportColor.Print(reportMsgType)
+	reportColor.Println(r.Message)
+	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
+
+	// The code snippet and underline are printed in the same color.
+	fmt.Print(snippet)
+	underline := fmt.Sprintf("%s^%s", padding, strings.Repeat("~", hLen))
+
+	if r.Label != "" {
+		reportColor.Print(underline)
+		colors.RED.Printf(" %s\n", r.Label)
+	} else {
+		reportColor.Println(underline)
+	}
+
+	if r.Hint != "" {
+		colors.YELLOW.Printf("Help: %s\n", r.Hint)
+	}
+
+	//colors.GREY.Println(strings.Repeat("-", numlen+2))
 }
 
 func addPrevLines(r *Report, snippet *string, lines []string, lineNumWidth int) {
@@ -219,30 +217,24 @@ func addPrevLines(r *Report, snippet *string, lines []string, lineNumWidth int) 
 
 // AddHint appends a new hint message to the diagnostic and returns the updated diagnostic.
 // It ignores empty hint messages.
+func (r *Report) AddLabel(msg string) *Report {
+
+	if msg == "" {
+		return r
+	}
+
+	r.Label = msg
+
+	return r
+}
+
 func (r *Report) AddHint(msg string) *Report {
 
 	if msg == "" {
 		return r
 	}
 
-	r.Hints.hint = "💡 " + msg
-	r.Hints.col = r.Location.Start.Column
-
-	return r
-}
-
-func (r *Report) AddHintAt(msg string, col int) *Report {
-	if msg == "" {
-		return r
-	}
-
-	r.Hints.hint = msg
-
-	if col < r.Location.Start.Column {
-		col = r.Location.Start.Column
-	}
-
-	r.Hints.col = col
+	r.Hint = msg
 
 	return r
 }
@@ -287,7 +279,7 @@ func (r *Report) setLevel(level PROBLEM_TYPE) {
 	}
 	r.Level = level
 	if level == CRITICAL_ERROR || level == SYNTAX_ERROR {
-		panic("critical or syntax error encountered, stopping compilation")
+		r.ShouldStop = true // Set flag instead of panicking
 	}
 }
 
@@ -375,6 +367,13 @@ func (r Reports) ShowStatus() {
 
 	messageColor.Print(totalProblemsString)
 	messageColor.Println("-------------")
+
+	// Check for critical errors and exit gracefully
+	for _, report := range r {
+		if report.ShouldStop {
+			os.Exit(1) // Graceful exit instead of panic
+		}
+	}
 
 	//os.Exit(errCode)
 }

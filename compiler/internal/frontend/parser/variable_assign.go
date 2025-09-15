@@ -44,7 +44,7 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 
 	if len(assignees) < len(expressions) {
 		current := p.previous()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "Mismatched number of variables and values", report.PARSING_PHASE).AddHint("Assignee count must be less than or equal to the number of expressions")
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "Mismatched number of variables and values", report.PARSING_PHASE).AddHint("assignee count must be less than or equal to the number of expressions")
 	}
 
 	return &ast.AssignmentStmt{

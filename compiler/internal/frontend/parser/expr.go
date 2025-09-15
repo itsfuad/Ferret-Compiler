@@ -80,7 +80,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 			source.NewLocation(&token.Start, &token.End),
 			report.INVALID_EXPRESSION,
 			report.PARSING_PHASE,
-		).AddHint("Add an expression after the return keyword")
+		).AddHint("add an expression after the return keyword")
 
 		return &ast.ReturnStmt{
 			Value:    nil,
@@ -98,7 +98,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 			source.NewLocation(&comma.Start, &comma.End),
 			"Multiple return values are not supported",
 			report.PARSING_PHASE,
-		).AddHint("Functions can only return a single value")
+		).AddHint("functions can only return a single value")
 
 		for p.match(lexer.COMMA_TOKEN) {
 			p.advance() // consume comma
@@ -451,7 +451,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("Remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}

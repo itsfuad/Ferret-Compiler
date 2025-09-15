@@ -93,7 +93,7 @@ func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module)
 					importStmt.Loc(),
 					fmt.Sprintf("Unused import: %q", importStmt.ImportPath.Value),
 					report.RESOLVER_PHASE,
-				).AddHint("Remove this import or use symbols from this module")
+				).AddHint("remove this import or use symbols from this module")
 			}
 		}
 	}
