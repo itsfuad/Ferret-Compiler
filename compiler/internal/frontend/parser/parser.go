@@ -170,8 +170,6 @@ func parseNode(p *Parser) ast.Node {
 		}
 	case lexer.IF_TOKEN:
 		node = parseIfStatement(p)
-	case lexer.AT_TOKEN:
-		node = parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:
 		// Look ahead to see if this is an assignment
 		expr := parseExpression(p)

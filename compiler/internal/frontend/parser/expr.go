@@ -485,7 +485,20 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.AT_TOKEN:
 		return parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:
+		// Check if this is a struct literal (identifier followed by {)
+		if p.next().Kind == lexer.OPEN_CURLY {
+			return parseStructLiteral(p)
+		}
 		return parseIdentifier(p)
+	case lexer.STRUCT_TOKEN:
+		// Check if this is an anonymous struct literal (struct followed by {)
+		if p.next().Kind == lexer.OPEN_CURLY {
+			return parseStructLiteral(p)
+		}
+		// Otherwise, it's an invalid use of 'struct' keyword
+		token := p.peek()
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "'struct' keyword can only be used for type declarations or anonymous struct literals", report.PARSING_PHASE)
+		return nil
 	}
 	handleUnexpectedToken(p, "expression")
 	return nil

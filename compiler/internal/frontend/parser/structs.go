@@ -69,12 +69,13 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 
 // parseStructLiteral parses a struct literal expression like Point{x: 10, y: 20}
 func parseStructLiteral(p *Parser) ast.Expression {
-	start := p.consume(lexer.AT_TOKEN, report.EXPECTED_AT_TOKEN).Start
-
+	// Note: @ token is no longer required, start directly with type name
 	typeName, ok := validateStructType(p)
 	if !ok {
 		return nil
 	}
+
+	start := typeName.Location.Start
 
 	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
@@ -96,7 +97,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 		StructName:  typeName,
 		Fields:      fields,
 		IsAnonymous: lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN,
-		Location:    *source.NewLocation(&start, &end),
+		Location:    *source.NewLocation(start, &end),
 	}
 }
 

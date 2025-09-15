@@ -64,13 +64,13 @@ let typedInteger16_2: Integer16 = 10 as Integer16;
 
 let myval := typedInteger16.toString();
 
-let namedPoint2d: Point = @struct{x: 12, y: 22} as Point;
+let namedPoint2d: Point = struct{x: 12, y: 22} as Point;
 
 namedPoint2d.x;
 
 //namedPoint2d.z;
 
-let namedPoint3d := @Point3D{x: 1, y: 2, z: 3};
+let namedPoint3d := Point3D{x: 1, y: 2, z: 3};
 namedPoint3d.z;
 
 namedPoint2d = namedPoint3d as Point;

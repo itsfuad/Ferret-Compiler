@@ -22,7 +22,7 @@ struct Point {
     y : int,
 }
 
-let p := @Point { x:1, y: 2 };
+let p := Point { x:1, y: 2 };
 
 let d := p.x;
 
