@@ -151,7 +151,7 @@ func TestParserFeature(t *testing.T) {
 ### Ferret Language Syntax
 #### Variable Declaration
 ```ferret
-let x = 10; // type inferred
+let x := 10; // type inferred
 let y: i32 = 20; // explicit type declaration
 let z: str; // string type
 ```
@@ -210,7 +210,7 @@ From `scripts/` directory. (Mandatory)
 
 Then go to the `app/` directory and run:
 ```bash
-ferret filename.fer --debug
+ferret run --debug
 ```
 Make sure you add the `bin` directory to your `PATH` environment variable to run the `ferret` command from anywhere.
 

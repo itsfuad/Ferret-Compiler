@@ -5,13 +5,15 @@ let p, q, r := 10, 12, 34;     // Type inference with :=
 let x, y: i32 = 100, 200;     // Explicit types with =
 let z: str;                    // Declaration only (no initialization)
 
+const PI := 3.1416; 
 fn add() {
     later();
     let rad := PI * 2 ** 2;
 }
 
-fn later() {
-    
+fn later() -> i32 {
+    return;
 }
 
-const PI := 3.1416;
+
+let x := a + ;

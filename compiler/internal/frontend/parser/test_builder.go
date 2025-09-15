@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"path/filepath"
+
 	//"runtime/debug"
 	"testing"
 
@@ -54,29 +55,27 @@ func createTestCompilerContext(t *testing.T, entryPointPath string) *ctx.Compile
 	}
 }
 
-func evaluateTestResult(t *testing.T, r interface{}, nodes []ast.Node, desc string, isValid bool) {
+func evaluateTestResult(t *testing.T, nodes []ast.Node, ctx *ctx.CompilerContext, desc string, isValid bool) {
 
-	whatsgot := ""
-	if r != nil {
-		whatsgot += fmt.Sprintf("panic: %s", r)
-	}
-	if len(nodes) == 0 {
+	whatsgot := fmt.Sprintf("%d nodes", len(nodes))
+
+	shouldstop := ctx.Reports.ShouldStopCompilation()
+
+	if shouldstop {
 		if whatsgot != "" {
 			whatsgot += ", "
 		}
-		whatsgot += "0 nodes"
+		whatsgot += "should stop compilation"
+	}
+
+	if isValid {
+		if len(nodes) == 0 || shouldstop {
+			t.Errorf("%s: expected some nodes, and no stop flag, got %s", desc, whatsgot)
+		}
 	} else {
-		//whatsgot = fmt.Sprintf("no panic, %d nodes", len(nodes))
-		if whatsgot != "" {
-			whatsgot += ", "
+		if len(nodes) > 0 && !shouldstop {
+			t.Errorf("%s: expected 0 nodes or stop flag, got %s, Nodes: %v, first: %#v", desc, whatsgot, nodes, nodes[0])
 		}
-		whatsgot += fmt.Sprintf("no panic, %d nodes", len(nodes))
-	}
-
-	if isValid && (r != nil || len(nodes) == 0) { // true if panic is nil or nodes are not empty
-		t.Errorf("%s: expected no panic or no 0 nodes, got %s", desc, whatsgot)
-	} else if !isValid && (r == nil && len(nodes) > 0) { // true if panic is not nil or nodes are empty
-		t.Errorf("%s: expected panic or 0 nodes, got %s, Nodes: %v, first: %#v", desc, whatsgot, nodes, nodes[0])
 	}
 }
 
@@ -88,12 +87,12 @@ func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) {
 
 	p := NewParser(filePath, ctx, false)
 
-	nodes := []ast.Node{}
-
 	defer func() {
-
-		evaluateTestResult(t, recover(), nodes, desc, isValid)
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
 	}()
 
-	nodes = p.Parse().Nodes
+	nodes := p.Parse().Nodes
+	evaluateTestResult(t, nodes, ctx, desc, isValid)
 }

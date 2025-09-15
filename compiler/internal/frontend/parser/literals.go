@@ -118,7 +118,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 	start := p.advance().Start // consume '['
 	elements := make([]ast.Expression, 0)
 
-	for !p.match(lexer.CLOSE_BRACKET) {
+	for !p.isAtEnd() && !p.match(lexer.CLOSE_BRACKET) {
 		expr := parseExpression(p)
 		if expr != nil {
 			elements = append(elements, expr)
