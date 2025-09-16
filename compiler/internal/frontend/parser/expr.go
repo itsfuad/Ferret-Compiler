@@ -552,7 +552,7 @@ func parsePrimary(p *Parser) ast.Expression {
 		// Check if this is an anonymous struct literal
 		if p.next().Kind == lexer.OPEN_CURLY {
 			if isPotentialLiteral(p) == StructLiteral {
-				parseStructLiteral(p)
+				return parseStructLiteral(p)
 			}
 		}
 		// Otherwise, it's an invalid use of 'struct' keyword
