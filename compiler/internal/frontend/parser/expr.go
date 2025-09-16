@@ -466,9 +466,18 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 	}, true
 }
 
-// isPotentialStructOrMapLiteral performs look-ahead to check if the content inside { ... } looks like a struct or map literal
+// LiteralType represents the type of literal detected
+type LiteralType int
+
+const (
+	NoLiteral LiteralType = iota
+	StructLiteral
+	MapLiteral
+)
+
+// isPotentialLiteral performs look-ahead to check if the content inside { ... } looks like a struct or map literal
 // It assumes the current token is IDENTIFIER and next is OPEN_CURLY
-func isPotentialStructOrMapLiteral(p *Parser) bool {
+func isPotentialLiteral(p *Parser) LiteralType {
 	// Save current position
 	savedPos := p.tokenNo
 	defer func() { p.tokenNo = savedPos }() // Restore on return
@@ -476,21 +485,36 @@ func isPotentialStructOrMapLiteral(p *Parser) bool {
 	// Skip the IDENTIFIER and OPEN_CURLY to be at the first token inside {
 	p.tokenNo += 2
 
-	// Check for empty literal: { }
-	if p.match(lexer.CLOSE_CURLY) {
-		return true
+	// Check for empty literal: { } (treat as struct for now)
+	if p.tokenNo < len(p.tokens) && p.tokens[p.tokenNo].Kind == lexer.CLOSE_CURLY {
+		return StructLiteral
 	}
 
-	// Check for field-like content: identifier followed by : or =>
-	if p.match(lexer.IDENTIFIER_TOKEN) {
-		p.tokenNo++                                                       // Consume identifier
-		if p.match(lexer.COLON_TOKEN) || p.match(lexer.FAT_ARROW_TOKEN) { // : for struct, => for map
-			return true
+	// Scan the tokens inside { } to find separators
+	hasColon := false
+	hasFatArrow := false
+	for p.tokenNo < len(p.tokens) && p.tokens[p.tokenNo].Kind != lexer.CLOSE_CURLY {
+		token := p.tokens[p.tokenNo]
+		if token.Kind == lexer.COLON_TOKEN {
+			hasColon = true
+		} else if token.Kind == lexer.FAT_ARROW_TOKEN {
+			hasFatArrow = true
 		}
+		p.tokenNo++ // Advance to next token
 	}
 
-	// If none of the above, it's not a literal
-	return false
+	// Determine the type based on separators found
+	if hasFatArrow && !hasColon {
+		return MapLiteral
+	} else if hasColon && !hasFatArrow {
+		return StructLiteral
+	} else if hasColon && hasFatArrow {
+		// Mixed separators, treat as error (could be handled later)
+		return NoLiteral
+	} else {
+		// No separators found, not a literal
+		return NoLiteral
+	}
 }
 
 // parsePrimary handles literals, identifiers, and parenthesized expressions
@@ -512,15 +536,24 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.AT_TOKEN:
 		return parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:
-		// Check if this is a struct/map literal (identifier followed by { with valid content)
-		if p.next().Kind == lexer.OPEN_CURLY && isPotentialStructOrMapLiteral(p) {
-			return parseStructLiteral(p)
+		// Check if this is a struct or map literal
+		if p.next().Kind == lexer.OPEN_CURLY {
+			switch isPotentialLiteral(p) {
+			case StructLiteral:
+				return parseStructLiteral(p)
+			case MapLiteral:
+				token := p.peek()
+				p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Map literals are not yet implemented", report.PARSING_PHASE)
+				return nil
+			}
 		}
 		return parseIdentifier(p)
 	case lexer.STRUCT_TOKEN:
-		// Check if this is an anonymous struct literal (struct followed by { with valid content)
-		if p.next().Kind == lexer.OPEN_CURLY && isPotentialStructOrMapLiteral(p) {
-			return parseStructLiteral(p)
+		// Check if this is an anonymous struct literal
+		if p.next().Kind == lexer.OPEN_CURLY {
+			if isPotentialLiteral(p) == StructLiteral {
+				parseStructLiteral(p)
+			}
 		}
 		// Otherwise, it's an invalid use of 'struct' keyword
 		token := p.peek()
