@@ -466,6 +466,33 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 	}, true
 }
 
+// isPotentialStructOrMapLiteral performs look-ahead to check if the content inside { ... } looks like a struct or map literal
+// It assumes the current token is IDENTIFIER and next is OPEN_CURLY
+func isPotentialStructOrMapLiteral(p *Parser) bool {
+	// Save current position
+	savedPos := p.tokenNo
+	defer func() { p.tokenNo = savedPos }() // Restore on return
+
+	// Skip the IDENTIFIER and OPEN_CURLY to be at the first token inside {
+	p.tokenNo += 2
+
+	// Check for empty literal: { }
+	if p.match(lexer.CLOSE_CURLY) {
+		return true
+	}
+
+	// Check for field-like content: identifier followed by : or =>
+	if p.match(lexer.IDENTIFIER_TOKEN) {
+		p.tokenNo++                                                       // Consume identifier
+		if p.match(lexer.COLON_TOKEN) || p.match(lexer.FAT_ARROW_TOKEN) { // : for struct, => for map
+			return true
+		}
+	}
+
+	// If none of the above, it's not a literal
+	return false
+}
+
 // parsePrimary handles literals, identifiers, and parenthesized expressions
 func parsePrimary(p *Parser) ast.Expression {
 	switch p.peek().Kind {
@@ -485,14 +512,14 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.AT_TOKEN:
 		return parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:
-		// Check if this is a struct literal (identifier followed by {)
-		if p.next().Kind == lexer.OPEN_CURLY {
+		// Check if this is a struct/map literal (identifier followed by { with valid content)
+		if p.next().Kind == lexer.OPEN_CURLY && isPotentialStructOrMapLiteral(p) {
 			return parseStructLiteral(p)
 		}
 		return parseIdentifier(p)
 	case lexer.STRUCT_TOKEN:
-		// Check if this is an anonymous struct literal (struct followed by {)
-		if p.next().Kind == lexer.OPEN_CURLY {
+		// Check if this is an anonymous struct literal (struct followed by { with valid content)
+		if p.next().Kind == lexer.OPEN_CURLY && isPotentialStructOrMapLiteral(p) {
 			return parseStructLiteral(p)
 		}
 		// Otherwise, it's an invalid use of 'struct' keyword

@@ -111,7 +111,15 @@ let doubleCall := outer()(2);
 type any interface{};
 
 fn printAny(value: any) {
-    
+    let a, b := 10, 29;
+    let sum := a + b;
+    if a > b {
+        printAny("a is greater");
+    } else {
+        printAny("b is greater");
+    }
+
+    printAny(sum);
 }
 
 printAny("hello");

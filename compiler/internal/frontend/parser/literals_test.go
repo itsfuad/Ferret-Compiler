@@ -19,6 +19,8 @@ func TestStructLiteralParsing(t *testing.T) {
 		{`let x := struct{name: "John", };`, true, "Struct literal with trailing comma"},
 		//annonymous struct
 		{`let x := struct { name: str, age: i32 };`, true, "Anonymous struct literal"},
+		// Map literal with =>
+		{`let m := Map{key => "value"};`, true, "Basic map literal"},
 
 		// Invalid cases
 		{`let x := struct{};`, false, "Empty struct literal"},

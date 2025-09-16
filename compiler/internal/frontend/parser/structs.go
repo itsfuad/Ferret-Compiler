@@ -36,11 +36,17 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 			return nil, false
 		}
 		fieldNames[fieldName.Value] = true
-		p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
+		// Accept either : for structs or => for maps
+		if !p.match(lexer.COLON_TOKEN, lexer.FAT_ARROW_TOKEN) {
+			token := p.peek()
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected ':' or '=>' after field name", report.PARSING_PHASE)
+			return nil, false
+		}
+		p.advance() // consume : or =>
 
 		value := parseExpression(p)
 		if value == nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&fieldName.Start, &fieldName.End), report.EXPECTED_FIELD_VALUE, report.PARSING_PHASE).AddHint("add an expression after the colon")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&fieldName.Start, &fieldName.End), report.EXPECTED_FIELD_VALUE, report.PARSING_PHASE).AddHint("add an expression after the separator")
 			return nil, false
 		}
 
