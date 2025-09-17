@@ -467,6 +467,17 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 }
 
 // isPotentialCompositeLiteral performs look-ahead to check if the content inside { ... } looks like a composite literal
+// isStatementKeyword checks if a token kind represents a statement-starting keyword
+func isStatementKeyword(kind lexer.TOKEN) bool {
+	switch kind {
+	case lexer.LET_TOKEN, lexer.CONST_TOKEN, lexer.IF_TOKEN, lexer.ELSE_TOKEN,
+		lexer.FOR_TOKEN, lexer.WHILE_TOKEN, lexer.RETURN_TOKEN, lexer.TYPE_TOKEN,
+		lexer.FUNCTION_TOKEN, lexer.IMPORT_TOKEN:
+		return true
+	}
+	return false
+}
+
 // It assumes the current token is IDENTIFIER and next is OPEN_CURLY
 func isPotentialCompositeLiteral(p *Parser) bool {
 	// Save current position
@@ -481,31 +492,28 @@ func isPotentialCompositeLiteral(p *Parser) bool {
 		return true
 	}
 
-	// Scan for top-level separators
-	hasSeparator := false
-	braceDepth := 0
-	parenDepth := 0
+	// Reject if first token is a statement keyword
+	if p.tokenNo < len(p.tokens) && isStatementKeyword(p.tokens[p.tokenNo].Kind) {
+		return false
+	}
 
-	for p.tokenNo < len(p.tokens) && (p.tokens[p.tokenNo].Kind != lexer.CLOSE_CURLY || braceDepth > 0) {
+	// Simple scan: look for any identifier/string followed by : or =>
+	for p.tokenNo < len(p.tokens) && p.tokens[p.tokenNo].Kind != lexer.CLOSE_CURLY {
 		token := p.tokens[p.tokenNo]
-		switch token.Kind {
-		case lexer.OPEN_CURLY:
-			braceDepth++
-		case lexer.CLOSE_CURLY:
-			braceDepth--
-		case lexer.OPEN_PAREN:
-			parenDepth++
-		case lexer.CLOSE_PAREN:
-			parenDepth--
-		case lexer.COLON_TOKEN, lexer.FAT_ARROW_TOKEN:
-			if braceDepth == 0 && parenDepth == 0 {
-				hasSeparator = true
+
+		if token.Kind == lexer.IDENTIFIER_TOKEN || token.Kind == lexer.STRING_TOKEN {
+			if p.tokenNo+1 < len(p.tokens) {
+				next := p.tokens[p.tokenNo+1]
+				if next.Kind == lexer.COLON_TOKEN || next.Kind == lexer.FAT_ARROW_TOKEN {
+					return true
+				}
 			}
 		}
+
 		p.tokenNo++
 	}
 
-	return hasSeparator
+	return false
 }
 
 // parsePrimary handles literals, identifiers, and parenthesized expressions
