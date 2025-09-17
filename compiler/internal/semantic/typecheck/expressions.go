@@ -62,8 +62,8 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 		resultType = checkCastExprType(r, e, cm)
 	case *ast.FieldAccessExpr:
 		resultType = checkFieldAccessType(r, e, cm)
-	case *ast.StructLiteralExpr:
-		resultType = checkStructLiteralType(r, e, cm)
+	case *ast.CompositeLiteralExpr:
+		resultType = checkCompositeLiteralType(r, e, cm)
 	case *ast.SpreadExpr:
 		resultType = checkSpreadExprType(r, e, cm)
 	default:
@@ -294,36 +294,38 @@ func findStructField(structType *stype.StructType, fieldName string) stype.Type 
 	return &stype.Invalid{}
 }
 
-// checkStructLiteralType handles struct literal expressions like Person{name: "Alice", age: 30} or struct{x: 10, y: 20}
-func checkStructLiteralType(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) stype.Type {
-	// Check if this is an anonymous struct or named struct
-	if structLiteral.IsAnonymous || structLiteral.StructName == nil {
-		return checkAnonymousStructLiteral(r, structLiteral, cm)
+// checkCompositeLiteralType handles composite literal expressions like Point{x: 10}, Map{key => val}, or @struct{x: 10, y: 20}
+func checkCompositeLiteralType(r *analyzer.AnalyzerNode, compositeLiteral *ast.CompositeLiteralExpr, cm *modules.Module) stype.Type {
+	// Check if this is an anonymous composite literal
+	if compositeLiteral.IsAnonymous || compositeLiteral.TypeName == nil {
+		return checkAnonymousCompositeLiteral(r, compositeLiteral, cm)
 	}
-	return checkNamedStructLiteral(r, structLiteral, cm)
+	return checkNamedCompositeLiteral(r, compositeLiteral, cm)
 }
 
-// checkAnonymousStructLiteral handles unnamed struct literals like @struct{x: 10, y: 20}
-func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) *stype.StructType {
+// checkAnonymousCompositeLiteral handles unnamed composite literals like @struct{x: 10, y: 20}
+func checkAnonymousCompositeLiteral(r *analyzer.AnalyzerNode, compositeLiteral *ast.CompositeLiteralExpr, cm *modules.Module) *stype.StructType {
 	// Build the field map for the anonymous struct
 	fields := make(map[string]stype.Type)
 
-	for _, field := range structLiteral.Fields {
-		if field.FieldIdentifier == nil {
+	for _, field := range compositeLiteral.Fields {
+		// For anonymous structs, keys must be identifiers
+		keyIdent, ok := (*field.Key).(*ast.IdentifierExpr)
+		if !ok {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
-				structLiteral.Loc(),
-				"Anonymous struct field must have a name",
+				compositeLiteral.Loc(),
+				"Anonymous composite literal field keys must be identifiers",
 				report.TYPECHECK_PHASE,
 			)
 			continue
 		}
 
-		fieldName := field.FieldIdentifier.Name
+		fieldName := keyIdent.Name
 
 		// Get the type of the field value
-		if field.FieldValue != nil {
-			fieldType := evaluateExpressionType(r, *field.FieldValue, cm)
+		if field.Value != nil {
+			fieldType := evaluateExpressionType(r, *field.Value, cm)
 			if fieldType != nil {
 				fields[fieldName] = fieldType
 			}
@@ -331,7 +333,7 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				&field.Location,
-				"Anonymous struct field must have a value",
+				"Anonymous composite literal field must have a value",
 				report.TYPECHECK_PHASE,
 			)
 		}
@@ -343,58 +345,79 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 	}
 }
 
-// checkNamedStructLiteral handles named struct literals like @Person{name: "Alice", age: 30}
-func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) *stype.UserType {
-	// Look up the struct type by name
-	structTypeName := structLiteral.StructName.Name
-	symbol, found := cm.SymbolTable.Lookup(structTypeName)
+// checkNamedCompositeLiteral handles named composite literals like Point{x: 10} or Map{key => val}
+func checkNamedCompositeLiteral(r *analyzer.AnalyzerNode, compositeLiteral *ast.CompositeLiteralExpr, cm *modules.Module) stype.Type {
+	// Look up the type by name
+	typeName := compositeLiteral.TypeName.Name
+	symbol, found := cm.SymbolTable.Lookup(typeName)
 	if !found {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			structLiteral.Loc(),
-			fmt.Sprintf("Unknown struct type %q", structTypeName),
+			compositeLiteral.Loc(),
+			fmt.Sprintf("Unknown type %q", typeName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
 	}
 
-	// Get the struct type from the symbol, handling UserType wrappers
-	//symbol type must be user type
+	// Check if it's a struct type or map type
 	userType, ok := symbol.Type.(*stype.UserType)
 	if !ok {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			structLiteral.Loc(),
-			fmt.Sprintf("type %q is not a user defined type", structTypeName),
+			compositeLiteral.Loc(),
+			fmt.Sprintf("type %q is not a user defined type", typeName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
 	}
 
 	unwrapped := semantic.UnwrapType(userType.Definition)
-	structType, ok := unwrapped.(*stype.StructType)
-	if !ok {
-		r.Ctx.Reports.AddSemanticError(
-			r.Program.FullPath,
-			structLiteral.Loc(),
-			fmt.Sprintf("%q is not a struct type", structTypeName),
-			report.TYPECHECK_PHASE,
-		)
-		return nil
+
+	// Check if it's a struct type
+	if structType, ok := unwrapped.(*stype.StructType); ok {
+		return checkNamedStructLiteral(r, compositeLiteral, structType, typeName, cm)
 	}
 
-	validateNamedStructFields(r, structLiteral, structType, structTypeName, cm)
+	// Check if it's a map type (this will be implemented later)
+	r.Ctx.Reports.AddSemanticError(
+		r.Program.FullPath,
+		compositeLiteral.Loc(),
+		fmt.Sprintf("Composite literals for type %q are not yet supported", typeName),
+		report.TYPECHECK_PHASE,
+	)
+	return nil
+}
 
-	return userType // Return the user type wrapper
+// checkNamedStructLiteral handles named struct literals like Point{x: 10}
+func checkNamedStructLiteral(r *analyzer.AnalyzerNode, compositeLiteral *ast.CompositeLiteralExpr, structType *stype.StructType, structTypeName string, cm *modules.Module) *stype.UserType {
+	validateNamedStructFields(r, compositeLiteral, structType, structTypeName, cm)
+
+	// Return the user type wrapper
+	return &stype.UserType{
+		Name:       structTypeName,
+		Definition: structType,
+	}
 }
 
 // validateNamedStructFields validates the fields in a named struct literal
-func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, structType *stype.StructType, structTypeName string, cm *modules.Module) {
+func validateNamedStructFields(r *analyzer.AnalyzerNode, compositeLiteral *ast.CompositeLiteralExpr, structType *stype.StructType, structTypeName string, cm *modules.Module) {
 	// Validate that all provided fields exist and have correct types
 	providedFields := make(map[string]bool)
-	for _, field := range structLiteral.Fields {
+	for _, field := range compositeLiteral.Fields {
+		// For named structs, keys must be identifiers
+		keyIdent, ok := (*field.Key).(*ast.IdentifierExpr)
+		if !ok {
+			r.Ctx.Reports.AddSemanticError(
+				r.Program.FullPath,
+				&field.Location,
+				"Struct literal field keys must be identifiers",
+				report.TYPECHECK_PHASE,
+			)
+			continue
+		}
 
-		fieldName := field.FieldIdentifier.Name
+		fieldName := keyIdent.Name
 		providedFields[fieldName] = true
 
 		// Check if the field exists in the struct definition
@@ -408,11 +431,11 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		}
 
 		// Check the type of the field value
-		if field.FieldValue == nil {
+		if field.Value == nil {
 			return
 		}
 
-		actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
+		actualFieldType := evaluateExpressionType(r, *field.Value, cm)
 
 		if actualFieldType == nil {
 			return
@@ -437,7 +460,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		if !providedFields[fieldName] {
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
-				structLiteral.Loc(),
+				compositeLiteral.Loc(),
 				fmt.Sprintf("Missing required field %q in struct literal for %q", fieldName, structTypeName),
 				report.TYPECHECK_PHASE,
 			)

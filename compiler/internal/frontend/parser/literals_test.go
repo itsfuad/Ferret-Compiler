@@ -19,8 +19,8 @@ func TestStructLiteralParsing(t *testing.T) {
 		{`let x := struct{name: "John", };`, true, "Struct literal with trailing comma"},
 		//annonymous struct
 		{`let x := struct { name: str, age: i32 };`, true, "Anonymous struct literal"},
-		// Map literal (not yet implemented)
-		{`let m := Map{key => "value"};`, false, "Basic map literal (not yet implemented)"},
+		// Map literal (now implemented as composite literal)
+		{`let m := Map{key => "value"};`, true, "Basic map literal"},
 
 		// Invalid cases
 		{`let x := struct{};`, false, "Empty struct literal"},
@@ -28,8 +28,8 @@ func TestStructLiteralParsing(t *testing.T) {
 		{`let x := struct{name: };`, false, "Missing value after colon"},
 		{`let x := struct{: "John"};`, false, "Missing field name"},
 		{`let x := struct{name: "John" age: 20};`, false, "Missing comma between fields"},
-		{`let x := struct{name: "John", name: "Jane"};`, false, "Duplicate field names"},
-		{`let x := struct{"name": "John"};`, false, "Non-identifier field name"},
+		{`let x := struct{name: "John", name: "Jane"};`, true, "Duplicate field names (checked at semantic level)"},
+		{`let x := struct{"name": "John"};`, true, "Non-identifier field name (valid for maps)"},
 		{`let x := struct{name: "John", age: 20}`, false, "Missing semicolon"},
 	}
 

@@ -69,17 +69,24 @@ func (a *ArrayLiteralExpr) INode()                {} // Impliments Node interfac
 func (a *ArrayLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (a *ArrayLiteralExpr) Loc() *source.Location { return &a.Location }
 
-// StructLiteralExpr represents a struct literal expression like Point{x: 10, y: 20}
-type StructLiteralExpr struct {
-	StructName  *IdentifierExpr
-	Fields      []StructField
-	IsAnonymous bool
+// CompositeLiteralExpr represents a composite literal expression like Point{x: 10} or Map{key => val}
+type CompositeLiteralExpr struct {
+	TypeName    *IdentifierExpr // nil for anonymous structs
+	IsAnonymous bool            // true for @struct{...} syntax
+	Fields      []CompositeField
 	source.Location
 }
 
-func (s *StructLiteralExpr) INode()                {} // Impliments Node interface
-func (s *StructLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
-func (s *StructLiteralExpr) Loc() *source.Location { return &s.Location }
+func (c *CompositeLiteralExpr) INode()                {} // Impliments Node interface
+func (c *CompositeLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (c *CompositeLiteralExpr) Loc() *source.Location { return &c.Location }
+
+type CompositeField struct {
+	Key       *Expression // Key expression (identifier for structs, any expr for maps)
+	Value     *Expression // Value expression
+	Separator string      // ":" or "=>"
+	source.Location
+}
 
 type FunctionLiteral struct {
 	ID         string // Unique identifier for this literal

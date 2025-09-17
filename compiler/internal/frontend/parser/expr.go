@@ -466,18 +466,9 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 	}, true
 }
 
-// LiteralType represents the type of literal detected
-type LiteralType int
-
-const (
-	NoLiteral LiteralType = iota
-	StructLiteral
-	MapLiteral
-)
-
-// isPotentialLiteral performs look-ahead to check if the content inside { ... } looks like a struct or map literal
+// isPotentialCompositeLiteral performs look-ahead to check if the content inside { ... } looks like a composite literal
 // It assumes the current token is IDENTIFIER and next is OPEN_CURLY
-func isPotentialLiteral(p *Parser) LiteralType {
+func isPotentialCompositeLiteral(p *Parser) bool {
 	// Save current position
 	savedPos := p.tokenNo
 	defer func() { p.tokenNo = savedPos }() // Restore on return
@@ -485,36 +476,36 @@ func isPotentialLiteral(p *Parser) LiteralType {
 	// Skip the IDENTIFIER and OPEN_CURLY to be at the first token inside {
 	p.tokenNo += 2
 
-	// Check for empty literal: { } (treat as struct for now)
+	// Check for empty literal: { }
 	if p.tokenNo < len(p.tokens) && p.tokens[p.tokenNo].Kind == lexer.CLOSE_CURLY {
-		return StructLiteral
+		return true
 	}
 
-	// Scan the tokens inside { } to find separators
-	hasColon := false
-	hasFatArrow := false
-	for p.tokenNo < len(p.tokens) && p.tokens[p.tokenNo].Kind != lexer.CLOSE_CURLY {
+	// Scan for top-level separators
+	hasSeparator := false
+	braceDepth := 0
+	parenDepth := 0
+
+	for p.tokenNo < len(p.tokens) && (p.tokens[p.tokenNo].Kind != lexer.CLOSE_CURLY || braceDepth > 0) {
 		token := p.tokens[p.tokenNo]
-		if token.Kind == lexer.COLON_TOKEN {
-			hasColon = true
-		} else if token.Kind == lexer.FAT_ARROW_TOKEN {
-			hasFatArrow = true
+		switch token.Kind {
+		case lexer.OPEN_CURLY:
+			braceDepth++
+		case lexer.CLOSE_CURLY:
+			braceDepth--
+		case lexer.OPEN_PAREN:
+			parenDepth++
+		case lexer.CLOSE_PAREN:
+			parenDepth--
+		case lexer.COLON_TOKEN, lexer.FAT_ARROW_TOKEN:
+			if braceDepth == 0 && parenDepth == 0 {
+				hasSeparator = true
+			}
 		}
-		p.tokenNo++ // Advance to next token
+		p.tokenNo++
 	}
 
-	// Determine the type based on separators found
-	if hasFatArrow && !hasColon {
-		return MapLiteral
-	} else if hasColon && !hasFatArrow {
-		return StructLiteral
-	} else if hasColon && hasFatArrow {
-		// Mixed separators, treat as error (could be handled later)
-		return NoLiteral
-	} else {
-		// No separators found, not a literal
-		return NoLiteral
-	}
+	return hasSeparator
 }
 
 // parsePrimary handles literals, identifiers, and parenthesized expressions
@@ -534,30 +525,25 @@ func parsePrimary(p *Parser) ast.Expression {
 		start := p.advance()
 		return parseFunctionLiteral(p, &start.Start, true)
 	case lexer.AT_TOKEN:
-		return parseStructLiteral(p)
+		return parseAnonymousCompositeLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:
-		// Check if this is a struct or map literal
+		// Check if this is a composite literal
 		if p.next().Kind == lexer.OPEN_CURLY {
-			switch isPotentialLiteral(p) {
-			case StructLiteral:
-				return parseStructLiteral(p)
-			case MapLiteral:
-				token := p.peek()
-				p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Map literals are not yet implemented", report.PARSING_PHASE)
-				return nil
+			if isPotentialCompositeLiteral(p) {
+				return parseCompositeLiteral(p)
 			}
 		}
 		return parseIdentifier(p)
 	case lexer.STRUCT_TOKEN:
-		// Check if this is an anonymous struct literal
+		// Check if this is an anonymous composite literal
 		if p.next().Kind == lexer.OPEN_CURLY {
-			if isPotentialLiteral(p) == StructLiteral {
-				return parseStructLiteral(p)
+			if isPotentialCompositeLiteral(p) {
+				return parseCompositeLiteral(p)
 			}
 		}
 		// Otherwise, it's an invalid use of 'struct' keyword
 		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "'struct' keyword can only be used for type declarations or anonymous struct literals", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "'struct' keyword can only be used for type declarations or anonymous composite literals", report.PARSING_PHASE)
 		return nil
 	}
 	handleUnexpectedToken(p, "expression")

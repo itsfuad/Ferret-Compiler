@@ -52,8 +52,8 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 		// Byte literals don't need resolution
 	case *ast.ArrayLiteralExpr:
 		resolveArrayLiteral(r, e, cm)
-	case *ast.StructLiteralExpr:
-		resolveStructLiteral(r, e, cm)
+	case *ast.CompositeLiteralExpr:
+		resolveCompositeLiteral(r, e, cm)
 	case *ast.FunctionLiteral:
 		resolveFunctionLiteral(r, e, cm)
 	case *ast.IndexableExpr:
@@ -66,9 +66,10 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 	}
 }
 
-func resolveStructLiteral(r *analyzer.AnalyzerNode, structLit *ast.StructLiteralExpr, cm *modules.Module) {
-	for _, field := range structLit.Fields {
-		resolveExpr(r, *field.FieldValue, cm)
+func resolveCompositeLiteral(r *analyzer.AnalyzerNode, compositeLit *ast.CompositeLiteralExpr, cm *modules.Module) {
+	for _, field := range compositeLit.Fields {
+		resolveExpr(r, *field.Key, cm)
+		resolveExpr(r, *field.Value, cm)
 	}
 }
 

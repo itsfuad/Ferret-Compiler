@@ -76,7 +76,7 @@ namedPoint3d.z;
 namedPoint2d = namedPoint3d as Point;
 //namedPoint3d.coordinates();
 
-let mm := mymap{1 => true, 2 => false};
+//let mm := mymap{1 => true, 2 => false};
 
 type I interface {
     fn abs() -> i32,
@@ -116,6 +116,7 @@ fn printAny(value: any) {
     let a, b := 10, 29;
     let sum := a + b;
     if a > b {
+        let big : i32 = a;
         printAny("a is greater");
     } else {
         printAny("b is greater");
