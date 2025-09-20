@@ -13,8 +13,6 @@ const (
 	testTagV200      = "refs/tags/v2.0.0"
 	testHeadsMain    = "refs/heads/main"
 	testHeadsDevelop = "refs/heads/develop"
-	testOwner        = "test-owner"
-	testRepo         = "test-repo"
 	testHashABC      = "abc123def456"
 	testHashDEF      = "def456ghi789"
 	testHashGHI      = "ghi789jkl012"
