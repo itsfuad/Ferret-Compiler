@@ -15,7 +15,25 @@ import (
 	"slices"
 )
 
-// evaluateExpressionType infers the semantic type from an AST expression
+// evaluateExpressionType performs semantic type inference and checking for AST expressions.
+// This is the main dispatch function for the type checker that handles all expression types.
+//
+// The function implements a visitor pattern over the AST, recursively analyzing:
+// 1. Literal values (strings, numbers, booleans, etc.)
+// 2. Identifiers and symbol resolution
+// 3. Binary operations with type compatibility checking
+// 4. Unary operations and their operand constraints
+// 5. Complex expressions (arrays, structs, function calls)
+// 6. Type casts and conversions
+//
+// Type checking rules:
+// - Literals have inherent types based on their syntax
+// - Identifiers resolve to their declared types in scope
+// - Binary ops require compatible operand types
+// - Function calls check argument/parameter type matching
+// - Type casts validate convertibility between types
+//
+// Returns the inferred semantic type, or Invalid{} if type checking fails.
 func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Module) stype.Type {
 
 	if expr == nil {

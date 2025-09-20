@@ -79,7 +79,7 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	var connectionClosed bool
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Panic in handleConnection: %v", r)
@@ -244,7 +244,7 @@ func writeMessage(writer *bufio.Writer, resp Response) {
 			log.Printf("Panic in writeMessage: %v", r)
 		}
 	}()
-	
+
 	data, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Failed to marshal response: %v", err)
@@ -267,7 +267,7 @@ func writeRawMessage(writer *bufio.Writer, msg interface{}) {
 			log.Printf("Panic in writeRawMessage: %v", r)
 		}
 	}()
-	
+
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Failed to marshal message: %v", err)
@@ -289,7 +289,7 @@ func hasFileInReports(reports report.Reports, filePath string) bool {
 	if reports == nil {
 		return false
 	}
-	
+
 	for _, r := range reports {
 		if r.FilePath == filePath {
 			return true
@@ -361,7 +361,7 @@ func tryProjectBasedAnalysis(writer *bufio.Writer, uri, filePath string) bool {
 
 	log.Println("Found project root:", projectRoot)
 	result := cmd.CompileProjectForLSP(projectRoot, false)
-	
+
 	if result == nil || (!result.Success && len(result.Reports) == 0) {
 		log.Printf("Project analysis failed or produced no results")
 		return false
@@ -380,7 +380,7 @@ func tryProjectBasedAnalysis(writer *bufio.Writer, uri, filePath string) bool {
 func trySingleFileAnalysis(writer *bufio.Writer, uri, filePath string) {
 	log.Println("Falling back to single-file analysis")
 	result := cmd.CompileForLSP(filePath, false)
-	
+
 	if result != nil {
 		makeDiagnostics(result.Reports, writer, uri)
 	} else {

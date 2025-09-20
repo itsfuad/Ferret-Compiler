@@ -114,7 +114,22 @@ func parseReturnStmt(p *Parser) ast.Statement {
 	}
 }
 
-// parseExpression is the entry point for expression parsing
+// parseExpression is the entry point for parsing expressions.
+// It starts with the lowest precedence operator (logical OR) and works up.
+//
+// Expression parsing follows operator precedence rules:
+// 1. Logical OR (||) - lowest precedence
+// 2. Logical AND (&&)
+// 3. Equality (== !=)
+// 4. Comparison (< > <= >=)
+// 5. Additive (+ -)
+// 6. Multiplicative (* / % **)
+// 7. Unary (! - ++ -- ...)
+// 8. Cast (as Type)
+// 9. Postfix ([] . () :: ++ --)
+// 10. Primary (literals, identifiers, grouping) - highest precedence
+//
+// This implements a classic recursive descent parser with precedence climbing.
 func parseExpression(p *Parser) ast.Expression {
 	return parseLogicalOr(p)
 }

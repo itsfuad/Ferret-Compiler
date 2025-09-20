@@ -144,7 +144,19 @@ func handleUnexpectedToken(p *Parser, expected string) ast.Statement {
 	return nil
 }
 
-// parseNode parses a single statement or expression
+// parseNode parses a single statement or expression based on the current token.
+// This is the main dispatch function that handles all Ferret language constructs.
+//
+// The parsing follows a recursive descent approach where:
+// 1. Keywords (import, let, const, type, return, function, if) are handled by specific parsers
+// 2. '@' token indicates struct literals
+// 3. Identifiers are parsed as expressions, potentially becoming expression statements
+// 4. Unknown tokens result in syntax errors
+//
+// Special handling:
+// - Function literals can be immediately invoked (IIFE pattern)
+// - Statements require semicolon termination
+// - Location information is updated for proper error reporting
 func parseNode(p *Parser) ast.Node {
 	var node ast.Node
 	switch p.peek().Kind {
@@ -203,7 +215,24 @@ func parseNode(p *Parser) ast.Node {
 	return node
 }
 
-// Parse is the entry point for parsing
+// Parse is the main entry point for parsing a Ferret source file.
+// It orchestrates the entire parsing process and returns a complete AST.
+//
+// The parsing process:
+// 1. Initializes project configuration and context
+// 2. Iteratively parses top-level statements until EOF
+// 3. Handles syntax errors gracefully by reporting and continuing
+// 4. Constructs the final Program AST with proper location information
+// 5. Registers the parsed module with the compiler context
+//
+// Error handling:
+// - Project configuration errors cause immediate termination
+// - Syntax errors are reported but don't stop parsing
+// - Empty files result in empty programs
+//
+// Returns:
+// - *ast.Program: Complete abstract syntax tree for the file
+// - Panics if module alias cannot be determined (indicates file path issues)
 func (p *Parser) Parse() *ast.Program {
 	var nodes []ast.Node
 

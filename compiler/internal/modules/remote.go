@@ -252,13 +252,43 @@ func extractSingleZipFile(file *zip.File, targetDir, expectedPrefix string) erro
 	return extractFile(file, targetPath)
 }
 
-// processFilePath removes expected prefix from file path
+// processFilePath removes expected prefix from file path and validates for security
 func processFilePath(fileName, expectedPrefix string) string {
 	relativePath := fileName
 	if after, ok := strings.CutPrefix(relativePath, expectedPrefix+"/"); ok {
 		relativePath = after
 	}
+	
+	// Validate path for security - prevent directory traversal
+	if !isPathSafe(relativePath) {
+		return "" // Skip unsafe paths
+	}
+	
 	return relativePath
+}
+
+// isPathSafe validates that a path doesn't contain directory traversal sequences
+func isPathSafe(path string) bool {
+	// Clean the path to resolve any . or .. components
+	cleanPath := filepath.Clean(path)
+	
+	// Check if the cleaned path tries to escape the intended directory
+	// by looking for .. at the beginning or anywhere in the path
+	if strings.Contains(cleanPath, "..") {
+		return false
+	}
+	
+	// Ensure path doesn't start with separator (absolute path)
+	if strings.HasPrefix(cleanPath, string(filepath.Separator)) {
+		return false
+	}
+	
+	// Ensure path is not empty and doesn't contain null bytes
+	if cleanPath == "" || cleanPath == "." || strings.Contains(cleanPath, "\x00") {
+		return false
+	}
+	
+	return true
 }
 
 // extractFile extracts a single file from zip archive

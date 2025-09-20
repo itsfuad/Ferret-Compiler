@@ -8,11 +8,60 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 )
 
 type Ref struct {
 	Hash string
 	Name string
+}
+
+// createHTTPClient creates an HTTP client with appropriate timeouts for Git operations
+func createHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 30 * time.Second, // 30 second timeout for Git operations
+	}
+}
+
+// validateGitHost validates that the host is a known and safe Git hosting service
+func validateGitHost(host string) error {
+	// Only allow known Git hosting services to prevent SSRF
+	allowedHosts := []string{
+		"github.com",
+		"gitlab.com",
+		"bitbucket.org",
+		"codeberg.org",
+		"gitea.com",
+	}
+	
+	for _, allowed := range allowedHosts {
+		if host == allowed {
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("unsupported Git host: %s", host)
+}
+
+// validateGitIdentifier validates owner/repo names for safety
+func validateGitIdentifier(identifier string) error {
+	if identifier == "" {
+		return fmt.Errorf("identifier cannot be empty")
+	}
+	
+	if len(identifier) > 100 {
+		return fmt.Errorf("identifier too long: %s", identifier)
+	}
+	
+	// Allow alphanumeric, hyphens, underscores, and dots
+	for _, r := range identifier {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || 
+		     (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
+			return fmt.Errorf("invalid character in identifier: %s", identifier)
+		}
+	}
+	
+	return nil
 }
 
 func parsePacketLength(body []byte) (int, error) {
@@ -50,8 +99,21 @@ func parseRefLine(line string) (Ref, bool) {
 }
 
 func FetchRefs(host, owner, repo string) ([]Ref, error) {
+	// Validate inputs to prevent SSRF and other attacks
+	if err := validateGitHost(host); err != nil {
+		return nil, err
+	}
+	if err := validateGitIdentifier(owner); err != nil {
+		return nil, fmt.Errorf("invalid owner: %w", err)
+	}
+	if err := validateGitIdentifier(repo); err != nil {
+		return nil, fmt.Errorf("invalid repo: %w", err)
+	}
+	
 	url := fmt.Sprintf("https://%s/%s/%s.git/info/refs?service=git-upload-pack", host, owner, repo)
-	resp, err := http.Get(url)
+	
+	client := createHTTPClient()
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -134,10 +196,19 @@ func GetModuleLatestVersion(input string) (string, error) {
 // VerifyTagDownloadable checks if a tag can actually be downloaded
 // This helps detect cases where a tag exists but the release/archive was deleted
 func VerifyTagDownloadable(owner, repo, version string) error {
+	// Validate inputs
+	if err := validateGitIdentifier(owner); err != nil {
+		return fmt.Errorf("invalid owner: %w", err)
+	}
+	if err := validateGitIdentifier(repo); err != nil {
+		return fmt.Errorf("invalid repo: %w", err)
+	}
+	
 	url := fmt.Sprintf("https://github.com/%s/%s/archive/refs/tags/%s.zip", owner, repo, version)
 
 	// Use HEAD request to check if the archive is available without downloading
-	resp, err := http.Head(url)
+	client := createHTTPClient()
+	resp, err := client.Head(url)
 	if err != nil {
 		return fmt.Errorf("failed to verify tag availability: %w", err)
 	}
