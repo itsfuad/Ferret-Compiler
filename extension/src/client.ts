@@ -130,10 +130,26 @@ function startLSPClient(context: ExtensionContext) {
 
   // Options to control the language client
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "ferret-fer" }],
+    documentSelector: [
+      { scheme: "file", language: "ferret-fer" },
+      { scheme: "file", language: "ferret-mod" },
+      { scheme: "file", language: "ferret-lock" }
+    ],
     synchronize: {
-      // Notify the server about file changes to .fer files contained in the workspace
-      fileEvents: workspace.createFileSystemWatcher("**/*.fer"),
+      // Notify the server about file changes to .fer, .ret, and .lock files contained in the workspace
+      fileEvents: [
+        workspace.createFileSystemWatcher("**/*.fer"),
+        workspace.createFileSystemWatcher("**/*.ret"), 
+        workspace.createFileSystemWatcher("**/fer.ret"),
+        workspace.createFileSystemWatcher("**/*.lock"),
+        workspace.createFileSystemWatcher("**/ferret.lock")
+      ]
+    },
+    initializationOptions: {
+      debugMode: workspace.getConfiguration('ferretLanguageServer').get<boolean>('debug', false),
+      enableCompletion: workspace.getConfiguration('ferretLanguageServer').get<boolean>('completion.enabled', true),
+      enableHover: workspace.getConfiguration('ferretLanguageServer').get<boolean>('hover.enabled', true),
+      enableDefinition: workspace.getConfiguration('ferretLanguageServer').get<boolean>('definition.enabled', true),
     },
     errorHandler: {
       error: (error, message, count) => {
@@ -141,6 +157,7 @@ function startLSPClient(context: ExtensionContext) {
         if (count !== undefined && count <= 3) {
           return { action: 1 }; // Continue
         }
+        window.showErrorMessage(`Ferret LSP encountered multiple errors. Please check the output panel.`);
         return { action: 2 }; // Shutdown
       },
       closed: () => {
@@ -148,7 +165,9 @@ function startLSPClient(context: ExtensionContext) {
         cleanupServerProcess();
         return { action: 1 }; // Restart
       }
-    }
+    },
+    outputChannelName: "Ferret Language Server",
+    traceOutputChannel: window.createOutputChannel("Ferret LSP Trace")
   };
 
   // Create the language client
@@ -187,7 +206,36 @@ async function stopLSPClient(): Promise<void> {
   }
 }
 
-// Function to toggle LSP server
+// Function to restart the LSP client
+async function restartLSP(context: ExtensionContext) {
+  console.log("Restarting Ferret LSP client...");
+  try {
+    if (client) {
+      await stopLSPClient();
+    }
+    
+    if (isLSPEnabled) {
+      startLSPClient(context);
+      window.showInformationMessage('Ferret LSP Server restarted successfully');
+    } else {
+      window.showInformationMessage('Ferret LSP Server is disabled. Enable it first to restart.');
+    }
+  } catch (error) {
+    console.error("Error restarting LSP:", error);
+    window.showErrorMessage(`Failed to restart LSP: ${error}`);
+  }
+}
+
+// Function to show LSP output channel
+function showLSPOutput() {
+  if (client) {
+    client.outputChannel.show();
+  } else {
+    const channel = window.createOutputChannel("Ferret Language Server");
+    channel.appendLine("Ferret LSP is not currently running.");
+    channel.show();
+  }
+}
 async function toggleLSP(context: ExtensionContext) {
   const config = workspace.getConfiguration('ferretLanguageServer');
   const currentState = config.get<boolean>('enabled', true);
@@ -222,11 +270,36 @@ export function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('ferretLanguageServer');
   isLSPEnabled = config.get<boolean>('enabled', true);
 
-  // Register toggle command
+  // Register commands
   const toggleCommand = commands.registerCommand('ferret.toggleLSP', () => {
     toggleLSP(context);
   });
-  context.subscriptions.push(toggleCommand);
+  const restartCommand = commands.registerCommand('ferret.restartLSP', () => {
+    restartLSP(context);
+  });
+  const showOutputCommand = commands.registerCommand('ferret.showLSPOutput', () => {
+    showLSPOutput();
+  });
+  
+  context.subscriptions.push(toggleCommand, restartCommand, showOutputCommand);
+
+  // Listen for configuration changes
+  workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('ferretLanguageServer')) {
+      const newEnabled = workspace.getConfiguration('ferretLanguageServer').get<boolean>('enabled', true);
+      
+      if (newEnabled !== isLSPEnabled) {
+        console.log(`LSP enabled state changed: ${isLSPEnabled} -> ${newEnabled}`);
+        isLSPEnabled = newEnabled;
+        
+        if (newEnabled && !client) {
+          startLSPClient(context);
+        } else if (!newEnabled && client) {
+          stopLSPClient();
+        }
+      }
+    }
+  });
 
   // Start LSP if enabled
   if (isLSPEnabled) {

@@ -120,6 +120,28 @@ func handleConnection(conn net.Conn) {
 			handleInitialize(writer, req)
 		case "textDocument/didOpen", "textDocument/didChange", "textDocument/didSave":
 			handleTextDocumentChange(writer, req)
+		case "textDocument/completion":
+			handleCompletion(writer, req)
+		case "textDocument/hover":
+			handleHover(writer, req)
+		case "textDocument/definition":
+			handleDefinition(writer, req)
+		case "textDocument/references":
+			handleReferences(writer, req)
+		case "textDocument/documentSymbol":
+			handleDocumentSymbol(writer, req)
+		case "workspace/symbol":
+			handleWorkspaceSymbol(writer, req)
+		case "textDocument/formatting":
+			handleDocumentFormatting(writer, req)
+		case "textDocument/documentHighlight":
+			handleDocumentHighlight(writer, req)
+		case "textDocument/rename":
+			handleRename(writer, req)
+		case "textDocument/foldingRange":
+			handleFoldingRange(writer, req)
+		case "textDocument/semanticTokens/full":
+			handleSemanticTokens(writer, req)
 		case "shutdown":
 			handleShutdown(writer, req)
 		case "exit":
@@ -136,7 +158,46 @@ func handleInitialize(writer *bufio.Writer, req Request) {
 		Id:      req.Id,
 		Result: map[string]interface{}{
 			"capabilities": map[string]interface{}{
-				"textDocumentSync": 1,
+				"textDocumentSync": map[string]interface{}{
+					"openClose": true,
+					"change":    1, // Full document sync
+					"save":      map[string]interface{}{"includeText": false},
+				},
+				"completionProvider": map[string]interface{}{
+					"triggerCharacters": []string{".", ":", "@"},
+					"resolveProvider":   false,
+				},
+				"hoverProvider":                true,
+				"definitionProvider":           true,
+				"referencesProvider":           true,
+				"documentSymbolProvider":       true,
+				"workspaceSymbolProvider":      true,
+				"documentFormattingProvider":   true,
+				"documentHighlightProvider":    true,
+				"renameProvider":               true,
+				"foldingRangeProvider":         true,
+				"semanticTokensProvider": map[string]interface{}{
+					"legend": map[string]interface{}{
+						"tokenTypes": []string{
+							"namespace", "type", "class", "enum", "interface",
+							"struct", "typeParameter", "parameter", "variable",
+							"property", "enumMember", "event", "function",
+							"method", "macro", "keyword", "modifier",
+							"comment", "string", "number", "regexp", "operator",
+						},
+						"tokenModifiers": []string{
+							"declaration", "definition", "readonly", "static",
+							"deprecated", "abstract", "async", "modification",
+							"documentation", "defaultLibrary",
+						},
+					},
+					"range": false,
+					"full":  true,
+				},
+			},
+			"serverInfo": map[string]interface{}{
+				"name":    "Ferret Language Server",
+				"version": "0.1.0",
 			},
 		},
 	}
@@ -461,4 +522,200 @@ func publishDiagnostics(writer *bufio.Writer, uri string, diagnostics []map[stri
 		},
 	}
 	writeRawMessage(writer, notification)
+}
+
+// Enhanced LSP Feature Handlers
+
+func handleCompletion(writer *bufio.Writer, req Request) {
+	// Parse the completion request
+	var params map[string]interface{}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		log.Printf("Invalid completion params: %v", err)
+		sendErrorResponse(writer, req.Id, -32602, "Invalid Parameters")
+		return
+	}
+
+	// Extract position and URI
+	textDocument := params["textDocument"].(map[string]interface{})
+	uri := textDocument["uri"].(string)
+	position := params["position"].(map[string]interface{})
+	line := int(position["line"].(float64))
+	character := int(position["character"].(float64))
+
+	log.Printf("Completion requested at %s line:%d char:%d", uri, line, character)
+
+	// For now, provide basic keyword completions
+	completions := []map[string]interface{}{
+		{
+			"label":      "let",
+			"kind":       14, // Keyword
+			"detail":     "Variable declaration",
+			"insertText": "let ${1:name} := ${2:value};",
+			"insertTextFormat": 2, // Snippet
+		},
+		{
+			"label":      "func",
+			"kind":       14, // Keyword
+			"detail":     "Function declaration",
+			"insertText": "func ${1:name}(${2:params}) -> ${3:returnType} {\n\t${4:body}\n}",
+			"insertTextFormat": 2, // Snippet
+		},
+		{
+			"label":      "type",
+			"kind":       14, // Keyword
+			"detail":     "Type declaration",
+			"insertText": "type ${1:Name} ${2:BaseType};",
+			"insertTextFormat": 2, // Snippet
+		},
+		{
+			"label":      "struct",
+			"kind":       22, // Struct
+			"detail":     "Struct declaration",
+			"insertText": "struct {\n\t${1:field}: ${2:type}\n}",
+			"insertTextFormat": 2, // Snippet
+		},
+		{
+			"label":      "interface",
+			"kind":       8, // Interface
+			"detail":     "Interface declaration",
+			"insertText": "interface {\n\t${1:method}(${2:params}) -> ${3:returnType};\n}",
+			"insertTextFormat": 2, // Snippet
+		},
+	}
+
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result: map[string]interface{}{
+			"isIncomplete": false,
+			"items":        completions,
+		},
+	}
+	writeMessage(writer, response)
+}
+
+func handleHover(writer *bufio.Writer, req Request) {
+	var params map[string]interface{}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		log.Printf("Invalid hover params: %v", err)
+		sendErrorResponse(writer, req.Id, -32602, "Invalid Parameters")
+		return
+	}
+
+	// For now, provide generic hover information
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result: map[string]interface{}{
+			"contents": map[string]interface{}{
+				"kind":  "markdown",
+				"value": "Ferret language symbol - detailed information coming soon!",
+			},
+		},
+	}
+	writeMessage(writer, response)
+}
+
+func handleDefinition(writer *bufio.Writer, req Request) {
+	// Return empty result for now - will be enhanced with symbol resolution
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleReferences(writer *bufio.Writer, req Request) {
+	// Return empty result for now - will be enhanced with symbol resolution
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleDocumentSymbol(writer *bufio.Writer, req Request) {
+	// Return empty result for now - will be enhanced with AST parsing
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleWorkspaceSymbol(writer *bufio.Writer, req Request) {
+	// Return empty result for now - will be enhanced with workspace indexing
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleDocumentFormatting(writer *bufio.Writer, req Request) {
+	// Return empty result for now - formatting not yet implemented
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleDocumentHighlight(writer *bufio.Writer, req Request) {
+	// Return empty result for now - highlighting not yet implemented
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleRename(writer *bufio.Writer, req Request) {
+	// Return null for now - renaming not yet implemented
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  nil,
+	}
+	writeMessage(writer, response)
+}
+
+func handleFoldingRange(writer *bufio.Writer, req Request) {
+	// Return empty result for now - will be enhanced with AST parsing
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result:  []interface{}{},
+	}
+	writeMessage(writer, response)
+}
+
+func handleSemanticTokens(writer *bufio.Writer, req Request) {
+	// Return empty semantic tokens for now
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      req.Id,
+		Result: map[string]interface{}{
+			"data": []int{},
+		},
+	}
+	writeMessage(writer, response)
+}
+
+func sendErrorResponse(writer *bufio.Writer, id int, code int, message string) {
+	response := Response{
+		Jsonrpc: "2.0",
+		Id:      id,
+		Error: &LspError{
+			Code:    code,
+			Message: message,
+		},
+	}
+	writeMessage(writer, response)
 }

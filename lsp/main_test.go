@@ -184,6 +184,77 @@ func TestHandleConnection(t *testing.T) {
 	}
 }
 
+// Test handleCompletion provides basic keyword completions
+func TestHandleCompletion(t *testing.T) {
+	var buf bytes.Buffer
+	writer := bufio.NewWriter(&buf)
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{
+			"uri": "file:///test.fer",
+		},
+		"position": map[string]interface{}{
+			"line":      0,
+			"character": 0,
+		},
+	}
+	paramsBytes, _ := json.Marshal(params)
+
+	req := Request{
+		Jsonrpc: "2.0",
+		Id:      42,
+		Method:  "textDocument/completion",
+		Params:  paramsBytes,
+	}
+	handleCompletion(writer, req)
+	writer.Flush()
+
+	outStr := buf.String()
+	if !strings.Contains(outStr, `"label":"let"`) {
+		t.Errorf("Completion should contain 'let' keyword: %s", outStr)
+	}
+	if !strings.Contains(outStr, `"label":"func"`) {
+		t.Errorf("Completion should contain 'func' keyword: %s", outStr)
+	}
+	if !strings.Contains(outStr, `"insertTextFormat":2`) {
+		t.Errorf("Completion should include snippet format: %s", outStr)
+	}
+}
+
+// Test handleHover provides hover information
+func TestHandleHover(t *testing.T) {
+	var buf bytes.Buffer
+	writer := bufio.NewWriter(&buf)
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{
+			"uri": "file:///test.fer",
+		},
+		"position": map[string]interface{}{
+			"line":      0,
+			"character": 5,
+		},
+	}
+	paramsBytes, _ := json.Marshal(params)
+
+	req := Request{
+		Jsonrpc: "2.0",
+		Id:      43,
+		Method:  "textDocument/hover",
+		Params:  paramsBytes,
+	}
+	handleHover(writer, req)
+	writer.Flush()
+
+	outStr := buf.String()
+	if !strings.Contains(outStr, `"kind":"markdown"`) {
+		t.Errorf("Hover should contain markdown content: %s", outStr)
+	}
+	if !strings.Contains(outStr, "Ferret language symbol") {
+		t.Errorf("Hover should contain symbol information: %s", outStr)
+	}
+}
+
 // readResponseFromReader reads a single response from the reader and returns it as a map.
 func readResponseFromReader(t *testing.T, reader *bufio.Reader) map[string]interface{} {
 	msg, err := readMessage(reader)

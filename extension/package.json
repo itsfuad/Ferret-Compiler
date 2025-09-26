@@ -91,6 +91,16 @@
         "command": "ferret.toggleLSP",
         "title": "Toggle LSP Server",
         "category": "Ferret"
+      },
+      {
+        "command": "ferret.restartLSP",
+        "title": "Restart LSP Server",
+        "category": "Ferret"
+      },
+      {
+        "command": "ferret.showLSPOutput",
+        "title": "Show LSP Output",
+        "category": "Ferret"
       }
     ],
     "configuration": {
@@ -101,6 +111,36 @@
           "type": "boolean",
           "default": true,
           "description": "Enable/disable Ferret Language Server. When disabled, only syntax highlighting will work."
+        },
+        "ferretLanguageServer.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug mode for the Ferret Language Server."
+        },
+        "ferretLanguageServer.port": {
+          "type": "number",
+          "default": 0,
+          "description": "Port for LSP server to use (0 = dynamic port selection)."
+        },
+        "ferretLanguageServer.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable code completion support."
+        },
+        "ferretLanguageServer.hover.enabled": {
+          "type": "boolean", 
+          "default": true,
+          "description": "Enable hover information support."
+        },
+        "ferretLanguageServer.definition.enabled": {
+          "type": "boolean",
+          "default": true, 
+          "description": "Enable go-to-definition support."
+        },
+        "ferretLanguageServer.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable diagnostic (error/warning) reporting."
         },
         "ferretLanguageServer.trace.server": {
           "type": "string",
