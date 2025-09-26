@@ -28,7 +28,65 @@ Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming l
 3. Add the `bin` directory to your PATH environment variable to use `ferret` commands globally.
 
 ## Language Support Extension
-Download the Ferret Language Support Extension for your IDE for Syntax Highlighting Errors.
+Download the Ferret Language Support Extension for your IDE for Syntax Highlighting and Language Server Protocol (LSP) support.
+
+### VS Code Extension Features
+The Ferret VS Code extension provides comprehensive language support including:
+
+- **Syntax Highlighting**: Full syntax highlighting for `.fer`, `.ret`, and `.lock` files
+- **Language Server Protocol (LSP)**: Advanced IDE features powered by the Ferret LSP server
+- **Real-time Diagnostics**: Error and warning reporting as you type
+- **Code Completion**: Smart autocomplete with snippets for Ferret language constructs
+- **Hover Information**: Documentation and type information on hover
+- **Go-to-Definition**: Navigate to symbol definitions (framework ready)
+- **Find References**: Find all references to symbols (framework ready)
+- **Document Symbols**: Outline view and symbol navigation (framework ready)
+- **Code Formatting**: Automatic code formatting (framework ready)
+
+### LSP Server Installation & Usage
+
+#### Building the LSP Server
+```bash
+cd scripts
+./lsp.sh      # Linux/macOS/Git Bash  
+./lsp.bat     # Windows CMD/PowerShell
+```
+
+This creates the `ferret-lsp` binary in the `bin` directory.
+
+#### VS Code Extension Installation
+1. Build the extension:
+   ```bash
+   cd scripts
+   ./pack.sh     # Linux/macOS/Git Bash
+   ./pack.bat    # Windows CMD/PowerShell
+   ```
+
+2. Install the generated `.vsix` file in VS Code:
+   - Open VS Code
+   - Go to Extensions (Ctrl+Shift+X)
+   - Click "..." menu → "Install from VSIX..."
+   - Select the generated `ferret-*.vsix` file
+
+#### LSP Configuration
+Configure the Ferret Language Server in VS Code settings:
+
+```json
+{
+  "ferretLanguageServer.enabled": true,
+  "ferretLanguageServer.debug": false,
+  "ferretLanguageServer.completion.enabled": true,
+  "ferretLanguageServer.hover.enabled": true,
+  "ferretLanguageServer.definition.enabled": true,
+  "ferretLanguageServer.diagnostics.enabled": true,
+  "ferretLanguageServer.trace.server": "off"
+}
+```
+
+#### Available Commands
+- **Ferret: Toggle LSP Server** - Enable/disable the language server
+- **Ferret: Restart LSP Server** - Restart the language server
+- **Ferret: Show LSP Output** - View language server logs
 
 ### Usage
 
@@ -501,6 +559,145 @@ The project uses GitHub Actions for continuous integration and deployment:
 4. Automated release created with version tag
 5. Binaries built for multiple platforms
 6. Release notes auto-generated from commits
+
+## Development & Contributing
+
+### LSP System Development
+
+The Ferret compiler includes a comprehensive Language Server Protocol (LSP) implementation that provides IDE integration for development tools.
+
+#### Architecture Overview
+```
+Ferret LSP System Architecture:
+
+VS Code Extension (TypeScript)
+        ↓ (TCP Connection)
+Ferret LSP Server (Go)
+        ↓ (API Calls)
+Ferret Compiler Core (Go)
+        ↓ (Analysis)
+AST → Semantic Analysis → Diagnostics
+```
+
+#### LSP Server Components
+- **`lsp/main.go`**: Main LSP server implementation with TCP communication
+- **`lsp/wio/`**: URI and file path conversion utilities
+- **`compiler/cmd/lsp_api.go`**: Compiler integration API for LSP
+
+#### VS Code Extension Components
+- **`extension/src/client.ts`**: Main extension client with LSP communication
+- **`extension/package.json`**: Extension manifest with capabilities and configuration
+- **`extension/syntaxes/`**: Syntax highlighting definitions
+
+#### Development Workflow
+
+1. **Setup Development Environment**:
+   ```bash
+   # Clone the repository
+   git clone https://github.com/itsfuad/Ferret-Compiler.git
+   cd Ferret-Compiler
+   
+   # Build all components
+   cd scripts
+   ./pack.sh  # Builds compiler, LSP server, and VS Code extension
+   ```
+
+2. **LSP Server Development**:
+   ```bash
+   # Build only the LSP server
+   ./scripts/lsp.sh
+   
+   # Run LSP tests
+   cd lsp && go test -v
+   
+   # Test manually with port binding
+   ./bin/ferret-lsp --port 9999
+   ```
+
+3. **VS Code Extension Development**:
+   ```bash
+   cd extension
+   
+   # Install dependencies
+   npm install
+   
+   # Compile TypeScript
+   npm run compile
+   
+   # Bundle for production
+   npm run bundle
+   
+   # Package extension
+   npx vsce package
+   ```
+
+4. **Testing LSP Features**:
+   ```bash
+   # Run all tests
+   ./scripts/test.sh
+   
+   # Test with sample Ferret files
+   cd app
+   # Create .fer files and test with VS Code extension
+   ```
+
+#### Extending LSP Capabilities
+
+To add new LSP features:
+
+1. **Add LSP Method Handler** (in `lsp/main.go`):
+   ```go
+   func handleYourFeature(writer *bufio.Writer, req Request) {
+       // Parse request parameters
+       // Call compiler API if needed
+       // Send response
+   }
+   ```
+
+2. **Register in Switch Statement**:
+   ```go
+   case "textDocument/yourFeature":
+       handleYourFeature(writer, req)
+   ```
+
+3. **Update Capabilities** (in `handleInitialize`):
+   ```go
+   "yourFeatureProvider": true,
+   ```
+
+4. **Add Tests**:
+   ```go
+   func TestHandleYourFeature(t *testing.T) {
+       // Test implementation
+   }
+   ```
+
+#### Build Scripts
+- **`scripts/build.sh`**: Build main compiler
+- **`scripts/lsp.sh`**: Build LSP server only
+- **`scripts/pack.sh`**: Build everything (compiler + LSP + extension)
+- **`scripts/test.sh`**: Run all tests
+- **`scripts/ci-check.sh`**: Full CI validation
+
+#### Configuration & Settings
+The LSP system supports extensive configuration:
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `ferretLanguageServer.enabled` | boolean | true | Enable/disable LSP |
+| `ferretLanguageServer.debug` | boolean | false | Debug mode |
+| `ferretLanguageServer.port` | number | 0 | LSP server port (0 = dynamic) |
+| `ferretLanguageServer.completion.enabled` | boolean | true | Code completion |
+| `ferretLanguageServer.hover.enabled` | boolean | true | Hover information |
+| `ferretLanguageServer.definition.enabled` | boolean | true | Go-to-definition |
+| `ferretLanguageServer.diagnostics.enabled` | boolean | true | Error/warning reporting |
+| `ferretLanguageServer.trace.server` | string | "off" | LSP communication tracing |
+
+#### Testing & Quality Assurance
+- **Unit Tests**: Go test suite for LSP server (`lsp/main_test.go`)
+- **Integration Tests**: End-to-end LSP communication testing
+- **Manual Testing**: Use `app/test_lsp.fer` for manual verification
+- **CI/CD**: Automated testing in GitHub Actions
 
 ## License
 This project is licensed under the Mozilla Public License 2.0 - see the LICENSE file for details.
