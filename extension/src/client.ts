@@ -68,25 +68,71 @@ function setupServerProcess(serverExec: string, resolve: (value: StreamInfo) => 
   const config = workspace.getConfiguration('ferretLanguageServer');
   const desiredPort = config.get<number>('port', 0); // 0 = dynamic
   console.log(`Launching Ferret LSP with port=${desiredPort === 0 ? 'dynamic' : desiredPort}`);
+  
+  // Check if the server executable exists (if it's an absolute path)
+  if (serverExec.includes('/') || serverExec.includes('\\')) {
+    try {
+      const fs = require('fs');
+      if (!fs.existsSync(serverExec)) {
+        const error = new Error(`LSP server not found at: ${serverExec}. Please build the LSP server using the build scripts or set a custom path in settings.`);
+        console.error(error.message);
+        window.showErrorMessage(error.message);
+        reject(error);
+        return;
+      }
+    } catch (checkError) {
+      console.warn(`Could not check if LSP server exists: ${checkError}`);
+    }
+  }
 
-  serverProcess = spawn(serverExec, ['--port', desiredPort.toString()]); // pass port to server
+  try {
+    serverProcess = spawn(serverExec, ['--port', desiredPort.toString()]); // pass port to server
+  } catch (spawnError) {
+    const error = new Error(`Failed to spawn LSP server: ${spawnError}. Make sure ferret-lsp is built and accessible.`);
+    console.error(error.message);
+    window.showErrorMessage(error.message);
+    reject(error);
+    return;
+  }
   
   serverProcess.stdout?.on('data', (data: Buffer) => {
     handleServerData(data, resolve, reject);
   });
   
   serverProcess.stderr?.on('data', (data: Buffer) => {
-    console.log(`LSP Server: ${data.toString()}`);
+    const errorOutput = data.toString();
+    console.log(`LSP Server stderr: ${errorOutput}`);
+    
+    // Check for common error patterns
+    if (errorOutput.includes('command not found') || errorOutput.includes('No such file or directory')) {
+      const error = new Error(`LSP server executable not found. Please build the Ferret compiler and LSP server using the build scripts, or set ferretLanguageServer.serverPath in settings.`);
+      window.showErrorMessage(error.message);
+      reject(error);
+    }
   });
   
   serverProcess.on('error', (error) => {
-    console.error(`Failed to start LSP server: ${error}`);
+    let errorMessage = `Failed to start LSP server: ${error.message}`;
+    
+    if (error.message.includes('ENOENT')) {
+      errorMessage = `LSP server executable not found: ${serverExec}. Please build the Ferret compiler and LSP server, or set ferretLanguageServer.serverPath in settings.`;
+    }
+    
+    console.error(errorMessage);
+    window.showErrorMessage(errorMessage);
     cleanupServerProcess();
-    reject(error);
+    reject(new Error(errorMessage));
   });
   
-  serverProcess.on('exit', (code) => {
-    console.log(`LSP server exited with code ${code}`);
+  serverProcess.on('exit', (code, signal) => {
+    const exitMessage = `LSP server exited with code ${code}${signal ? ` (signal: ${signal})` : ''}`;
+    console.log(exitMessage);
+    
+    if (code !== 0 && code !== null) {
+      const error = new Error(`${exitMessage}. Check the output panel for more details.`);
+      window.showErrorMessage(error.message);
+    }
+    
     cleanupServerProcess();
   });
 }
@@ -109,6 +155,43 @@ function cleanupServerProcess(): void {
   serverProcess = null;
 }
 
+// Function to find the LSP server executable
+function findLSPServerExecutable(): string {
+  const config = workspace.getConfiguration('ferretLanguageServer');
+  const customPath = config.get<string>('serverPath');
+  
+  if (customPath) {
+    console.log(`Using custom LSP server path: ${customPath}`);
+    return customPath;
+  }
+  
+  // Try common locations relative to workspace
+  if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
+    const workspaceRoot = workspace.workspaceFolders[0].uri.fsPath;
+    const commonPaths = [
+      `${workspaceRoot}/bin/ferret-lsp`,
+      `${workspaceRoot}/../bin/ferret-lsp`,
+      `${workspaceRoot}/scripts/../bin/ferret-lsp`,
+    ];
+    
+    for (const path of commonPaths) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(path)) {
+          console.log(`Found LSP server at: ${path}`);
+          return path;
+        }
+      } catch (error) {
+        // Continue searching
+      }
+    }
+  }
+  
+  // Fall back to PATH
+  console.log("Falling back to 'ferret-lsp' from PATH");
+  return "ferret-lsp";
+}
+
 // Function to start the LSP client
 function startLSPClient(context: ExtensionContext) {
   if (client) {
@@ -118,8 +201,7 @@ function startLSPClient(context: ExtensionContext) {
 
   console.log("Starting Ferret LSP client...");
   
-  //use the "ferret-lsp" from PATH
-  const serverExec = "ferret-lsp";
+  const serverExec = findLSPServerExecutable();
 
   // Create server options that spawn the server and connect via TCP
   const serverOptions: ServerOptions = () => {
@@ -226,6 +308,25 @@ async function restartLSP(context: ExtensionContext) {
   }
 }
 
+// Function to set LSP server path
+async function setLSPPath() {
+  const options = {
+    canSelectMany: false,
+    filters: {
+      'Executables': ['exe', ''],
+      'All files': ['*']
+    },
+    openLabel: 'Select ferret-lsp executable'
+  };
+  
+  const fileUri = await window.showOpenDialog(options);
+  if (fileUri && fileUri[0]) {
+    const config = workspace.getConfiguration('ferretLanguageServer');
+    await config.update('serverPath', fileUri[0].fsPath, true);
+    window.showInformationMessage(`LSP server path set to: ${fileUri[0].fsPath}`);
+  }
+}
+
 // Function to show LSP output channel
 function showLSPOutput() {
   if (client) {
@@ -280,8 +381,11 @@ export function activate(context: ExtensionContext) {
   const showOutputCommand = commands.registerCommand('ferret.showLSPOutput', () => {
     showLSPOutput();
   });
+  const setPathCommand = commands.registerCommand('ferret.setLSPPath', () => {
+    setLSPPath();
+  });
   
-  context.subscriptions.push(toggleCommand, restartCommand, showOutputCommand);
+  context.subscriptions.push(toggleCommand, restartCommand, showOutputCommand, setPathCommand);
 
   // Listen for configuration changes
   workspace.onDidChangeConfiguration((event) => {

@@ -74,6 +74,7 @@ Configure the Ferret Language Server in VS Code settings:
 ```json
 {
   "ferretLanguageServer.enabled": true,
+  "ferretLanguageServer.serverPath": "",
   "ferretLanguageServer.debug": false,
   "ferretLanguageServer.completion.enabled": true,
   "ferretLanguageServer.hover.enabled": true,
@@ -82,6 +83,33 @@ Configure the Ferret Language Server in VS Code settings:
   "ferretLanguageServer.trace.server": "off"
 }
 ```
+
+#### Troubleshooting
+
+**LSP Server Not Starting:**
+
+1. **Automatic Detection**: The extension will try to find `ferret-lsp` in these locations:
+   - `workspace/bin/ferret-lsp`
+   - `workspace/../bin/ferret-lsp`
+   - `ferret-lsp` in system PATH
+
+2. **Manual Configuration**: If auto-detection fails, set the path manually:
+   - Open VS Code settings (Ctrl+,)
+   - Search for "ferretLanguageServer.serverPath"
+   - Set the full path to your `ferret-lsp` executable
+   - Or use the command: **Ferret: Set LSP Server Path**
+
+3. **Build the LSP Server**: If the binary doesn't exist:
+   ```bash
+   cd Ferret-Compiler/scripts
+   ./lsp.sh      # Linux/macOS
+   ./lsp.bat     # Windows
+   ```
+
+4. **Check LSP Status**: Use these commands from the VS Code Command Palette:
+   - **Ferret: Show LSP Output** - View detailed logs
+   - **Ferret: Restart LSP Server** - Restart if needed
+   - **Ferret: Toggle LSP Server** - Enable/disable
 
 #### Available Commands
 - **Ferret: Toggle LSP Server** - Enable/disable the language server
