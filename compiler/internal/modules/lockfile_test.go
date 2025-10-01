@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"compiler/constants"
+	"compiler/config"
 	"reflect"
 	"testing"
 )
@@ -52,8 +52,8 @@ func TestLockfileSaveAndLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadLockfile failed: %v", err)
 	}
-	if loaded.Version != constants.LOCKFILE_VERSION {
-		t.Errorf("expected version %s, got %s", constants.LOCKFILE_VERSION, loaded.Version)
+	if loaded.Version != config.LOCKFILE_VERSION {
+		t.Errorf("expected version %s, got %s", config.LOCKFILE_VERSION, loaded.Version)
 	}
 	if len(loaded.Dependencies) != 1 {
 		t.Errorf("expected 1 dependency, got %d", len(loaded.Dependencies))

@@ -1,0 +1,17 @@
+// This is a test file for the Ferret LSP functionality
+let greeting := "Hello from Ferret!";
+
+type Person struct {
+    name: str,
+    age: i32
+};
+
+func greet(person: Person) -> str {
+    return "Hello, " + person.name + "!";
+}
+
+let john = @Person{name: "John", age: 30};
+let message = greet(john);
+
+// This should show an error - undefined variable
+let undefined_var = some_undefined_variable;

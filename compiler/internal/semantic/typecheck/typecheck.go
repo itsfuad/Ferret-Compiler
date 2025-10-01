@@ -18,17 +18,17 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_TYPECHECKED {
 			// Already processed, skip
 			if r.Debug {
-				colors.GREEN.Printf("Skipping type checking for %q (already in phase: %s)\n", r.Program.FullPath, currentPhase)
+				colors.GREEN.Printf("skipping type checking for %q (already in phase: %s)\n", r.Program.FullPath, currentPhase)
 			}
 			return
 		}
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Module not ready for type checking phase", report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "module not ready for type checking phase", report.TYPECHECK_PHASE)
 		return
 	}
 
 	currentModule, err := r.Ctx.GetModule(importPath)
 	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "failed to get current module: "+err.Error(), report.TYPECHECK_PHASE)
 		return
 	}
 
@@ -40,7 +40,7 @@ func CheckProgram(r *analyzer.AnalyzerNode) {
 	r.Ctx.SetModulePhase(importPath, modules.PHASE_TYPECHECKED)
 
 	if r.Debug {
-		colors.GREEN.Printf("Type checked %q\n", r.Program.FullPath)
+		colors.GREEN.Printf("type checked %q\n", r.Program.FullPath)
 	}
 }
 
@@ -69,8 +69,8 @@ func checkNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.ReturnStmt:
 		// Return statements are checked in the context of function declarations
 		// Standalone return statements are an error
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), "Return statement outside function", report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), "return statement outside function", report.TYPECHECK_PHASE)
 	default:
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for type checking", n), report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("unsupported node type <%T> for type checking", n), report.TYPECHECK_PHASE)
 	}
 }

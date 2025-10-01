@@ -10,21 +10,21 @@ import (
 // parseIfStatement parses an if statement with optional else and else-if branches
 func parseIfStatement(p *Parser) ast.BlockConstruct {
 
-	start := p.consume(lexer.IF_TOKEN, report.EXPECTED_IF) // consume 'if'
+	start := p.advance() // consume 'if'
 
 	// Parse condition (parentheses are optional)
 	var condition ast.Expression
 	if p.match(lexer.OPEN_PAREN) {
 		p.advance() // consume '('
 		condition = parseExpression(p)
-		p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+		p.consume(lexer.CLOSE_PAREN, "expected ')' after the expression")
 	} else {
 		condition = parseExpression(p)
 	}
 
 	if condition == nil {
 		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected condition after 'if'", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected condition after 'if'", report.PARSING_PHASE)
 		return nil
 	}
 	// Parse if body

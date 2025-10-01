@@ -33,13 +33,13 @@ func validateGitHost(host string) error {
 		"codeberg.org",
 		"gitea.com",
 	}
-	
+
 	for _, allowed := range allowedHosts {
 		if host == allowed {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("unsupported Git host: %s", host)
 }
 
@@ -48,19 +48,19 @@ func validateGitIdentifier(identifier string) error {
 	if identifier == "" {
 		return fmt.Errorf("identifier cannot be empty")
 	}
-	
+
 	if len(identifier) > 100 {
 		return fmt.Errorf("identifier too long: %s", identifier)
 	}
-	
+
 	// Allow alphanumeric, hyphens, underscores, and dots
 	for _, r := range identifier {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || 
-		     (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
 			return fmt.Errorf("invalid character in identifier: %s", identifier)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -109,9 +109,9 @@ func FetchRefs(host, owner, repo string) ([]Ref, error) {
 	if err := validateGitIdentifier(repo); err != nil {
 		return nil, fmt.Errorf("invalid repo: %w", err)
 	}
-	
+
 	url := fmt.Sprintf("https://%s/%s/%s.git/info/refs?service=git-upload-pack", host, owner, repo)
-	
+
 	client := createHTTPClient()
 	resp, err := client.Get(url)
 	if err != nil {
@@ -203,7 +203,7 @@ func VerifyTagDownloadable(owner, repo, version string) error {
 	if err := validateGitIdentifier(repo); err != nil {
 		return fmt.Errorf("invalid repo: %w", err)
 	}
-	
+
 	url := fmt.Sprintf("https://github.com/%s/%s/archive/refs/tags/%s.zip", owner, repo, version)
 
 	// Use HEAD request to check if the archive is available without downloading

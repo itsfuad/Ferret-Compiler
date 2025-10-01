@@ -24,7 +24,7 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *module
 	}
 
 	if r.Debug {
-		colors.YELLOW.Printf("Resolving import %q as %q in module %q\n", imp.ImportPath.Value, imp.Alias, cm.AST.Alias)
+		colors.YELLOW.Printf("resolving import %q as %q in module %q\n", imp.ImportPath.Value, imp.Alias, cm.AST.Alias)
 	}
 
 	// Resolve the import path based on context
@@ -34,7 +34,7 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *module
 	//module must be parses and stored already
 	module, err := r.Ctx.GetModule(moduleKey)
 	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, imp.Loc(), "failed to get imported module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -44,27 +44,27 @@ func resolveImportStmt(r *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *module
 	cm.SymbolTable.Imports[imp.Alias] = module.SymbolTable
 
 	if r.Debug {
-		colors.GREEN.Printf("Successfully stored import %q in module %q\n", imp.Alias, cm.AST.Alias)
+		colors.GREEN.Printf("successfully stored import %q in module %q\n", imp.Alias, cm.AST.Alias)
 	}
 }
 
 func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution, cm *modules.Module) {
 
 	if r.Debug {
-		colors.CYAN.Printf("Looking for module %q in imports of %q\n", res.Module.Name, cm.AST.Alias)
+		colors.CYAN.Printf("looking for module %q in imports of %q\n", res.Module.Name, cm.AST.Alias)
 	}
 
 	symbolTable, err := cm.SymbolTable.GetImportedModule(res.Module.Name)
 	if err != nil {
 		if r.Debug {
-			colors.RED.Printf("Available imports in %q: %v\n", cm.AST.Alias, getImportKeys(cm.SymbolTable.Imports))
+			colors.RED.Printf("available imports in %q: %v\n", cm.AST.Alias, getImportKeys(cm.SymbolTable.Imports))
 		}
 		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
 	if _, found := symbolTable.Lookup(res.Identifier.Name); !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol %q not found in module %q", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("symbol %q not found in module %q", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -77,6 +77,6 @@ func resolveImportedSymbol(r *analyzer.AnalyzerNode, res *ast.VarScopeResolution
 
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
-		colors.TEAL.Printf("Resolved imported symbol %q from module %q imported from %q\n", res.Identifier.Name, res.Module.Name, cm.AST.Alias)
+		colors.TEAL.Printf("resolved imported symbol %q from module %q imported from %q\n", res.Identifier.Name, res.Module.Name, cm.AST.Alias)
 	}
 }

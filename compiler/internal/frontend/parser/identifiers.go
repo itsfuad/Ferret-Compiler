@@ -7,7 +7,7 @@ import (
 )
 
 func parseIdentifier(p *Parser) *ast.IdentifierExpr {
-	token := p.consume(lexer.IDENTIFIER_TOKEN, "Expected identifier")
+	token := p.consume(lexer.IDENTIFIER_TOKEN, "expected identifier")
 
 	// Create the identifier expression
 	identifier := &ast.IdentifierExpr{

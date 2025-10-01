@@ -43,7 +43,7 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
 		if r.Debug {
-			colors.TEAL.Printf("Inferred type %q for variable %q at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
+			colors.TEAL.Printf("inferred type %q for variable %q at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
 		}
 		return
 	}
@@ -58,7 +58,7 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			variable.ExplicitType.Loc(),
-			"Invalid explicit type for variable declaration: "+err.Error(),
+			"invalid explicit type for variable declaration: "+err.Error(),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -93,7 +93,7 @@ func checkTypeCompatibility(r *analyzer.AnalyzerNode, variable *ast.VariableToDe
 func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, cm *modules.Module) {
 	// Check that we have both left and right hand sides
 	if assign.Left == nil || assign.Right == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(), "Assignment statement must have both left and right hand sides", report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Loc(), "assignment statement must have both left and right hand sides", report.TYPECHECK_PHASE)
 		return
 	}
 
@@ -101,12 +101,12 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 	rightTypes := checkExprListType(r, assign.Right, cm)
 
 	if len(leftTypes) == 0 {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Left.Loc(), "No valid left-hand side expressions found", report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Left.Loc(), "no valid left-hand side expressions found", report.TYPECHECK_PHASE)
 		return
 	}
 
 	if len(rightTypes) == 0 {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), "No valid right-hand side expressions found", report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, assign.Right.Loc(), "no valid right-hand side expressions found", report.TYPECHECK_PHASE)
 		return
 	}
 
@@ -122,7 +122,7 @@ func checkAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt, c
 		rhsType := rightTypes[i]
 		lhsType := leftTypes[i]
 		if lhsType == nil || rhsType == nil {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), "Failed to determine type for assignment", report.TYPECHECK_PHASE)
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, lhs.Loc(), "failed to determine type for assignment", report.TYPECHECK_PHASE)
 			continue
 		}
 		if ok, err := isImplicitCastable(lhsType, rhsType); !ok {
@@ -167,7 +167,7 @@ func checkFunctionDecl(r *analyzer.AnalyzerNode, funcDecl *ast.FunctionDecl, cm 
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			funcDecl.Loc(),
-			fmt.Sprintf("Function %q not found in symbol table", funcDecl.Identifier.Name),
+			fmt.Sprintf("function %q not found in symbol table", funcDecl.Identifier.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -185,7 +185,7 @@ func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *m
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			methodDecl.Receiver.Type.Loc(),
-			fmt.Sprintf("Receiver type %q not found in symbol table", methodDecl.Receiver.Type.Type().String()),
+			fmt.Sprintf("receiver type %q not found in symbol table", methodDecl.Receiver.Type.Type().String()),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -197,7 +197,7 @@ func checkMethodDecl(r *analyzer.AnalyzerNode, methodDecl *ast.MethodDecl, cm *m
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			methodDecl.Loc(),
-			fmt.Sprintf("Method %q not found in symbol table", methodDecl.Method.Name),
+			fmt.Sprintf("method %q not found in symbol table", methodDecl.Method.Name),
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -217,7 +217,7 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				fn.ReturnType.Loc(),
-				fmt.Sprintf("Invalid return type: %s", err.Error()),
+				fmt.Sprintf("invalid return type: %s", err.Error()),
 				report.TYPECHECK_PHASE,
 			)
 			return
@@ -245,7 +245,7 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				fn.Loc(),
-				"Not all paths in function return a value",
+				"not all paths in function return a value",
 				report.TYPECHECK_PHASE,
 			)
 
@@ -255,7 +255,7 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 					r.Ctx.Reports.AddSemanticError(
 						r.Program.FullPath,
 						&loc,
-						"Missing return statement in this path",
+						"missing return statement in this path",
 						report.TYPECHECK_PHASE,
 					)
 				}
@@ -264,7 +264,7 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				fn.Loc(),
-				"Not all paths in function return a value",
+				"not all paths in function return a value",
 				report.TYPECHECK_PHASE,
 			)
 		}
@@ -274,7 +274,7 @@ func checkFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm 
 // checkFunctionLiteralType checks function literals and returns their type
 func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) stype.Type {
 	if fn == nil || fn.ID == "" {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.TYPECHECK_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "function literal missing ID", report.TYPECHECK_PHASE)
 		return &stype.Invalid{}
 	}
 
@@ -284,7 +284,7 @@ func checkFunctionLiteralType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral,
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			fn.Loc(),
-			"Function literal '"+fn.ID+"' not found in symbol table",
+			"function literal '"+fn.ID+"' not found in symbol table",
 			report.TYPECHECK_PHASE,
 		)
 		return &stype.Invalid{}

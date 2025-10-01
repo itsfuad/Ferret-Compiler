@@ -147,7 +147,7 @@ func DownloadRemoteModule(host, user, repo, version, cachePath string) error {
 		return fmt.Errorf("failed to extract module: %w", err)
 	}
 
-	colors.GREEN.Printf("Successfully downloaded and cached %s/%s@%s\n", user, repo, normalizedVersion)
+	colors.GREEN.Printf("successfully downloaded and cached %s/%s@%s\n", user, repo, normalizedVersion)
 	return nil
 }
 
@@ -156,7 +156,7 @@ func internalDownloadModuleArchive(user, repo, version string) (string, error) {
 	// Create download URL
 	downloadURL := fmt.Sprintf(GitHubTagArchiveURL, user, repo, version)
 
-	colors.BLUE.Printf("Downloading %s from %s\n", repo, downloadURL)
+	colors.BLUE.Printf("downloading %s from %s\n", repo, downloadURL)
 
 	// Download the archive
 	resp, err := http.Get(downloadURL)
@@ -258,12 +258,12 @@ func processFilePath(fileName, expectedPrefix string) string {
 	if after, ok := strings.CutPrefix(relativePath, expectedPrefix+"/"); ok {
 		relativePath = after
 	}
-	
+
 	// Validate path for security - prevent directory traversal
 	if !isPathSafe(relativePath) {
 		return "" // Skip unsafe paths
 	}
-	
+
 	return relativePath
 }
 
@@ -271,23 +271,23 @@ func processFilePath(fileName, expectedPrefix string) string {
 func isPathSafe(path string) bool {
 	// Clean the path to resolve any . or .. components
 	cleanPath := filepath.Clean(path)
-	
+
 	// Check if the cleaned path tries to escape the intended directory
 	// by looking for .. at the beginning or anywhere in the path
 	if strings.Contains(cleanPath, "..") {
 		return false
 	}
-	
+
 	// Ensure path doesn't start with separator (absolute path)
 	if strings.HasPrefix(cleanPath, string(filepath.Separator)) {
 		return false
 	}
-	
+
 	// Ensure path is not empty and doesn't contain null bytes
 	if cleanPath == "" || cleanPath == "." || strings.Contains(cleanPath, "\x00") {
 		return false
 	}
-	
+
 	return true
 }
 

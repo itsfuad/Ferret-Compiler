@@ -19,17 +19,17 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 		if currentPhase >= modules.PHASE_RESOLVED {
 			// Already processed or in a later phase, skip
 			if r.Debug {
-				colors.TEAL.Printf("Skipping resolution for %q (already in phase: %s)\n", r.Program.FullPath, currentPhase)
+				colors.TEAL.Printf("skipping resolution for %q (already in phase: %s)\n", r.Program.FullPath, currentPhase)
 			}
 			return
 		}
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Module not ready for resolution phase", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "module not ready for resolution phase", report.RESOLVER_PHASE)
 		return
 	}
 
 	currentModule, err := r.Ctx.GetModule(importPath)
 	if err != nil {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "Failed to get current module: "+err.Error(), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, nil, "failed to get current module: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -44,13 +44,13 @@ func ResolveProgram(r *analyzer.AnalyzerNode) {
 	r.Ctx.SetModulePhase(importPath, modules.PHASE_RESOLVED)
 
 	if r.Debug {
-		colors.GREEN.Printf("Resolved %q\n", r.Program.FullPath)
+		colors.GREEN.Printf("resolved %q\n", r.Program.FullPath)
 	}
 }
 
 // resolveNode dispatches resolution to the appropriate handler based on node type
 func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
-	fmt.Printf("Resolving node of type: %T\n", node)
+	fmt.Printf("resolving node of type: %T\n", node)
 	switch n := node.(type) {
 	case *ast.ImportStmt:
 		resolveImportStmt(r, n, cm)
@@ -77,7 +77,7 @@ func resolveNode(r *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
 	case *ast.FunctionLiteral:
 		resolveFunctionLiteral(r, n, cm)
 	default:
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("Unsupported node type <%T> for resolution", n), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, node.Loc(), fmt.Sprintf("unsupported node type <%T> for resolution", n), report.RESOLVER_PHASE)
 	}
 }
 
@@ -91,7 +91,7 @@ func checkUnusedImports(r *analyzer.AnalyzerNode, currentModule *modules.Module)
 				r.Ctx.Reports.AddWarning(
 					r.Program.FullPath,
 					importStmt.Loc(),
-					fmt.Sprintf("Unused import: %q", importStmt.ImportPath.Value),
+					fmt.Sprintf("unused import: %q", importStmt.ImportPath.Value),
 					report.RESOLVER_PHASE,
 				).AddHint("remove this import or use symbols from this module")
 			}

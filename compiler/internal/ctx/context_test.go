@@ -21,8 +21,8 @@ const (
 	mainEntry          = "main.fer"
 	mainOutput         = "main.exe"
 	ferretCacheDir     = ".ferret"
-	expectedPanicMsg   = "Expected panic but didn't get one"
-	expectedNonNilCtx  = "Expected non-nil context"
+	expectedPanicMsg   = "expected panic but didn't get one"
+	expectedNonNilCtx  = "expected non-nil context"
 )
 
 // Test helper to create a temporary project config
@@ -60,7 +60,7 @@ func createTempDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "ferret-test-")
 	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
+		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	t.Cleanup(func() {
 		os.RemoveAll(dir)

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"compiler/constants"
 	"compiler/toml"
 	"os"
 	"path/filepath"
@@ -111,7 +110,7 @@ func TestIsProjectRoot(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	configPath := filepath.Join(tempDir, constants.CONFIG_FILE)
+	configPath := filepath.Join(tempDir, CONFIG_FILE)
 	if err := os.WriteFile(configPath, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
@@ -208,7 +207,7 @@ func setupTestProjectStructure(t *testing.T) string {
 	}
 
 	// Create config file in root
-	configPath := filepath.Join(tempDir, constants.CONFIG_FILE)
+	configPath := filepath.Join(tempDir, CONFIG_FILE)
 	if err := os.WriteFile(configPath, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}

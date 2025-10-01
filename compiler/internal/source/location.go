@@ -29,8 +29,8 @@ func (l *Location) Contains(pos *Position) bool {
 
 func (l *Location) String() string {
 	if l.Start == nil || l.End == nil {
-		return "Location(unknown)"
+		return "location(unknown)"
 	}
 
-	return fmt.Sprintf("Location(%d:%d - %d:%d)", l.Start.Line, l.Start.Column, l.End.Line, l.End.Column)
+	return fmt.Sprintf("location(%d:%d - %d:%d)", l.Start.Line, l.Start.Column, l.End.Line, l.End.Column)
 }

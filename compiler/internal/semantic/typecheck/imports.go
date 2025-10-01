@@ -22,7 +22,7 @@ func checkImportStmt(c *analyzer.AnalyzerNode, imp *ast.ImportStmt, cm *modules.
 	//module must be parses and stored already
 	module, err := c.Ctx.GetModule(moduleKey)
 	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), "Failed to get imported module: "+err.Error(), report.TYPECHECK_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, imp.Loc(), "failed to get imported module: "+err.Error(), report.TYPECHECK_PHASE)
 		return
 	}
 
@@ -42,16 +42,16 @@ func checkImportedSymbolType(r *analyzer.AnalyzerNode, res *ast.VarScopeResoluti
 
 	resIdentifier, found := symbolTable.Lookup(res.Identifier.Name)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol %q not found in module %q", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("symbol %q not found in module %q", res.Identifier.Name, res.Module.Name), report.RESOLVER_PHASE)
 		return &stype.Invalid{}
 	}
 	if resIdentifier.Type == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("Symbol %q has no type defined", res.Identifier.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, res.Loc(), fmt.Sprintf("symbol %q has no type defined", res.Identifier.Name), report.RESOLVER_PHASE)
 		return &stype.Invalid{}
 	}
 	if r.Debug {
 		//print symbol X found in module Y imported from Z
-		colors.AQUA.Printf("Type Checked imported symbol %q of type %q from module %q imported from %q\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, cm.AST.Alias)
+		colors.AQUA.Printf("type Checked imported symbol %q of type %q from module %q imported from %q\n", res.Identifier.Name, resIdentifier.Type, res.Module.Name, cm.AST.Alias)
 	}
 
 	return resIdentifier.Type

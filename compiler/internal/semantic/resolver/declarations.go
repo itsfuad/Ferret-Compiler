@@ -17,8 +17,8 @@ func resolveFunctionDecl(r *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *mod
 
 	functionSymbol, found := cm.SymbolTable.Lookup(fn.Identifier.Name)
 	if !found {
-		colors.RED.Printf("Function %q not found in symbol table\n", fn.Identifier.Name)
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function '"+fn.Identifier.Name+"' is not declared", report.RESOLVER_PHASE)
+		colors.RED.Printf("function %q not found in symbol table\n", fn.Identifier.Name)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "function '"+fn.Identifier.Name+"' is not declared", report.RESOLVER_PHASE)
 		return
 	}
 
@@ -29,14 +29,14 @@ func resolveFunctionLike(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, func
 	// Resolve parameter types and update function scope symbols
 	paramTypes := resolveParameterTypes(r, fn, cm, functionSymbol.SelfScope)
 	if paramTypes == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function '"+fn.ID+"'", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "failed to resolve parameter types for function '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return // Error occurred during parameter resolution
 	}
 
 	// Resolve return type
 	returnType := resolveReturnType(r, fn, cm)
 	if returnType == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function '"+fn.ID+"'", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "failed to resolve return type for function '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return // Error occurred during return type resolution
 	}
 
@@ -63,15 +63,15 @@ func resolveParameterTypes(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm
 	}
 
 	if functionScope == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function scope not found", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "function scope not found", report.RESOLVER_PHASE)
 		return nil // Return nil to indicate error
 	}
 
 	for _, param := range fn.Params {
 		paramType, err := semantic.DeriveSemanticType(param.Type, cm)
 		if err != nil {
-			colors.RED.Printf("Error deriving type for parameter %q: %s\n", param.Identifier.Name, err.Error())
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "Invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
+			colors.RED.Printf("error deriving type for parameter %q: %s\n", param.Identifier.Name, err.Error())
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Type.Loc(), "invalid parameter type: "+err.Error(), report.RESOLVER_PHASE)
 			return nil // Return nil to indicate error
 		}
 
@@ -91,16 +91,16 @@ func createOrUpdateParameterSymbol(param *ast.Parameter, paramType stype.Type, f
 			// Update existing symbol
 			paramSymbol.Type = paramType
 			if r.Debug {
-				colors.YELLOW.Printf("Updated parameter symbol %q with type %q\n", param.Identifier.Name, paramType)
+				colors.YELLOW.Printf("updated parameter symbol %q with type %q\n", param.Identifier.Name, paramType)
 			}
 		} else {
 			// Create new symbol (for function literals)
 			paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, paramType, param.Identifier.Loc())
 			err := functionScope.Declare(param.Identifier.Name, paramSymbol)
 			if err != nil {
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+err.Error(), report.RESOLVER_PHASE)
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, param.Identifier.Loc(), "failed to declare parameter symbol: "+err.Error(), report.RESOLVER_PHASE)
 			} else if r.Debug {
-				colors.GREEN.Printf("Created parameter symbol %q with type %q for function literal\n", param.Identifier.Name, paramType)
+				colors.GREEN.Printf("created parameter symbol %q with type %q for function literal\n", param.Identifier.Name, paramType)
 			}
 		}
 	}
@@ -110,7 +110,7 @@ func resolveReturnType(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *mo
 	if fn != nil && fn.ReturnType != nil {
 		retType, err := semantic.DeriveSemanticType(fn.ReturnType, cm)
 		if err != nil {
-			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.ReturnType.Loc(), "Invalid return type: "+err.Error(), report.RESOLVER_PHASE)
+			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.ReturnType.Loc(), "invalid return type: "+err.Error(), report.RESOLVER_PHASE)
 			return nil
 		}
 		return retType
@@ -122,33 +122,33 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 	//get the receiver symbol
 	receiverSymbol, found := cm.SymbolTable.Lookup(method.Receiver.Type.Type().String())
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver %q not found in method %q", method.Receiver.Identifier.Name, method.Method.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("receiver %q not found in method %q", method.Receiver.Identifier.Name, method.Method.Name), report.RESOLVER_PHASE)
 		return
 	}
 
 	// resolve the method
 	methodSymbol, found := receiverSymbol.SelfScope.Lookup(method.Method.Name)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Method.Loc(), fmt.Sprintf("Method %q not collected during symbol collection phase", method.Method.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Method.Loc(), fmt.Sprintf("method %q not collected during symbol collection phase", method.Method.Name), report.RESOLVER_PHASE)
 		return
 	}
 
 	// Check if the receiver type is valid for methods
 	if !isValidMethodReceiverType(method.Receiver.Type) {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type for method declaration", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "invalid receiver type for method declaration", report.RESOLVER_PHASE)
 		return
 	}
 
 	receiverType, err := semantic.DeriveSemanticType(method.Receiver.Type, cm)
 	if err != nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "Invalid receiver type: "+err.Error(), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Type.Loc(), "invalid receiver type: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
 	receiverSymbol.Type = receiverType // Update receiver type
 	receiverParam, found := methodSymbol.SelfScope.Lookup(method.Receiver.Identifier.Name)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver parameter %q was not collected during symbol collection phase", method.Receiver.Identifier.Name), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("receiver parameter %q was not collected during symbol collection phase", method.Receiver.Identifier.Name), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -160,14 +160,14 @@ func resolveMethodDecl(r *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *mod
 	// must be user-defined type
 	castedReceiverSymbol, ok := receiverSymbol.Type.(*stype.UserType)
 	if !ok {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type %q is not a user-defined type", receiverSymbol.Type.String()), report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("receiver type %q is not a user-defined type", receiverSymbol.Type.String()), report.COLLECTOR_PHASE)
 		return
 	}
 
 	unwrappedRecieverType := semantic.UnwrapType(receiverSymbol.Type)
 	//cannot be interface or null or void
 	if _, ok := unwrappedRecieverType.(*stype.InterfaceType); ok || unwrappedRecieverType == nil || unwrappedRecieverType == types.VOID {
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type %q cannot be an interface, null or void", receiverSymbol.Type.String()), report.COLLECTOR_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("receiver type %q cannot be an interface, null or void", receiverSymbol.Type.String()), report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -191,22 +191,22 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 		// Look up the already-declared symbol from the collector phase
 		symbol, found := cm.SymbolTable.Lookup(variable.Identifier.Name)
 		if !found {
-			colors.RED.Printf("Variable %q not found in symbol table\n", variable.Identifier.Name)
-			r.Ctx.Reports.AddCriticalError(r.Program.FullPath, variable.Identifier.Loc(), "Variable '"+variable.Identifier.Name+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
+			colors.RED.Printf("variable %q not found in symbol table\n", variable.Identifier.Name)
+			r.Ctx.Reports.AddCriticalError(r.Program.FullPath, variable.Identifier.Loc(), "variable '"+variable.Identifier.Name+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
 			continue
 		}
 
 		if variable.ExplicitType != nil {
 			got, err := semantic.DeriveSemanticType(variable.ExplicitType, cm)
 			if err != nil {
-				colors.RED.Printf("Error deriving type for variable %q: %s\n", variable.Identifier.Name, err.Error())
-				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "Invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
+				colors.RED.Printf("error deriving type for variable %q: %s\n", variable.Identifier.Name, err.Error())
+				r.Ctx.Reports.AddSemanticError(r.Program.FullPath, variable.ExplicitType.Loc(), "invalid explicit type for variable declaration: "+err.Error(), report.RESOLVER_PHASE)
 				continue
 			}
 			// Update the symbol's type
 			symbol.Type = got
 			if r.Debug {
-				colors.TEAL.Printf("Declared variable symbol %q with explicit type '%v' at %s\n", variable.Identifier.Name, symbol.Type, variable.Identifier.Loc())
+				colors.TEAL.Printf("declared variable symbol %q with explicit type '%v' at %s\n", variable.Identifier.Name, symbol.Type, variable.Identifier.Loc())
 			}
 		}
 	}
@@ -215,20 +215,20 @@ func resolveVariableDeclaration(r *analyzer.AnalyzerNode, decl *ast.VarDeclStmt,
 func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *modules.Module) {
 	aliasName := decl.Alias.Name
 	if aliasName == "" {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "type alias name cannot be empty", report.RESOLVER_PHASE)
 		return
 	}
 
 	// Look up the already-declared symbol from the collector phase
 	symbol, found := cm.SymbolTable.Lookup(aliasName)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "Type alias '"+aliasName+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.Alias.Loc(), "type alias '"+aliasName+"' was not collected during symbol collection phase", report.RESOLVER_PHASE)
 		return
 	}
 
 	typeToDeclare, err := semantic.DeriveSemanticType(decl.BaseType, cm)
 	if err != nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.BaseType.Loc(), "Invalid base type for type declaration: "+err.Error(), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, decl.BaseType.Loc(), "invalid base type for type declaration: "+err.Error(), report.RESOLVER_PHASE)
 		return
 	}
 
@@ -241,7 +241,7 @@ func resolveTypeDeclaration(r *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm
 	symbol.Type = symbolType
 
 	if r.Debug {
-		colors.ORANGE.Printf("Resolved type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc())
+		colors.ORANGE.Printf("resolved type alias '%v', Def: %v at %s\n", symbol.Type, symbol.Type.(*stype.UserType).Definition, decl.Alias.Loc())
 	}
 }
 
@@ -256,38 +256,38 @@ func resolveAssignmentStmt(r *analyzer.AnalyzerNode, assign *ast.AssignmentStmt,
 	}
 
 	if r.Debug {
-		colors.TEAL.Printf("Resolved assignment statement at %s\n", assign.Loc())
+		colors.TEAL.Printf("resolved assignment statement at %s\n", assign.Loc())
 	}
 }
 
 func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 	if fn == nil || fn.ID == "" {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Function literal missing ID", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "function literal missing ID", report.RESOLVER_PHASE)
 		return
 	}
 
 	// Check if function is already declared in the current scope
 	functionSymbol, found := cm.SymbolTable.Lookup(fn.ID)
 	if !found {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), fmt.Sprintf("Function %q was not collected during symbol collection phase", fn.ID), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), fmt.Sprintf("function %q was not collected during symbol collection phase", fn.ID), report.RESOLVER_PHASE)
 		return
 	}
 
 	if r.Debug {
-		colors.BLUE.Printf("Resolved function literal %q at %s\n", fn.ID, fn.Loc())
+		colors.BLUE.Printf("resolved function literal %q at %s\n", fn.ID, fn.Loc())
 	}
 
 	// Resolve parameter types and update function scope symbols
 	paramTypes := resolveParameterTypes(r, fn, cm, functionSymbol.SelfScope)
 	if paramTypes == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve parameter types for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "failed to resolve parameter types for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return
 	}
 
 	// Resolve return type
 	returnType := resolveReturnType(r, fn, cm)
 	if returnType == nil {
-		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "Failed to resolve return type for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddSemanticError(r.Program.FullPath, fn.Loc(), "failed to resolve return type for function literal '"+fn.ID+"'", report.RESOLVER_PHASE)
 		return
 	}
 
@@ -307,7 +307,7 @@ func resolveFunctionLiteral(r *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, c
 	functionSymbol.Type = functionType
 
 	if r.Debug {
-		colors.ORANGE.Printf("Resolved function literal %q with parameters: %v and return type: %v\n", fn.ID, paramTypes, returnType)
+		colors.ORANGE.Printf("resolved function literal %q with parameters: %v and return type: %v\n", fn.ID, paramTypes, returnType)
 	}
 }
 

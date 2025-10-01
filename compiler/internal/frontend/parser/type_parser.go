@@ -7,6 +7,7 @@ import (
 	"compiler/internal/types"
 	"compiler/internal/utils/lists"
 	"compiler/report"
+	"fmt"
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {
@@ -14,7 +15,7 @@ func parseIntegerType(p *Parser) (ast.DataType, bool) {
 	typename := types.TYPE_NAME(token.Value)
 	bitSize := types.GetNumberBitSize(typename)
 	if bitSize == 0 {
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), fmt.Sprintf("invalid type %s", typename), report.PARSING_PHASE).AddLabel("bitsize cannot be 0")
 		return nil, false
 	}
 
@@ -61,7 +62,7 @@ func parseFloatType(p *Parser) (ast.DataType, bool) {
 	typename := types.TYPE_NAME(token.Value)
 	bitSize := types.GetNumberBitSize(typename)
 	if bitSize == 0 {
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), fmt.Sprintf("invalid type %s", typename), report.PARSING_PHASE).AddLabel("bitsize cannot be 0")
 		return nil, false
 	}
 
@@ -100,7 +101,7 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 	//consume the '[' token
 	start := p.advance().Start
 	// consume the ']' token
-	p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
+	p.consume(lexer.CLOSE_BRACKET, "expected ']' after '['")
 
 	//parse the type
 
@@ -119,11 +120,11 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 // parseStructField parses a single struct field
 func parseStructField(p *Parser) *ast.StructField {
 	// Parse field name
-	nameToken := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME+" got "+p.peek().Value)
+	nameToken := p.consume(lexer.IDENTIFIER_TOKEN, "exptected field name but got "+p.peek().Value)
 	fieldName := nameToken.Value
 
 	// Expect colon
-	p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
+	p.consume(lexer.COLON_TOKEN, "expected ':' after field name")
 
 	// Parse field type
 	fieldType, ok := parseType(p)
@@ -142,17 +143,17 @@ func parseStructField(p *Parser) *ast.StructField {
 
 // parseStructType parses a struct type definition like struct { name: str, age: i32 }
 func parseStructType(p *Parser) (ast.DataType, bool) {
-	// Consume 'struct' keyword
-	start := p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD).Start
+
+	start := p.advance().Start // consume the 'struct' token
 
 	// Consume opening brace
-	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
+	p.consume(lexer.OPEN_CURLY, "expected '{' after 'struct'")
 
 	// Check for empty struct
 	if p.peek().Kind == lexer.CLOSE_CURLY {
 		token := p.peek()
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End),
-			report.EMPTY_STRUCT_NOT_ALLOWED, report.PARSING_PHASE)
+			"struct is empty", report.PARSING_PHASE).AddHint("struct must have at least one field")
 		return nil, false
 	}
 
@@ -170,7 +171,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		// Check for duplicate field names
 		if fieldNames[field.FieldIdentifier.Name] {
 			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(field.Location.Start, field.Location.End),
-				report.DUPLICATE_FIELD_NAME, report.PARSING_PHASE)
+				fmt.Sprintf("field %q already defined", field.FieldIdentifier.Name), report.PARSING_PHASE)
 			return nil, false
 		}
 
@@ -181,15 +182,15 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		if p.match(lexer.CLOSE_CURLY) {
 			break
 		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
+			comma := p.consume(lexer.COMMA_TOKEN, "expected ',' or '}' after struct field")
 			if p.match(lexer.CLOSE_CURLY) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "unnecessary trailing comma after the last property", report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}
 	}
 
-	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
+	end := p.consume(lexer.CLOSE_CURLY, "expected '}' after struct fields").End
 
 	return &ast.StructType{
 		Fields:   fields,
@@ -200,16 +201,16 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 
-	start := p.consume(lexer.INTERFACE_TOKEN, report.EXPECTED_INTERFACE_KEYWORD)
+	start := p.advance()
 
 	//consume the '{' token
-	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
+	p.consume(lexer.OPEN_CURLY, "expected '{' after 'interface'")
 
 	methods := make([]ast.InterfaceMethod, 0)
 
 	for !p.match(lexer.CLOSE_CURLY) {
 
-		start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD).Start
+		start := p.consume(lexer.FUNCTION_TOKEN, "expected 'fn' keyword to define the function signature").Start
 
 		name := declareFunction(p)
 
@@ -232,7 +233,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		if lists.Has(methods, method, func(a ast.InterfaceMethod, b ast.InterfaceMethod) bool {
 			return a.Name.Name == b.Name.Name
 		}) {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(method.Location.Start, method.Location.End), report.DUPLICATE_METHOD_NAME, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(method.Location.Start, method.Location.End), fmt.Sprintf("method %q already defined", name), report.PARSING_PHASE).AddHint("remove the duplicate method or rename it")
 			return nil, false
 		}
 
@@ -242,9 +243,9 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 			break
 		} else {
 			//must be a comma
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
+			comma := p.consume(lexer.COMMA_TOKEN, "expected ',' or '}' after method signature")
 			if p.match(lexer.CLOSE_CURLY) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "unnecessary trailing comma after last method", report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}
@@ -260,8 +261,8 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 }
 
 func parseFunctionType(p *Parser) (ast.DataType, bool) {
-	//consume the 'fn' token
-	token := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
+
+	token := p.advance()
 
 	// parse the parameters
 	parameters, returnType := parseSignature(p, true)
@@ -305,14 +306,14 @@ func parseType(p *Parser) (ast.DataType, bool) {
 func parseTypeDecl(p *Parser) ast.Statement {
 	start := p.advance() // consume the 'type' token
 
-	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE)
+	typeName := p.consume(lexer.IDENTIFIER_TOKEN, "expected type name after 'type'")
 
 	// Parse the underlying type
 	underlyingType, ok := parseType(p)
 	if !ok {
 		token := p.peek()
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End),
-			report.EXPECTED_TYPE, report.PARSING_PHASE)
+			"expected underlying type after type name", report.PARSING_PHASE)
 		return nil
 	}
 

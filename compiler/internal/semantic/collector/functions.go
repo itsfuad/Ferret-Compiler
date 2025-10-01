@@ -25,7 +25,7 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {
 
 	if c.Debug {
-		colors.AQUA.Printf("Collecting function literal %q at %s\n", fn.ID, fn.Loc())
+		colors.AQUA.Printf("collecting function literal %q at %s\n", fn.ID, fn.Loc())
 	}
 
 	functionScope := declareFunctionSymbol(c, fn, cm.SymbolTable, symbol.SymbolFunc)
@@ -48,7 +48,7 @@ func declareFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, pa
 	functionSymbol := symbol.NewSymbolWithLocation(fn.ID, kind, nil, fn.Loc())
 	err := parentScope.Declare(fn.ID, functionSymbol)
 	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "Failed to declare symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, fn.Loc(), "failed to declare symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return nil
 	}
 
@@ -79,12 +79,12 @@ func collectFunctionParameters(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral
 		paramSymbol := symbol.NewSymbolWithLocation(param.Identifier.Name, symbol.SymbolVar, nil, param.Identifier.Loc())
 		paramErr := functionScope.Declare(param.Identifier.Name, paramSymbol)
 		if paramErr != nil {
-			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, param.Identifier.Loc(), "Failed to declare parameter symbol: "+paramErr.Error(), report.COLLECTOR_PHASE)
+			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, param.Identifier.Loc(), "failed to declare parameter symbol: "+paramErr.Error(), report.COLLECTOR_PHASE)
 			continue
 		}
 
 		if c.Debug {
-			colors.GREEN.Printf("Declared parameter symbol %q (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc())
+			colors.GREEN.Printf("declared parameter symbol %q (incomplete) at %s\n", param.Identifier.Name, param.Identifier.Loc())
 		}
 	}
 }
@@ -106,26 +106,26 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 
 	//collect reciever
 	if method.Receiver == nil {
-		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, method.Loc(), "Method receiver cannot be nil", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, method.Loc(), "method receiver cannot be nil", report.COLLECTOR_PHASE)
 		return
 	}
 
 	//must be user-defined type
 	utype, ok := method.Receiver.Type.(*ast.UserDefinedType)
 	if !ok {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "Method receiver must be a user-defined type", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "method receiver must be a user-defined type", report.COLLECTOR_PHASE)
 		return
 	}
 
 	// Check if the receiver type is already defined
 	receiverSymbol, found := cm.SymbolTable.Lookup(string(utype.TypeName))
 	if !found {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type %q not found in symbol table", utype.TypeName), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("receiver type %q not found in symbol table", utype.TypeName), report.COLLECTOR_PHASE)
 		return
 	}
 
 	if receiverSymbol.SelfScope == nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("Receiver type %q does not have a valid symbol table", utype.TypeName), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), fmt.Sprintf("receiver type %q does not have a valid symbol table", utype.TypeName), report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -137,7 +137,7 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 	methodScope.ScopeName = symbol.SYMBOL_TABLE_FUNCTION
 	err := receiverSymbol.SelfScope.Declare(method.Method.Name, methodSymbol)
 	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Method.Loc(), "Failed to declare method symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Method.Loc(), "failed to declare method symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -145,12 +145,12 @@ func collectMethodSymbol(c *analyzer.AnalyzerNode, method *ast.MethodDecl, cm *m
 	receiverParamSymbol := symbol.NewSymbolWithLocation(method.Receiver.Identifier.Name, symbol.SymbolField, nil, method.Receiver.Identifier.Loc())
 	err = methodSymbol.SelfScope.Declare(method.Receiver.Identifier.Name, receiverParamSymbol)
 	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "Failed to declare receiver symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, method.Receiver.Identifier.Loc(), "failed to declare receiver symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
 
 	if c.Debug {
-		colors.GREEN.Printf("Declared receiver symbol %q (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
+		colors.GREEN.Printf("declared receiver symbol %q (incomplete) at %s\n", method.Receiver.Identifier.Name, method.Receiver.Identifier.Loc())
 	}
 
 	collectFunctionParameters(c, method.Function, methodScope)

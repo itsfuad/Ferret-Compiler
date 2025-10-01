@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"compiler/constants"
+	"compiler/config"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -26,7 +26,7 @@ type Lockfile struct {
 }
 
 func LoadLockfile(projectRoot string) (*Lockfile, error) {
-	lockfilePath := filepath.Join(projectRoot, constants.LOCKFILE)
+	lockfilePath := filepath.Join(projectRoot, config.LOCKFILE)
 	lockfile := &Lockfile{
 		projectRoot:  projectRoot,
 		Dependencies: make(map[string]LockfileEntry),
@@ -50,8 +50,8 @@ func LoadLockfile(projectRoot string) (*Lockfile, error) {
 }
 
 func (l *Lockfile) Save() error {
-	lockfilePath := filepath.Join(l.projectRoot, constants.LOCKFILE)
-	l.Version = constants.LOCKFILE_VERSION
+	lockfilePath := filepath.Join(l.projectRoot, config.LOCKFILE)
+	l.Version = config.LOCKFILE_VERSION
 	l.GeneratedAt = time.Now().Format(time.RFC3339)
 
 	data, err := json.MarshalIndent(l, "", "  ")

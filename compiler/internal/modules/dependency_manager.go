@@ -609,7 +609,7 @@ func installDependency(dm *DependencyManager, packagename string, isDirect bool)
 	// check what versions are available
 	actualVersion, err := CheckRemoteModuleExists(host, user, repo, version)
 	if err != nil {
-		colors.RED.Printf("Package %s/%s/%s@%s not found on %s\n", host, user, repo, version, host)
+		colors.RED.Printf("package %s/%s/%s@%s not found on %s\n", host, user, repo, version, host)
 		os.Exit(1)
 	}
 
@@ -621,7 +621,7 @@ func installDependency(dm *DependencyManager, packagename string, isDirect bool)
 	if alreadyCached {
 		colors.GREEN.Printf("✅ Successfully installed %s/%s/%s@%s\n", host, user, repo, actualVersion)
 	} else {
-		colors.BLUE.Printf("Module %s/%s/%s@%s is already cached\n", host, user, repo, version)
+		colors.BLUE.Printf("module %s/%s/%s@%s is already cached\n", host, user, repo, version)
 	}
 
 	if isDirect {

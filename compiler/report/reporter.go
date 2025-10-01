@@ -183,7 +183,7 @@ func printReport(r *Report) {
 	}
 
 	if r.Hint != "" {
-		colors.YELLOW.Printf("Help: %s\n", r.Hint)
+		colors.YELLOW.Printf("help: %s\n", r.Hint)
 	}
 
 	//colors.GREY.Println(strings.Repeat("-", numlen+2))

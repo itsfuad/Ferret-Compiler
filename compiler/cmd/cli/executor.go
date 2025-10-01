@@ -3,7 +3,6 @@ package cli
 import (
 	"compiler/cmd"
 	"compiler/colors"
-	"compiler/constants"
 	"compiler/internal/modules"
 	"fmt"
 	"os"
@@ -270,7 +269,7 @@ func getRoot() string {
 	}
 
 	// Enforce: must be run from project root (directory containing fer.ret)
-	ferretPath := filepath.Join(cwd, constants.CONFIG_FILE)
+	ferretPath := filepath.Join(cwd, config.CONFIG_FILE)
 	if _, err := os.Stat(ferretPath); err != nil {
 		colors.RED.Printf(CONFIG_LOAD_ERROR, err)
 		os.Exit(1)

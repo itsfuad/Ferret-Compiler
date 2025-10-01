@@ -15,7 +15,7 @@ func parseExpressionList(p *Parser, first ast.Expression) ast.ExpressionList {
 		next := parseExpression(p)
 		if next == nil {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected expression after comma", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected expression after comma", report.PARSING_PHASE)
 			break
 		}
 		exprs = append(exprs, next)
@@ -40,7 +40,7 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 
 // parseBlock parses a block of statements
 func parseBlock(p *Parser) *ast.Block {
-	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
+	start := p.consume(lexer.OPEN_CURLY, "expected '{' before block").Start
 
 	nodes := make([]ast.Node, 0)
 
@@ -51,7 +51,7 @@ func parseBlock(p *Parser) *ast.Block {
 		}
 	}
 
-	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
+	end := p.consume(lexer.CLOSE_CURLY, "expected '}' after block").End
 
 	return &ast.Block{
 		Nodes:    nodes,
@@ -60,7 +60,9 @@ func parseBlock(p *Parser) *ast.Block {
 }
 
 func parseReturnStmt(p *Parser) ast.Statement {
-	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
+
+	start := p.advance().Start // consume 'return' and get start position
+
 	end := start
 
 	// Return immediately if there's a semicolon (no return value)
@@ -78,7 +80,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 		p.ctx.Reports.AddSyntaxError(
 			p.fullPath,
 			source.NewLocation(&token.Start, &token.End),
-			report.INVALID_EXPRESSION,
+			"invalid expression after return keyword",
 			report.PARSING_PHASE,
 		).AddHint("add an expression after the return keyword")
 
@@ -96,7 +98,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 		p.ctx.Reports.AddSyntaxError(
 			p.fullPath,
 			source.NewLocation(&comma.Start, &comma.End),
-			"Multiple return values are not supported",
+			"multiple return values are not supported",
 			report.PARSING_PHASE,
 		).AddHint("functions can only return a single value")
 
@@ -281,18 +283,18 @@ func handlePlusMinus(p *Parser) ast.Expression {
 	operator := p.advance()
 	// Check for consecutive operators
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-		errMsg := report.INVALID_CONSECUTIVE_INCREMENT
+		errMsg := "invalid consecutive increment operators"
 		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
-			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+			errMsg = "invalid consecutive decrement operators"
 		}
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
 		return nil
 	}
 	operand := parseUnary(p)
 	if operand == nil {
-		errMsg := report.INVALID_INCREMENT_OPERAND
+		errMsg := "invalid operand for increment operator"
 		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
-			errMsg = report.INVALID_DECREMENT_OPERAND
+			errMsg = "invalid operand for decrement operator"
 		}
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
 		return nil
@@ -300,7 +302,7 @@ func handlePlusMinus(p *Parser) ast.Expression {
 
 	// Check if operand already has a postfix operator
 	if _, ok := operand.(*ast.PostfixExpr); ok {
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "cannot mix prefix and postfix operators", report.PARSING_PHASE)
 		return nil
 	}
 
@@ -316,7 +318,7 @@ func handleSpread(p *Parser) ast.Expression {
 	operator := p.advance()
 	right := parseUnary(p)
 	if right == nil {
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "Expected expression after spread operator", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), "expected expression after spread operator", report.PARSING_PHASE)
 		return nil
 	}
 
@@ -334,7 +336,7 @@ func parseCast(p *Parser) ast.Expression {
 		asToken := p.advance()
 		targetType, ok := parseType(p)
 		if !ok || targetType == nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&asToken.Start, &asToken.End), "Expected type after 'as' keyword", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&asToken.Start, &asToken.End), "expected type after 'as' keyword", report.PARSING_PHASE)
 			return expr
 		}
 
@@ -356,11 +358,11 @@ func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	index := parseExpression(p)
 	if index == nil {
 		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.MISSING_INDEX_EXPRESSION, report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected valid indexing expression", report.PARSING_PHASE)
 		return nil, false
 	}
 
-	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
+	end := p.consume(lexer.CLOSE_BRACKET, "expected ']' after index expression")
 	return &ast.IndexableExpr{
 		Indexable: &expr,
 		Index:     &index,
@@ -372,9 +374,9 @@ func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 func parseIncDec(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	operator := p.advance()
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-		errMsg := report.INVALID_CONSECUTIVE_INCREMENT
+		errMsg := "invalid consecutive increment operators"
 		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
-			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+			errMsg = "invalid consecutive decrement operators"
 		}
 		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&operator.Start, &operator.End), errMsg, report.PARSING_PHASE)
 		return nil, false
@@ -391,7 +393,7 @@ func handlePostfixOperator(p *Parser, expr ast.Expression) (ast.Expression, bool
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
 		if _, ok := expr.(*ast.PrefixExpr); ok {
 			current := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "Cannot mix prefix and postfix operators", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "cannot mix prefix and postfix operators", report.PARSING_PHASE)
 			return nil, false
 		}
 		return parseIncDec(p, expr)
@@ -441,7 +443,7 @@ func parsePostfix(p *Parser) ast.Expression {
 func parseGrouping(p *Parser) ast.Expression {
 	p.advance() // consume '('
 	expr := parseExpression(p)
-	p.consume(lexer.CLOSE_PAREN, "Expected ')' after expression")
+	p.consume(lexer.CLOSE_PAREN, "expected ')' after expression")
 	return expr
 }
 
@@ -456,7 +458,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		arg := parseExpression(p)
 		if arg == nil {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected function argument", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected function argument", report.PARSING_PHASE)
 			return nil, false
 		}
 		arguments = append(arguments, arg)
@@ -464,15 +466,15 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 		if p.match(lexer.CLOSE_PAREN) {
 			break
 		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			comma := p.consume(lexer.COMMA_TOKEN, "expected ',' or ')' after parameter")
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "unnecessary trailing comma after last argument", report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}
 	}
 
-	end := p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+	end := p.consume(lexer.CLOSE_PAREN, "expected ')' after function arguments")
 
 	return &ast.FunctionCallExpr{
 		Caller:    &caller,

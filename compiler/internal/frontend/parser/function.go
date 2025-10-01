@@ -7,6 +7,7 @@ import (
 	"compiler/internal/utils"
 	"compiler/internal/utils/lists"
 	"compiler/report"
+	"fmt"
 )
 
 // detect if it's a function or a method
@@ -45,7 +46,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 
 	params := []ast.Parameter{}
 
-	p.consume(lexer.OPEN_PAREN, report.EXPECTED_OPEN_PAREN)
+	p.consume(lexer.OPEN_PAREN, "expected '(' before function parameters")
 
 	for !p.match(lexer.CLOSE_PAREN) {
 
@@ -56,18 +57,18 @@ func parseParameters(p *Parser) []ast.Parameter {
 			p.advance()
 		}
 
-		identifier := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PARAMETER_NAME)
+		identifier := p.consume(lexer.IDENTIFIER_TOKEN, "expected parameter name")
 
 		location := *source.NewLocation(&identifier.Start, &identifier.End)
 
 		paramName := &ast.IdentifierExpr{Name: identifier.Value, Location: location}
 
-		p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
+		p.consume(lexer.COLON_TOKEN, "expected ':' after parameter name")
 
 		paramType, ok := parseType(p)
 		if !ok {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_PARAMETER_TYPE, report.PARSING_PHASE).AddHint("add a type after the colon")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "no parameter type provided", report.PARSING_PHASE).AddLabel("add a type after the colon")
 			return nil
 		}
 
@@ -81,7 +82,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		if lists.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
 			return p.Identifier.Name == b.Identifier.Name
 		}) {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &param.Identifier.Location, report.PARAMETER_REDEFINITION, report.PARSING_PHASE).AddHint("parameter name already used")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &param.Identifier.Location, fmt.Sprintf("parameter %q already defined", paramName.Name), report.PARSING_PHASE).AddHint("remove the duplicate parameter or rename it")
 			return nil
 		}
 
@@ -94,15 +95,15 @@ func parseParameters(p *Parser) []ast.Parameter {
 		if p.match(lexer.CLOSE_PAREN) {
 			break
 		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			comma := p.consume(lexer.COMMA_TOKEN, "expected ',' or ')' after parameter")
 			if p.match(lexer.CLOSE_PAREN) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "unnecessary trailing comma after the last parameter", report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}
 	}
 
-	p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+	p.consume(lexer.CLOSE_PAREN, "expected ')' after function parameters")
 
 	return params
 }
@@ -113,7 +114,7 @@ func parseReturnType(p *Parser) ast.DataType {
 	// Check if user is trying to use multiple return types (parentheses)
 	if p.peek().Kind == lexer.OPEN_PAREN {
 		token := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Multiple return types are not supported", report.PARSING_PHASE).AddHint("functions can only return a single type")
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "multiple return types are not supported", report.PARSING_PHASE).AddHint("functions can only return a single type")
 		// Skip the entire parentheses expression to continue parsing
 		p.advance() // consume '('
 		parenCount := 1
@@ -132,7 +133,7 @@ func parseReturnType(p *Parser) ast.DataType {
 	returnType, ok := parseType(p)
 	if !ok {
 		token := p.previous()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE, report.PARSING_PHASE).AddHint("add a return type after the arrow")
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "no return type provided", report.PARSING_PHASE).AddLabel("add a return type after the arrow")
 		return nil
 	}
 
@@ -190,7 +191,7 @@ func declareFunction(p *Parser) *ast.IdentifierExpr {
 func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 
 	// consume the function token
-	start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
+	start := p.advance()
 
 	name := declareFunction(p)
 

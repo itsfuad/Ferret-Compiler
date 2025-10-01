@@ -11,7 +11,7 @@ import (
 )
 
 func parseNumberLiteral(p *Parser) ast.Expression {
-	number := p.consume(lexer.NUMBER_TOKEN, report.EXPECTED_NUMBER)
+	number := p.consume(lexer.NUMBER_TOKEN, "expected number literal")
 	raw := number.Value
 	value := strings.ReplaceAll(raw, "_", "") // Remove underscores
 	loc := *source.NewLocation(&number.Start, &number.End)
@@ -20,9 +20,9 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsHexadecimal(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE)
-			return nil
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, "invalid hexadecimal literal", report.PARSING_PHASE)
 		}
+
 		return &ast.IntLiteral{
 			Value:    intVal,
 			Raw:      raw,
@@ -34,7 +34,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsOctal(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, "invalid octal literal", report.PARSING_PHASE)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -48,7 +48,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsBinary(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, "invalid binary literal", report.PARSING_PHASE)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -63,7 +63,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsDecimal(value) {
 		intVal, err := numeric.StringToInteger(value)
 		if err != nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, report.INT_OUT_OF_RANGE, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, "invalid integer literal", report.PARSING_PHASE)
 			return nil
 		}
 		return &ast.IntLiteral{
@@ -78,7 +78,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if numeric.IsFloat(value) {
 		floatVal, err := numeric.StringToFloat(value)
 		if err != nil {
-			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, report.FLOAT_OUT_OF_RANGE, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, "invalid float literal", report.PARSING_PHASE)
 			return nil
 		}
 
@@ -90,12 +90,12 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	}
 
 	// If neither, it's an invalid number format
-	p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, report.INVALID_NUMBER, report.PARSING_PHASE)
+	p.ctx.Reports.AddSyntaxError(p.fullPath, &loc, "invalid nummeric literal", report.PARSING_PHASE)
 	return nil
 }
 
 func parseStringLiteral(p *Parser) ast.Expression {
-	stringLiteral := p.consume(lexer.STRING_TOKEN, report.EXPECTED_STRING)
+	stringLiteral := p.consume(lexer.STRING_TOKEN, "expected string literal")
 	loc := *source.NewLocation(&stringLiteral.Start, &stringLiteral.End)
 
 	return &ast.StringLiteral{
@@ -105,7 +105,7 @@ func parseStringLiteral(p *Parser) ast.Expression {
 }
 
 func parseByteLiteral(p *Parser) ast.Expression {
-	byteLiteral := p.consume(lexer.BYTE_TOKEN, report.EXPECTED_BYTE)
+	byteLiteral := p.consume(lexer.BYTE_TOKEN, "expected byte literal")
 	loc := *source.NewLocation(&byteLiteral.Start, &byteLiteral.End)
 
 	return &ast.ByteLiteral{
@@ -127,20 +127,20 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 		if p.match(lexer.CLOSE_BRACKET) {
 			break
 		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACKET)
+			comma := p.consume(lexer.COMMA_TOKEN, "expected ',' or ']' after array element")
 			if p.match(lexer.CLOSE_BRACKET) {
-				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED, report.PARSING_PHASE).AddHint("remove the trailing comma")
+				p.ctx.Reports.AddWarning(p.fullPath, source.NewLocation(&comma.Start, &comma.End), "unnecessary trailing comma after last array element", report.PARSING_PHASE).AddHint("remove the trailing comma")
 				break
 			}
 		}
 	}
 
-	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
+	end := p.consume(lexer.CLOSE_BRACKET, "expected ']' after array literal")
 
 	// at least one element required
 	if len(elements) == 0 {
 		peek := p.peek()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&peek.Start, &peek.End), report.ARRAY_EMPTY, report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&peek.Start, &peek.End), "empty array", report.PARSING_PHASE).AddHint("array literals must contain at least one element to infer the type")
 		return nil
 	}
 

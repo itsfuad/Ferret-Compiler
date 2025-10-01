@@ -11,7 +11,6 @@ import (
 	"compiler/cmd/flags"
 	"compiler/colors"
 	"compiler/config"
-	"compiler/constants"
 	"compiler/internal/ctx"
 	"compiler/internal/modules"
 
@@ -146,7 +145,7 @@ func getRemoteDependencyPath(projectConfig *config.ProjectConfig, depKey string)
 	host, owner, repo := repoParts[0], repoParts[1], repoParts[2]
 
 	// Construct cache path
-	cachePath := filepath.Join(projectConfig.ProjectRoot, constants.CACHE_DIR)
+	cachePath := filepath.Join(projectConfig.ProjectRoot, config.CACHE_DIR)
 	return filepath.Join(cachePath, host, owner, modules.BuildPackageSpec(repo, version))
 }
 

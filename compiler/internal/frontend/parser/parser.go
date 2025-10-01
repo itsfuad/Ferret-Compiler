@@ -44,16 +44,16 @@ func NewParser(filePath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 func NewParserWithImportPath(filePath string, importPath string, ctxx *ctx.CompilerContext, debug bool) *Parser {
 
 	if ctxx == nil {
-		panic("Cannot create parser: Compiler context is nil")
+		panic("cannot create parser: Compiler context is nil")
 	}
 	if filePath == "" {
-		panic("Cannot create parser: File path is empty")
+		panic("cannot create parser: File path is empty")
 	}
 
 	filePath = filepath.ToSlash(filePath) // Ensure forward slashes for consistency
 
 	if !fs.IsValidFile(filePath) {
-		panic(fmt.Sprintf("Cannot create parser: Invalid file path: %s", filePath))
+		panic(fmt.Sprintf("cannot create parser: Invalid file path: %s", filePath))
 	}
 
 	alias := ctxx.FullPathToAlias(filePath)
@@ -205,7 +205,7 @@ func parseNode(p *Parser) ast.Node {
 			loc := source.NewLocation(&token.Start, &token.End)
 			loc.Start.Column += 1
 			loc.End.Column += 1
-			p.ctx.Reports.AddSyntaxError(p.fullPath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value, report.PARSING_PHASE).AddHint("add a semicolon to the end of the statement")
+			p.ctx.Reports.AddSyntaxError(p.fullPath, loc, "expected semicolon after "+token.Value, report.PARSING_PHASE).AddHint("add a semicolon to the end of the statement")
 		}
 		end := p.advance()
 		node.Loc().End.Column = end.End.Column

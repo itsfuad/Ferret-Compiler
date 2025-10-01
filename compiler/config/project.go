@@ -9,13 +9,23 @@ import (
 
 	"compiler/cmd/flags"
 	"compiler/colors"
-	"compiler/constants"
 	"compiler/toml"
 )
 
 const SHAREKEY = "allow-sharing"
 const REMOTEKEY = "allow-remote-import"
 const EXTERNALKEY = "allow-neighbor-import"
+
+const (
+	EXT              = ".fer"
+	CACHE_DIR        = ".ferret"
+	CONFIG_FILE      = "fer.ret"
+	LOCKFILE         = "ferret.lock"
+	LOCKFILE_VERSION = "1.0.0"
+	GITHUB_HOST      = "github.com"
+
+	STD_LIBS_PATH = "modules"
+)
 
 // ProjectConfig represents the structure
 type ProjectConfig struct {
@@ -84,7 +94,7 @@ func (conf *ProjectConfig) Save() error {
 	}
 
 	// Save the configuration to the fer.ret file
-	if err := toml.WriteTOMLFile(filepath.Join(conf.ProjectRoot, constants.CONFIG_FILE), tomData, nil); err != nil {
+	if err := toml.WriteTOMLFile(filepath.Join(conf.ProjectRoot, CONFIG_FILE), tomData, nil); err != nil {
 		colors.RED.Println(err)
 		return fmt.Errorf("failed to save config file: %w", err)
 	}
@@ -131,7 +141,7 @@ func CreateDefaultProjectConfig(projectName string) error {
 		os.Exit(1)
 	}
 
-	configPath := filepath.Join(cwd, constants.CONFIG_FILE)
+	configPath := filepath.Join(cwd, CONFIG_FILE)
 
 	// if already exist, ask for overwrite
 	if _, err := os.Stat(configPath); err == nil {
@@ -161,7 +171,7 @@ func CreateDefaultProjectConfig(projectName string) error {
 		os.Exit(1)
 	}
 
-	colors.GREEN.Printf("📁 Created %s successfully!\n", constants.CONFIG_FILE)
+	colors.GREEN.Printf("📁 Created %s successfully!\n", CONFIG_FILE)
 
 	// remove old lockfiles and cache
 	if err := os.RemoveAll(filepath.Join(cwd, ".ferret")); err != nil {
@@ -315,7 +325,7 @@ func ValidateProjectConfig(config *ProjectConfig) error {
 
 // IsProjectRoot checks if the given directory contains a fer.ret file
 func IsProjectRoot(dir string) bool {
-	configPath := filepath.Join(dir, constants.CONFIG_FILE)
+	configPath := filepath.Join(dir, CONFIG_FILE)
 	_, err := os.Stat(filepath.FromSlash(configPath))
 	return err == nil
 }
@@ -331,7 +341,7 @@ func GetProjectRoot(filePath string) (string, error) {
 
 	// Walk up the directory tree until we find a fer.ret file
 	for {
-		configPath := filepath.Join(dir, constants.CONFIG_FILE)
+		configPath := filepath.Join(dir, CONFIG_FILE)
 		// Check if fer.ret exists in this directory
 		if _, err := os.Stat(configPath); err == nil {
 			// Found the project root
@@ -349,7 +359,7 @@ func GetProjectRoot(filePath string) (string, error) {
 		dir = parent
 	}
 
-	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", constants.CONFIG_FILE, dir)
+	return "", fmt.Errorf("❌ %s not found (searched from: %s up to filesystem root)", CONFIG_FILE, dir)
 }
 
 func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
@@ -360,11 +370,11 @@ func LoadProjectConfig(projectRoot string) (*ProjectConfig, error) {
 		os.Exit(1)
 	}
 
-	configPath := filepath.Join(projectRoot, constants.CONFIG_FILE)
+	configPath := filepath.Join(projectRoot, CONFIG_FILE)
 
 	// if not exists, ask user to create one
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		colors.RED.Printf("❌ Configuration file %s not found in %s\nCreate project by running 'ferret init' command\n", constants.CONFIG_FILE, projectRoot)
+		colors.RED.Printf("❌ Configuration file %s not found in %s\nCreate project by running 'ferret init' command\n", CONFIG_FILE, projectRoot)
 	}
 
 	// Use our custom TOML parser

@@ -12,7 +12,7 @@ import (
 func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportStmt) {
 	defer func() {
 		if r := recover(); r != nil {
-			collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("Panic while collecting symbols from import: %v", r), report.COLLECTOR_PHASE)
+			collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("panic while collecting symbols from import: %v", r), report.COLLECTOR_PHASE)
 		}
 	}()
 
@@ -25,7 +25,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	// Get the current module
 	currentModule, err := collector.Ctx.GetModule(collector.Program.ImportPath)
 	if err != nil {
-		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), "Failed to get current module for import validation", report.COLLECTOR_PHASE)
+		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), "failed to get current module for import validation", report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -35,7 +35,7 @@ func collectSymbolsFromImport(collector *analyzer.AnalyzerNode, imp *ast.ImportS
 	//module must be parses and stored already
 	module, err := collector.Ctx.GetModule(moduleKey)
 	if err != nil {
-		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("Failed to get imported module: %s", err.Error()), report.COLLECTOR_PHASE)
+		collector.Ctx.Reports.AddCriticalError(collector.Program.FullPath, imp.Loc(), fmt.Sprintf("failed to get imported module: %s", err.Error()), report.COLLECTOR_PHASE)
 		return
 	}
 

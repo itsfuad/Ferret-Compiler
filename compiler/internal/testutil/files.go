@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"compiler/constants"
+	"compiler/config"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,13 +12,13 @@ func CreateTempProject(t *testing.T) string {
 	tempDir := t.TempDir()
 
 	// skip if fer.ret file already exists
-	if _, err := os.Stat(filepath.Join(tempDir, constants.CONFIG_FILE)); err == nil {
+	if _, err := os.Stat(filepath.Join(tempDir, config.CONFIG_FILE)); err == nil {
 		return tempDir
 	}
 
 	// create a fer.ret file
-	if err := os.WriteFile(filepath.Join(tempDir, constants.CONFIG_FILE), []byte("name = \"demo-apps\""), 0644); err != nil {
-		t.Fatalf("Failed to create fer.ret file: %v", err)
+	if err := os.WriteFile(filepath.Join(tempDir, config.CONFIG_FILE), []byte("name = \"demo-apps\""), 0644); err != nil {
+		t.Fatalf("failed to create fer.ret file: %v", err)
 	}
 
 	return tempDir
@@ -29,7 +29,7 @@ func CreateTestFile(t *testing.T, content string) string {
 	dir := CreateTempProject(t)
 	filePath := filepath.Join(dir, "test.fer")
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+		t.Fatalf("failed to create test file: %v", err)
 	}
 	return filePath
 }
@@ -38,11 +38,11 @@ func CreateTestFile(t *testing.T, content string) string {
 func CreateTestFileInDir(t *testing.T, dir, filename, content string) string {
 	// Ensure the target directory exists
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatalf("Failed to create directory: %v", err)
+		t.Fatalf("failed to create directory: %v", err)
 	}
 	filePath := filepath.Join(dir, filename)
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+		t.Fatalf("failed to create test file: %v", err)
 	}
 	return filePath
 }

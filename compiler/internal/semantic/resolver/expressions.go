@@ -10,7 +10,7 @@ import (
 )
 
 func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Module) {
-	fmt.Printf("Resolving expression of type: %T\n", expr)
+	fmt.Printf("resolving expression of type: %T\n", expr)
 	if expr == nil {
 		panic("resolveExpr called with nil expression")
 	}
@@ -62,7 +62,7 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 	case *ast.CastExpr:
 		resolveExpr(r, *e.Value, cm)
 	default:
-		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, expr.Loc(), fmt.Sprintf("Expression <%T> is not implemented yet", e), report.RESOLVER_PHASE)
+		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, expr.Loc(), fmt.Sprintf("expression <%T> is not implemented yet", e), report.RESOLVER_PHASE)
 	}
 }
 
@@ -97,7 +97,7 @@ func resolveIdentifier(r *analyzer.AnalyzerNode, id *ast.IdentifierExpr, cm *mod
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				id.Loc(),
-				fmt.Sprintf("Cannot use variable %q before it is declared",
+				fmt.Sprintf("cannot use variable %q before it is declared",
 					id.Name),
 				report.RESOLVER_PHASE,
 			).AddHint("consider declaring the variable before its first use").AddLabel("undefined here")

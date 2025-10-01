@@ -21,18 +21,18 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 		val := parseExpression(p)
 		if val == nil {
 			current := p.previous()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "Expected expression in assignment", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "expected expression in assignment", report.PARSING_PHASE)
 		}
 		assignees = append(assignees, val)
 	}
 
-	p.consume(lexer.EQUALS_TOKEN, "Expected '=' in assignment")
+	p.consume(lexer.EQUALS_TOKEN, "expected '=' in assignment")
 
 	for {
 		val := parseExpression(p)
 		if val == nil {
 			current := p.previous()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "Expected expression in assignment", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "expected expression in assignment", report.PARSING_PHASE)
 		}
 		expressions = append(expressions, val)
 		if p.peek().Kind == lexer.COMMA_TOKEN {
@@ -44,7 +44,7 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 
 	if len(assignees) < len(expressions) {
 		current := p.previous()
-		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "Mismatched number of variables and values", report.PARSING_PHASE).AddHint("assignee count must be less than or equal to the number of expressions")
+		p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&current.Start, &current.End), "mismatched number of variables and values", report.PARSING_PHASE).AddHint("assignee count must be less than or equal to the number of expressions")
 	}
 
 	return &ast.AssignmentStmt{

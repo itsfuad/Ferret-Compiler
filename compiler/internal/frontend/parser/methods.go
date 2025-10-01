@@ -9,7 +9,7 @@ import (
 
 func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {
 
-	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_METHOD_NAME)
+	name := p.consume(lexer.IDENTIFIER_TOKEN, "expected method name")
 
 	iden := ast.IdentifierExpr{
 		Name:     name.Value,
@@ -17,7 +17,7 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 	}
 
 	if len(receivers) == 0 {
-		p.ctx.Reports.AddSyntaxError(p.fullPath, &iden.Location, "Expected receiver", report.PARSING_PHASE)
+		p.ctx.Reports.AddSyntaxError(p.fullPath, &iden.Location, "expected receiver", report.PARSING_PHASE)
 		return nil
 	}
 

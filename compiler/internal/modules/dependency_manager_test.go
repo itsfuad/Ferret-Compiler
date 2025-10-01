@@ -2,7 +2,6 @@ package modules
 
 import (
 	"compiler/config"
-	"compiler/constants"
 	"compiler/internal/testutil"
 	"fmt"
 	"os"
@@ -222,7 +221,7 @@ output = "bin"
 path = "backup"
 `)
 
-	return os.WriteFile(filepath.Join(moduleDir, constants.CONFIG_FILE), []byte(configContent.String()), 0644)
+	return os.WriteFile(filepath.Join(moduleDir, config.CONFIG_FILE), []byte(configContent.String()), 0644)
 }
 
 // Wrapper methods to use mocked versions
@@ -262,7 +261,7 @@ func setupTestDependencyManager(t *testing.T) (*testDependencyManager, string) {
 [cache]
 path = "backup"
 `
-	if err := os.WriteFile(filepath.Join(projectRoot, constants.CONFIG_FILE), []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(projectRoot, config.CONFIG_FILE), []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to create fer.ret file: %v", err)
 	}
 

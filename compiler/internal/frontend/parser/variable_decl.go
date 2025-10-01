@@ -17,7 +17,7 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableToDeclare, int) {
 	for {
 		if !p.check(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.MISSING_NAME, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected variable name", report.PARSING_PHASE)
 			return nil, 0
 		}
 		identifierName := p.advance()
@@ -51,7 +51,7 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 		typeNode, ok := parseType(p)
 		if !ok {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_TYPE, report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected type after ':'", report.PARSING_PHASE)
 			return nil, false
 		}
 		types = append(types, typeNode)
@@ -72,7 +72,7 @@ func parseValueList(p *Parser) ([]ast.Expression, bool) {
 		value := parseExpression(p)
 		if value == nil {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected valid expression", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected valid expression", report.PARSING_PHASE)
 			return nil, false
 		}
 		values = append(values, value)
@@ -103,7 +103,9 @@ func assignTypes(p *Parser, variables []*ast.VariableToDeclare, types []ast.Data
 		return true
 	}
 	token := p.peek()
-	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), report.MISMATCHED_VARIABLE_AND_TYPE_COUNT+fmt.Sprintf(": Expected %d types, got %d", varCount, len(types)), report.PARSING_PHASE)
+	//p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), fmt.Sprintf("expected %d types for explicit type binding or 1 for all but got %d", varCount, len(types)), report.PARSING_PHASE)
+	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "mismatched variable and type count", report.PARSING_PHASE).
+		AddHint(fmt.Sprintf("expected %d types for explicit type binding or 1 for all but got %d", varCount, len(types)))
 	return false
 }
 

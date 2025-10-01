@@ -90,7 +90,7 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 		r.Ctx.Reports.AddCriticalError(
 			r.Program.FullPath,
 			e.Loc(),
-			fmt.Sprintf("Unsupported expression type <%T> for type inference", e),
+			fmt.Sprintf("unsupported expression type <%T> for type inference", e),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -221,7 +221,7 @@ func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccess
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			fieldAccess.Loc(),
-			"Invalid field access expression",
+			"invalid field access expression",
 			report.TYPECHECK_PHASE,
 		)
 		return &stype.Invalid{}
@@ -253,7 +253,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
-			fmt.Sprintf("Struct has no field named %q", propName),
+			fmt.Sprintf("struct has no field named %q", propName),
 			report.TYPECHECK_PHASE,
 		)
 		return &stype.Invalid{} // Field not found
@@ -267,7 +267,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			location,
-			fmt.Sprintf("Interface has no method named %q", propName),
+			fmt.Sprintf("interface has no method named %q", propName),
 			report.TYPECHECK_PHASE,
 		)
 		return &stype.Invalid{} // Method not found
@@ -281,7 +281,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				location,
-				fmt.Sprintf("Unknown user type %q", userType.Name),
+				fmt.Sprintf("unknown user type %q", userType.Name),
 				report.TYPECHECK_PHASE,
 			)
 			return &stype.Invalid{} // User type not found
@@ -292,7 +292,7 @@ func checkStructFieldOrMethodAccess(r *analyzer.AnalyzerNode, objectType stype.T
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				location,
-				fmt.Sprintf("User type %q has no method or field named %q", userType.Name, propName),
+				fmt.Sprintf("user type %q has no method or field named %q", userType.Name, propName),
 				report.TYPECHECK_PHASE,
 			)
 			return &stype.Invalid{} // Method/field not found
@@ -312,7 +312,7 @@ func findStructField(structType *stype.StructType, fieldName string) stype.Type 
 	return &stype.Invalid{}
 }
 
-// checkStructLiteralType handles struct literal expressions like Person{name: "Alice", age: 30} or struct{x: 10, y: 20}
+// checkStructLiteralType handles struct literal expressions like Person{name: "alice", age: 30} or struct{x: 10, y: 20}
 func checkStructLiteralType(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) stype.Type {
 	// Check if this is an anonymous struct or named struct
 	if structLiteral.IsAnonymous || structLiteral.StructName == nil {
@@ -331,7 +331,7 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				structLiteral.Loc(),
-				"Anonymous struct field must have a name",
+				"anonymous struct field must have a name",
 				report.TYPECHECK_PHASE,
 			)
 			continue
@@ -349,7 +349,7 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				&field.Location,
-				"Anonymous struct field must have a value",
+				"anonymous struct field must have a value",
 				report.TYPECHECK_PHASE,
 			)
 		}
@@ -361,7 +361,7 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 	}
 }
 
-// checkNamedStructLiteral handles named struct literals like @Person{name: "Alice", age: 30}
+// checkNamedStructLiteral handles named struct literals like @Person{name: "alice", age: 30}
 func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.StructLiteralExpr, cm *modules.Module) *stype.UserType {
 	// Look up the struct type by name
 	structTypeName := structLiteral.StructName.Name
@@ -370,7 +370,7 @@ func checkNamedStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.Struct
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			structLiteral.Loc(),
-			fmt.Sprintf("Unknown struct type %q", structTypeName),
+			fmt.Sprintf("unknown struct type %q", structTypeName),
 			report.TYPECHECK_PHASE,
 		)
 		return nil
@@ -419,7 +419,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 		expectedFieldType, exists := structType.Fields[fieldName]
 		if !exists {
 			r.Ctx.Reports.AddSemanticError(r.Program.FullPath, &field.Location,
-				fmt.Sprintf("Struct %q has no field named %q", structTypeName, fieldName),
+				fmt.Sprintf("struct %q has no field named %q", structTypeName, fieldName),
 				report.TYPECHECK_PHASE,
 			)
 			continue
@@ -440,7 +440,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 			rp := r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				&field.Location,
-				fmt.Sprintf("Field error: %s", err.Error()),
+				fmt.Sprintf("field error: %s", err.Error()),
 				report.TYPECHECK_PHASE,
 			)
 
@@ -456,7 +456,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				structLiteral.Loc(),
-				fmt.Sprintf("Missing required field %q in struct literal for %q", fieldName, structTypeName),
+				fmt.Sprintf("missing required field %q in struct literal for %q", fieldName, structTypeName),
 				report.TYPECHECK_PHASE,
 			)
 		}

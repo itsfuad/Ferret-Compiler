@@ -9,7 +9,6 @@ import (
 
 	"compiler/colors"
 	"compiler/config"
-	"compiler/constants"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/modules"
 	"compiler/internal/symbol"
@@ -155,7 +154,7 @@ func (c *CompilerContext) validateResolvedPath(resolvedPath, importPath string) 
 	}
 
 	// Add extension and check if file exists
-	finalPath := resolvedPath + constants.EXT
+	finalPath := resolvedPath + config.EXT
 	if !fs.IsValidFile(finalPath) {
 		fmt.Printf("Final path: %s\n", finalPath)
 		return "", fmt.Errorf("module %q does not exist", importPath)
@@ -421,7 +420,7 @@ func NewCompilerContext(projectConfig *config.ProjectConfig) *CompilerContext {
 	entryPoint = filepath.ToSlash(entryPoint) // Ensure forward slashes for consistency
 
 	// Set up remote module cache path
-	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, constants.CACHE_DIR)
+	remoteCachePath := filepath.Join(projectConfig.ProjectRoot, config.CACHE_DIR)
 	remoteCachePath = filepath.ToSlash(remoteCachePath)
 	os.MkdirAll(remoteCachePath, 0755)
 

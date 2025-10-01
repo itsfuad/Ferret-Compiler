@@ -12,7 +12,7 @@ import (
 func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm *modules.Module) {
 	for _, variable := range decl.Variables {
 		if variable.Identifier.Name == "" {
-			c.Ctx.Reports.AddSemanticError(c.Program.FullPath, variable.Identifier.Loc(), "Variable identifier cannot be empty", report.COLLECTOR_PHASE)
+			c.Ctx.Reports.AddSemanticError(c.Program.FullPath, variable.Identifier.Loc(), "variable identifier cannot be empty", report.COLLECTOR_PHASE)
 			continue
 		}
 
@@ -20,11 +20,11 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 		variableSymbol := symbol.NewSymbolWithLocation(variable.Identifier.Name, symbol.SymbolVar, nil, variable.Identifier.Loc())
 		err := cm.SymbolTable.Declare(variable.Identifier.Name, variableSymbol)
 		if err != nil {
-			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, variable.Identifier.Loc(), "Failed to declare variable symbol: "+err.Error(), report.COLLECTOR_PHASE)
+			c.Ctx.Reports.AddCriticalError(c.Program.FullPath, variable.Identifier.Loc(), "failed to declare variable symbol: "+err.Error(), report.COLLECTOR_PHASE)
 			continue
 		}
 		if c.Debug {
-			colors.GREEN.Printf("Declared variable symbol %q (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
+			colors.GREEN.Printf("declared variable symbol %q (incomplete) at %s\n", variable.Identifier.Name, variable.Identifier.Loc())
 		}
 	}
 	// Collect initializers if any
@@ -34,7 +34,7 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 		}
 		collectSymbols(c, initializer, cm) // Collect symbols from the initializer expression
 		if c.Debug {
-			colors.GREEN.Printf("Collected symbols from initializer at %s\n", initializer.Loc())
+			colors.GREEN.Printf("collected symbols from initializer at %s\n", initializer.Loc())
 		}
 	}
 }
@@ -42,7 +42,7 @@ func collectVariableSymbols(c *analyzer.AnalyzerNode, decl *ast.VarDeclStmt, cm 
 func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *modules.Module) {
 	aliasName := decl.Alias.Name
 	if aliasName == "" {
-		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, decl.Alias.Loc(), "Type alias name cannot be empty", report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddSemanticError(c.Program.FullPath, decl.Alias.Loc(), "type alias name cannot be empty", report.COLLECTOR_PHASE)
 		return
 	}
 
@@ -51,10 +51,10 @@ func collectTypeSymbol(c *analyzer.AnalyzerNode, decl *ast.TypeDeclStmt, cm *mod
 
 	err := cm.SymbolTable.Declare(aliasName, typeSymbol)
 	if err != nil {
-		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, decl.Alias.Loc(), "Failed to declare type symbol: "+err.Error(), report.COLLECTOR_PHASE)
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, decl.Alias.Loc(), "failed to declare type symbol: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
 	if c.Debug {
-		colors.GREEN.Printf("Declared type symbol %q (incomplete) at %s\n", aliasName, decl.Alias.Loc())
+		colors.GREEN.Printf("declared type symbol %q (incomplete) at %s\n", aliasName, decl.Alias.Loc())
 	}
 }

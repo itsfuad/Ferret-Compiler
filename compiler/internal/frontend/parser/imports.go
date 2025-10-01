@@ -16,8 +16,8 @@ import (
 // parseImport parses an import statement
 func parseImport(p *Parser) ast.Node {
 
-	start := p.consume(lexer.IMPORT_TOKEN, report.EXPECTED_IMPORT_KEYWORD)
-	importToken := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
+	start := p.advance() // consume 'import'
+	importToken := p.consume(lexer.STRING_TOKEN, "expected import module path as string")
 
 	importpath := importToken.Value
 
@@ -25,7 +25,7 @@ func parseImport(p *Parser) ast.Node {
 	var alias string
 	if p.match(lexer.AS_TOKEN) {
 		p.advance() // consume 'as'
-		aliasToken := p.consume(lexer.IDENTIFIER_TOKEN, "Expected identifier after 'as' in import")
+		aliasToken := p.consume(lexer.IDENTIFIER_TOKEN, "expected identifier after 'as' in import")
 		alias = aliasToken.Value
 	} else {
 		alias = fs.LastPart(importpath)
@@ -66,7 +66,7 @@ func parseImport(p *Parser) ast.Node {
 		currentModule := p.importPath
 		targetModule := importpath
 
-		cycleMsg := fmt.Sprintf("Import cycle detected: %s\n - %q cannot import %q (already in dependency path)",
+		cycleMsg := fmt.Sprintf("import cycle detected: %s\n - %q cannot import %q (already in dependency path)",
 			cycleStr, currentModule, targetModule)
 		p.ctx.Reports.AddCriticalError(p.fullPath, &loc, cycleMsg, report.PARSING_PHASE)
 		return stmt
@@ -76,7 +76,7 @@ func parseImport(p *Parser) ast.Node {
 	if !p.ctx.IsModuleParsed(importpath) {
 		module := NewParserWithImportPath(moduleFullPath, importpath, p.ctx, p.debug).Parse()
 		if module == nil {
-			p.ctx.Reports.AddSemanticError(p.fullPath, &loc, "Failed to parse imported module", report.PARSING_PHASE)
+			p.ctx.Reports.AddSemanticError(p.fullPath, &loc, "failed to parse imported module", report.PARSING_PHASE)
 			return &ast.ImportStmt{Location: loc}
 		}
 	}
@@ -90,15 +90,15 @@ func shouldSkip(p *Parser, loc *source.Location, config *config.ProjectConfig, i
 	if modType != modules.LOCAL && modType != modules.BUILTIN {
 		con := p.ctx.ProjectStack.Peek()
 		if modType == modules.NEIGHBOR && !con.External.AllowExternalImport {
-			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import neighbor module %q as your project disabled neighbor project access", importPath), report.PARSING_PHASE).AddHint("enable allow-external-import=true in <project_root>/fer.ret")
+			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("cannot import neighbor module %q as your project disabled neighbor project access", importPath), report.PARSING_PHASE).AddHint("enable allow-external-import=true in <project_root>/fer.ret")
 			return true
 		} else if modType == modules.REMOTE && !con.External.AllowRemoteImport {
-			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Cannot import remote module %q as your project disabled remote imports", importPath), report.PARSING_PHASE).AddHint("enable allow-remote-import=true in <project_root>/fer.ret")
+			p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("cannot import remote module %q as your project disabled remote imports", importPath), report.PARSING_PHASE).AddHint("enable allow-remote-import=true in <project_root>/fer.ret")
 			return true
 		}
 	}
 	if modType == modules.BUILTIN && !config.External.AllowSharing {
-		p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("Module %q is not enabled for sharing", importPath), report.PARSING_PHASE)
+		p.ctx.Reports.AddError(p.fullPath, loc, fmt.Sprintf("module %q is not enabled for sharing", importPath), report.PARSING_PHASE)
 		return true
 	}
 	return false
@@ -107,10 +107,10 @@ func shouldSkip(p *Parser, loc *source.Location, config *config.ProjectConfig, i
 func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	// Handle scope resolution operator
 	if module, ok := expr.(*ast.IdentifierExpr); ok {
-		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
+		p.advance()
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.peek()
-			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'", report.PARSING_PHASE)
+			p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "expected identifier after '::'", report.PARSING_PHASE)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -121,6 +121,6 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		}, true
 	}
 	token := p.peek()
-	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier", report.PARSING_PHASE)
+	p.ctx.Reports.AddSyntaxError(p.fullPath, source.NewLocation(&token.Start, &token.End), "left side of '::' must be an identifier", report.PARSING_PHASE)
 	return nil, false
 }
