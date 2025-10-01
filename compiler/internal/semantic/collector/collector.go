@@ -19,15 +19,18 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 			// Already processed or in a later phase, skip
 			if c.Debug {
 				colors.BLUE.Printf("skipping collection for %q (already in phase: %s)\n", c.Program.FullPath, currentPhase)
+				colors.BLUE.Printf("skipping collection for %q (already in phase: %s)\n", c.Program.FullPath, currentPhase)
 			}
 			return
 		}
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "module not ready for symbol collection phase", report.COLLECTOR_PHASE)
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "module not ready for symbol collection phase", report.COLLECTOR_PHASE)
 		return
 	}
 
 	currentModule, err := c.Ctx.GetModule(importPath)
 	if err != nil {
+		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "failed to get current module: "+err.Error(), report.COLLECTOR_PHASE)
 		c.Ctx.Reports.AddCriticalError(c.Program.FullPath, c.Program.Loc(), "failed to get current module: "+err.Error(), report.COLLECTOR_PHASE)
 		return
 	}
@@ -40,6 +43,7 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 	c.Ctx.SetModulePhase(importPath, modules.PHASE_COLLECTED)
 
 	if c.Debug {
+		colors.BLUE.Printf("collected symbols for %q\n", c.Program.FullPath)
 		colors.BLUE.Printf("collected symbols for %q\n", c.Program.FullPath)
 	}
 }
