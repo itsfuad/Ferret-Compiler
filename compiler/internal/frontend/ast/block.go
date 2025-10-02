@@ -25,7 +25,7 @@ func (f *FunctionDecl) Loc() *source.Location { return &f.Location }
 
 // IfStmt represents an if statement with optional else and else-if branches
 type IfStmt struct {
-	Condition   *Expression
+	Condition   Expression
 	Body        *Block
 	Alternative Node
 	source.Location

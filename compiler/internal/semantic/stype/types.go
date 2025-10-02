@@ -90,7 +90,16 @@ func (f *FunctionType) String() string {
 		paramStrs = append(paramStrs, fmt.Sprintf("%s: %s", param.Name, param.Type))
 	}
 
-	return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType)
+	//dynamically generate string representation, fn() with no params, fn(...) with no return type, fn(...) -> type with return type
+	if len(paramStrs) == 0 && f.ReturnType == nil {
+		return "fn()"
+	} else if len(paramStrs) == 0 && f.ReturnType != nil {
+		return fmt.Sprintf("fn() -> %s", f.ReturnType)
+	} else if len(paramStrs) > 0 && f.ReturnType == nil {
+		return fmt.Sprintf("fn(%s)", strings.Join(paramStrs, ", "))
+	} else {
+		return fmt.Sprintf("fn(%s) -> %s", strings.Join(paramStrs, ", "), f.ReturnType)
+	}
 }
 
 // InterfaceType represents interface types with method signatures

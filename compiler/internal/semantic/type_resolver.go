@@ -177,7 +177,7 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Modu
 		}
 		params = append(params, stype.ParamsType{Name: param.Identifier.Name, Type: paramType, IsVariadic: param.IsVariadic})
 	}
-	var returnType stype.Type
+	var returnType stype.Type = &stype.PrimitiveType{TypeName: types.VOID} // Default to void
 	if function.ReturnType != nil {
 		retType, err := DeriveSemanticType(function.ReturnType, module)
 		if err != nil {
@@ -185,6 +185,7 @@ func deriveSemanticFunctionType(function *ast.FunctionType, module *modules.Modu
 		}
 		returnType = retType
 	}
+
 	return &stype.FunctionType{
 		Parameters: params,
 		ReturnType: returnType,

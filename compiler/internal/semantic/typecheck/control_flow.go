@@ -34,7 +34,7 @@ func checkIfStmt(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Modul
 }
 
 // checkIfCondition ensures the condition evaluates to a boolean type
-func checkIfCondition(r *analyzer.AnalyzerNode, condition *ast.Expression, cm *modules.Module) {
+func checkIfCondition(r *analyzer.AnalyzerNode, condition ast.Expression, cm *modules.Module) {
 	if condition == nil {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
@@ -45,11 +45,11 @@ func checkIfCondition(r *analyzer.AnalyzerNode, condition *ast.Expression, cm *m
 		return
 	}
 
-	conditionType := evaluateExpressionType(r, *condition, cm)
+	conditionType := evaluateExpressionType(r, condition, cm)
 	if conditionType == nil {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			(*condition).Loc(),
+			condition.Loc(),
 			"cannot determine type of if condition",
 			report.TYPECHECK_PHASE,
 		)
@@ -60,7 +60,7 @@ func checkIfCondition(r *analyzer.AnalyzerNode, condition *ast.Expression, cm *m
 	if !semantic.IsBoolType(conditionType) {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			(*condition).Loc(),
+			condition.Loc(),
 			fmt.Sprintf("if condition must be boolean, got %q", conditionType),
 			report.TYPECHECK_PHASE,
 		)
@@ -113,11 +113,11 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 	}
 
 	// This return has a value
-	returnValueType := evaluateExpressionType(r, *returnStmt.Value, cm)
+	returnValueType := evaluateExpressionType(r, returnStmt.Value, cm)
 	if returnValueType == nil {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			(*returnStmt.Value).Loc(),
+			returnStmt.Value.Loc(),
 			"cannot determine type of return value",
 			report.TYPECHECK_PHASE,
 		)

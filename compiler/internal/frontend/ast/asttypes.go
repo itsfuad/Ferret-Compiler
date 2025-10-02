@@ -125,8 +125,8 @@ type Parameter struct {
 
 type StructField struct {
 	FieldIdentifier *IdentifierExpr
-	FieldType       DataType    // nil for literal
-	FieldValue      *Expression // nil for type
+	FieldType       DataType   // nil for literal
+	FieldValue      Expression // nil for type
 	source.Location
 }
 

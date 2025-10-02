@@ -22,8 +22,8 @@ func checkIdentifierType(e *ast.IdentifierExpr, cm *modules.Module) stype.Type {
 
 // checkBinaryExprType infers the result type of binary expressions
 func checkBinaryExprType(r *analyzer.AnalyzerNode, e *ast.BinaryExpr, cm *modules.Module) stype.Type {
-	leftType := evaluateExpressionType(r, *e.Left, cm)
-	rightType := evaluateExpressionType(r, *e.Right, cm)
+	leftType := evaluateExpressionType(r, e.Left, cm)
+	rightType := evaluateExpressionType(r, e.Right, cm)
 
 	if leftType == nil || rightType == nil {
 		return &stype.Invalid{}
@@ -184,12 +184,12 @@ func checkArrayLiteralType(r *analyzer.AnalyzerNode, e *ast.ArrayLiteralExpr, cm
 
 // checkIndexableType infers types for array/map indexing
 func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modules.Module) stype.Type {
-	indexableType := evaluateExpressionType(r, *e.Indexable, cm)
+	indexableType := evaluateExpressionType(r, e.Indexable, cm)
 	if indexableType == nil {
 		return &stype.Invalid{}
 	}
 
-	indexType := evaluateExpressionType(r, *e.Index, cm)
+	indexType := evaluateExpressionType(r, e.Index, cm)
 	if indexType == nil {
 		return &stype.Invalid{}
 	}
@@ -197,7 +197,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 	if !semantic.IsIntegerType(indexType) {
 		r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
-			(*e.Index).Loc(),
+			e.Index.Loc(),
 			"array index must be an integer type",
 			report.TYPECHECK_PHASE,
 		)
@@ -216,7 +216,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 
 	r.Ctx.Reports.AddSemanticError(
 		r.Program.FullPath,
-		(*e.Indexable).Loc(),
+		e.Indexable.Loc(),
 		fmt.Sprintf("type %q is not indexable", indexableType),
 		report.TYPECHECK_PHASE,
 	)
@@ -224,7 +224,7 @@ func checkIndexableType(r *analyzer.AnalyzerNode, e *ast.IndexableExpr, cm *modu
 }
 
 func checkUnaryExprType(r *analyzer.AnalyzerNode, e *ast.UnaryExpr, cm *modules.Module) stype.Type {
-	operandType := evaluateExpressionType(r, *e.Operand, cm)
+	operandType := evaluateExpressionType(r, e.Operand, cm)
 	if operandType == nil {
 		return &stype.Invalid{}
 	}
@@ -253,7 +253,7 @@ func checkUnaryExprType(r *analyzer.AnalyzerNode, e *ast.UnaryExpr, cm *modules.
 
 // checkPrefixExprType handles prefix increment/decrement operations (++x, --x)
 func checkPrefixExprType(r *analyzer.AnalyzerNode, e *ast.PrefixExpr, cm *modules.Module) stype.Type {
-	operandType := evaluateExpressionType(r, *e.Operand, cm)
+	operandType := evaluateExpressionType(r, e.Operand, cm)
 	if operandType == nil {
 		return &stype.Invalid{}
 	}
@@ -284,7 +284,7 @@ func checkPrefixExprType(r *analyzer.AnalyzerNode, e *ast.PrefixExpr, cm *module
 
 // checkPostfixExprType handles postfix increment/decrement operations (x++, x--)
 func checkPostfixExprType(r *analyzer.AnalyzerNode, e *ast.PostfixExpr, cm *modules.Module) stype.Type {
-	operandType := evaluateExpressionType(r, *e.Operand, cm)
+	operandType := evaluateExpressionType(r, e.Operand, cm)
 	if operandType == nil {
 		return &stype.Invalid{}
 	}

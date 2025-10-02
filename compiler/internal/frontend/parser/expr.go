@@ -111,7 +111,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 	}
 
 	return &ast.ReturnStmt{
-		Value:    &value,
+		Value:    value,
 		Location: *source.NewLocation(&start, &end),
 	}
 }
@@ -143,11 +143,10 @@ func parseLogicalOr(p *Parser) ast.Expression {
 	for p.match(lexer.OR_TOKEN) {
 		operator := p.advance()
 		right := parseLogicalAnd(p)
-		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &left,
+			Left:     expr,
 			Operator: operator,
-			Right:    &right,
+			Right:    right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -162,11 +161,10 @@ func parseLogicalAnd(p *Parser) ast.Expression {
 	for p.match(lexer.AND_TOKEN) {
 		operator := p.advance()
 		right := parseEquality(p)
-		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &left,
+			Left:     expr,
 			Operator: operator,
-			Right:    &right,
+			Right:    right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -181,11 +179,10 @@ func parseEquality(p *Parser) ast.Expression {
 	for p.match(lexer.DOUBLE_EQUAL_TOKEN, lexer.NOT_EQUAL_TOKEN) {
 		operator := p.advance()
 		right := parseComparison(p)
-		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &left,
+			Left:     expr,
 			Operator: operator,
-			Right:    &right,
+			Right:    right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -200,11 +197,10 @@ func parseComparison(p *Parser) ast.Expression {
 	for p.match(lexer.LESS_TOKEN, lexer.GREATER_TOKEN, lexer.LESS_EQUAL_TOKEN, lexer.GREATER_EQUAL_TOKEN) {
 		operator := p.advance()
 		right := parseAdditive(p)
-		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &left,
+			Left:     expr,
 			Operator: operator,
-			Right:    &right,
+			Right:    right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -219,11 +215,10 @@ func parseAdditive(p *Parser) ast.Expression {
 	for p.match(lexer.PLUS_TOKEN, lexer.MINUS_TOKEN) {
 		operator := p.advance()
 		right := parseMultiplicative(p)
-		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &left,
+			Left:     expr,
 			Operator: operator,
-			Right:    &right,
+			Right:    right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -238,11 +233,10 @@ func parseMultiplicative(p *Parser) ast.Expression {
 	for p.match(lexer.MUL_TOKEN, lexer.DIV_TOKEN, lexer.MOD_TOKEN, lexer.EXP_TOKEN) {
 		operator := p.advance()
 		right := parseUnary(p)
-		left := expr // Create a copy to avoid circular reference
 		expr = &ast.BinaryExpr{
-			Left:     &left,
+			Left:     expr,
 			Operator: operator,
-			Right:    &right,
+			Right:    right,
 			Location: *source.NewLocation(expr.Loc().Start, right.Loc().End),
 		}
 	}
@@ -274,7 +268,7 @@ func handleNotNegative(p *Parser) ast.Expression {
 	right := parseUnary(p)
 	return &ast.UnaryExpr{
 		Operator: operator,
-		Operand:  &right,
+		Operand:  right,
 		Location: *source.NewLocation(&operator.Start, right.Loc().End),
 	}
 }
@@ -308,7 +302,7 @@ func handlePlusMinus(p *Parser) ast.Expression {
 
 	return &ast.PrefixExpr{
 		Operator: operator,
-		Operand:  &operand,
+		Operand:  operand,
 		Location: *source.NewLocation(&operator.Start, operand.Loc().End),
 	}
 }
@@ -323,7 +317,7 @@ func handleSpread(p *Parser) ast.Expression {
 	}
 
 	return &ast.SpreadExpr{
-		Expression: &right,
+		Expression: right,
 		Location:   *source.NewLocation(&operator.Start, right.Loc().End),
 	}
 }
@@ -341,7 +335,7 @@ func parseCast(p *Parser) ast.Expression {
 		}
 
 		return &ast.CastExpr{
-			Value:      &expr,
+			Value:      expr,
 			TargetType: targetType,
 			Location:   *source.NewLocation(expr.Loc().Start, targetType.Loc().End),
 		}
@@ -364,8 +358,8 @@ func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 
 	end := p.consume(lexer.CLOSE_BRACKET, "expected ']' after index expression")
 	return &ast.IndexableExpr{
-		Indexable: &expr,
-		Index:     &index,
+		Indexable: expr,
+		Index:     index,
 		Location:  *source.NewLocation(start, &end.End),
 	}, true
 }
@@ -382,7 +376,7 @@ func parseIncDec(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 		return nil, false
 	}
 	return &ast.PostfixExpr{
-		Operand:  &expr,
+		Operand:  expr,
 		Operator: operator,
 		Location: *source.NewLocation(expr.Loc().Start, &operator.End),
 	}, true
@@ -477,7 +471,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) 
 	end := p.consume(lexer.CLOSE_PAREN, "expected ')' after function arguments")
 
 	return &ast.FunctionCallExpr{
-		Caller:    &caller,
+		Caller:    caller,
 		Arguments: arguments,
 		Location:  *source.NewLocation(start, &end.End),
 	}, true

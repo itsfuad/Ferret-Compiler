@@ -52,7 +52,7 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 				Name:     fieldName.Value,
 				Location: *source.NewLocation(&fieldName.Start, &fieldName.End),
 			},
-			FieldValue: &value,
+			FieldValue: value,
 			Location:   *source.NewLocation(&fieldName.Start, value.Loc().End),
 		})
 
@@ -123,7 +123,7 @@ func parseFieldAccess(p *Parser, object ast.Expression) (ast.Expression, bool) {
 	}
 
 	return &ast.FieldAccessExpr{
-		Object:   &object,
+		Object:   object,
 		Field:    field,
 		Location: *source.NewLocation(object.Loc().Start, &fieldToken.End),
 	}, true

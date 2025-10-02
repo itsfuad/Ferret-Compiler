@@ -18,27 +18,27 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 	case *ast.IdentifierExpr:
 		resolveIdentifier(r, e, cm)
 	case *ast.BinaryExpr:
-		resolveExpr(r, *e.Left, cm)
-		resolveExpr(r, *e.Right, cm)
+		resolveExpr(r, e.Left, cm)
+		resolveExpr(r, e.Right, cm)
 	case *ast.UnaryExpr:
-		resolveExpr(r, *e.Operand, cm)
+		resolveExpr(r, e.Operand, cm)
 	case *ast.PrefixExpr:
-		resolveExpr(r, *e.Operand, cm)
+		resolveExpr(r, e.Operand, cm)
 	case *ast.PostfixExpr:
-		resolveExpr(r, *e.Operand, cm)
+		resolveExpr(r, e.Operand, cm)
 	case *ast.FunctionCallExpr:
 		// Resolve the caller expression
-		resolveExpr(r, *e.Caller, cm)
+		resolveExpr(r, e.Caller, cm)
 		// Resolve arguments
 		for _, arg := range e.Arguments {
 			resolveExpr(r, arg, cm)
 		}
 	case *ast.FieldAccessExpr:
-		resolveExpr(r, *e.Object, cm)
+		resolveExpr(r, e.Object, cm)
 	case *ast.VarScopeResolution:
 		resolveImportedSymbol(r, e, cm)
 	case *ast.SpreadExpr:
-		resolveExpr(r, *e.Expression, cm)
+		resolveExpr(r, e.Expression, cm)
 	// Literal expressions - no resolution needed, just validate they exist
 	case *ast.StringLiteral:
 		// String literals don't need resolution
@@ -57,10 +57,10 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 	case *ast.FunctionLiteral:
 		resolveFunctionLiteral(r, e, cm)
 	case *ast.IndexableExpr:
-		resolveExpr(r, *e.Indexable, cm)
-		resolveExpr(r, *e.Index, cm)
+		resolveExpr(r, e.Indexable, cm)
+		resolveExpr(r, e.Index, cm)
 	case *ast.CastExpr:
-		resolveExpr(r, *e.Value, cm)
+		resolveExpr(r, e.Value, cm)
 	default:
 		r.Ctx.Reports.AddCriticalError(r.Program.FullPath, expr.Loc(), fmt.Sprintf("expression <%T> is not implemented yet", e), report.RESOLVER_PHASE)
 	}
@@ -68,7 +68,7 @@ func resolveExpr(r *analyzer.AnalyzerNode, expr ast.Expression, cm *modules.Modu
 
 func resolveStructLiteral(r *analyzer.AnalyzerNode, structLit *ast.StructLiteralExpr, cm *modules.Module) {
 	for _, field := range structLit.Fields {
-		resolveExpr(r, *field.FieldValue, cm)
+		resolveExpr(r, field.FieldValue, cm)
 	}
 }
 

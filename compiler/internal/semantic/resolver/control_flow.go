@@ -10,7 +10,7 @@ import (
 func resolveIfStmt(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Module) {
 	// Resolve condition expression
 	if ifStmt.Condition != nil {
-		resolveExpr(r, *ifStmt.Condition, cm)
+		resolveExpr(r, ifStmt.Condition, cm)
 	}
 
 	// Resolve body block
@@ -28,6 +28,6 @@ func resolveIfStmt(r *analyzer.AnalyzerNode, ifStmt *ast.IfStmt, cm *modules.Mod
 func resolveReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *modules.Module) {
 	// Resolve the return value expression if present
 	if returnStmt.Value != nil {
-		resolveExpr(r, *returnStmt.Value, cm)
+		resolveExpr(r, returnStmt.Value, cm)
 	}
 }

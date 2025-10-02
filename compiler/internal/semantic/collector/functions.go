@@ -20,6 +20,10 @@ func collectFunctionSymbol(c *analyzer.AnalyzerNode, fn *ast.FunctionDecl, cm *m
 
 	collectFunctionParameters(c, fn.Function, functionScope)
 	collectFunctionBody(c, fn.Function, cm, functionScope)
+
+	if c.Debug {
+		colors.AQUA.Printf("collected function %q at %s\n", fn.Function.ID, fn.Loc())
+	}
 }
 
 func collectFunctionLiteral(c *analyzer.AnalyzerNode, fn *ast.FunctionLiteral, cm *modules.Module) {

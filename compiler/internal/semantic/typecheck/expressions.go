@@ -100,7 +100,7 @@ func evaluateExpressionType(r *analyzer.AnalyzerNode, expr ast.Expression, cm *m
 
 func checkSpreadExprType(r *analyzer.AnalyzerNode, expr *ast.SpreadExpr, cm *modules.Module) stype.Type {
 	// expr should be array
-	eType := evaluateExpressionType(r, *expr.Expression, cm)
+	eType := evaluateExpressionType(r, expr.Expression, cm)
 	if eType == nil {
 		return &stype.Invalid{}
 	}
@@ -121,7 +121,7 @@ func checkSpreadExprType(r *analyzer.AnalyzerNode, expr *ast.SpreadExpr, cm *mod
 
 func checkFunctionCallType(r *analyzer.AnalyzerNode, call *ast.FunctionCallExpr, cm *modules.Module) stype.Type {
 	// Get the type of the function being called
-	functionType := evaluateExpressionType(r, *call.Caller, cm)
+	functionType := evaluateExpressionType(r, call.Caller, cm)
 	if functionType == nil {
 		return &stype.Invalid{}
 	}
@@ -228,7 +228,7 @@ func checkFieldAccessType(r *analyzer.AnalyzerNode, fieldAccess *ast.FieldAccess
 	}
 
 	// Evaluate the object being accessed
-	objectType := evaluateExpressionType(r, *fieldAccess.Object, cm)
+	objectType := evaluateExpressionType(r, fieldAccess.Object, cm)
 	if objectType == nil {
 		return &stype.Invalid{} // Error already reported
 	}
@@ -341,7 +341,7 @@ func checkAnonymousStructLiteral(r *analyzer.AnalyzerNode, structLiteral *ast.St
 
 		// Get the type of the field value
 		if field.FieldValue != nil {
-			fieldType := evaluateExpressionType(r, *field.FieldValue, cm)
+			fieldType := evaluateExpressionType(r, field.FieldValue, cm)
 			if fieldType != nil {
 				fields[fieldName] = fieldType
 			}
@@ -430,7 +430,7 @@ func validateNamedStructFields(r *analyzer.AnalyzerNode, structLiteral *ast.Stru
 			return
 		}
 
-		actualFieldType := evaluateExpressionType(r, *field.FieldValue, cm)
+		actualFieldType := evaluateExpressionType(r, field.FieldValue, cm)
 
 		if actualFieldType == nil {
 			return

@@ -75,7 +75,7 @@ func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
-	Value *Expression
+	Value Expression
 	source.Location
 }
 

@@ -33,7 +33,7 @@ var auto_promote_map = map[types.TYPE_NAME][]types.TYPE_NAME{
 
 func checkCastExprType(r *analyzer.AnalyzerNode, cast *ast.CastExpr, cm *modules.Module) stype.Type {
 	// Evaluate the source expression type
-	sourceType := evaluateExpressionType(r, *cast.Value, cm)
+	sourceType := evaluateExpressionType(r, cast.Value, cm)
 	if sourceType == nil {
 		return &stype.Invalid{}
 	}

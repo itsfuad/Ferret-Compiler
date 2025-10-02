@@ -40,11 +40,30 @@ func checkSingleVariableDeclaration(r *analyzer.AnalyzerNode, variable *ast.Vari
 	}
 
 	// Case: no explicit type → just infer
+	shouldReturn := false
 	if variable.ExplicitType == nil {
 		variableInModule.Type = inferredType
 		if r.Debug {
 			colors.TEAL.Printf("inferred type %q for variable %q at %s\n", inferredType, variable.Identifier.Name, variable.Identifier.Loc())
 		}
+
+		shouldReturn = true
+	}
+
+	// if infered type is a function,
+	if _, isFunc := variableInModule.Type.(*stype.FunctionType); isFunc {
+		fnSig := variableInModule.Type.String()
+		//insert name after "fn "
+		fnSig = "fn " + variable.Identifier.Name + fnSig[2:]
+		r.Ctx.Reports.AddSemanticError(
+			r.Program.FullPath,
+			&variable.Identifier.Location,
+			fmt.Sprintf("function literal assigned to variable %q cannot be used before declaration", variable.Identifier.Name),
+			report.TYPECHECK_PHASE,
+		).AddHint(fmt.Sprintf("use '%s' instead for proper function declaration that can be used anywhere", fnSig))
+	}
+
+	if shouldReturn {
 		return
 	}
 

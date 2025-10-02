@@ -45,6 +45,9 @@ func CollectSymbols(c *analyzer.AnalyzerNode) {
 }
 
 func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module) {
+
+	fmt.Printf("Collecting symbols from node: %T\n", node)
+
 	if node == nil {
 		return
 	}
@@ -72,26 +75,27 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 		collectExprStmt(c, n, cm)
 	case *ast.SpreadExpr:
 		fmt.Printf("collecting symbols from spread expression: %v\n", n)
-		collectSymbols(c, *n.Expression, cm)
+		collectSymbols(c, n.Expression, cm)
 	case *ast.ReturnStmt:
-		collectSymbols(c, *n.Value, cm)
+		fmt.Printf("Return node: %v\n", (*n).Value)
+		collectSymbols(c, n.Value, cm)
 	case *ast.BinaryExpr:
 		// Recursively collect from both operands
 		if n.Left != nil {
-			collectSymbols(c, *n.Left, cm)
+			collectSymbols(c, n.Left, cm)
 		}
 		if n.Right != nil {
-			collectSymbols(c, *n.Right, cm)
+			collectSymbols(c, n.Right, cm)
 		}
 	case *ast.PrefixExpr:
 		// Recursively collect from the operand
 		if n.Operand != nil {
-			collectSymbols(c, *n.Operand, cm)
+			collectSymbols(c, n.Operand, cm)
 		}
 	case *ast.PostfixExpr:
 		// Recursively collect from the operand
 		if n.Operand != nil {
-			collectSymbols(c, *n.Operand, cm)
+			collectSymbols(c, n.Operand, cm)
 		}
 		// For other expressions and nodes, we don't need to collect symbols
 		// (literals, identifiers, etc. don't contain nested function literals)
@@ -101,7 +105,7 @@ func collectSymbols(c *analyzer.AnalyzerNode, node ast.Node, cm *modules.Module)
 func collectCall(c *analyzer.AnalyzerNode, callExpr *ast.FunctionCallExpr, cm *modules.Module) {
 	// Recursively collect from the caller (might be a function literal)
 	if callExpr.Caller != nil {
-		collectSymbols(c, *callExpr.Caller, cm)
+		collectSymbols(c, callExpr.Caller, cm)
 	}
 	// Recursively collect from arguments (might contain function literals)
 	for _, arg := range callExpr.Arguments {

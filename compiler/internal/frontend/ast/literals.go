@@ -51,8 +51,8 @@ func (b *ByteLiteral) Expr()                 {} // Expr is a marker interface fo
 func (b *ByteLiteral) Loc() *source.Location { return &b.Location }
 
 type IndexableExpr struct {
-	Indexable *Expression // The expression being indexed (array, map, etc.)
-	Index     *Expression // The index expression
+	Indexable Expression // The expression being indexed (array, map, etc.)
+	Index     Expression // The index expression
 	source.Location
 }
 

@@ -7,13 +7,21 @@ let z: str;                    // Declaration only (no initialization)
 
 const PI := 3.1416; 
 fn add() {
-    later();
+    //later();
     let rad := PI * 2 ** 2;
 }
 
-fn later() -> i32 {
-    return;
+// fn later() -> i32 {
+//     return 0;
+// }
+
+fn search(keyword: str, callback: fn()) {
+    callback();
 }
 
+const later := fn() -> i32 {
+    return 0;
+};
+
 // comment
-let x := a + ;
+//let x := a + ;
