@@ -117,6 +117,43 @@ Packages the VS Code language extension.
   ./scripts/pack.sh
   ```
 
+#### `lsp.bat` / `lsp.sh`
+Builds the Language Server Protocol (LSP) server.
+- **Purpose**: Creates the LSP server binary for IDE integration
+- **Output**: `bin/ferret-lsp.exe` (Windows) or `bin/ferret-lsp` (Unix)
+- **Usage**:
+  ```bash
+  # Windows Command Prompt/PowerShell
+  .\scripts\lsp.bat
+  
+  # Linux/macOS/Git Bash
+  ./scripts/lsp.sh
+  ```
+
+### Development Tools
+
+#### `symquery.bat` / `symquery.sh`
+Builds and runs the Symbol Query Server.
+- **Purpose**: Interactive/programmatic symbol information querying
+- **Features**: 
+  - Compiles project up to typecheck phase
+  - Interactive REPL for symbol exploration
+  - JSON mode for LSP/tooling integration
+  - Query symbols, modules, and statistics
+- **Usage**:
+  ```bash
+  # Windows Command Prompt/PowerShell
+  .\scripts\symquery.bat ..\app
+  .\scripts\symquery.bat ..\app --json
+  .\scripts\symquery.bat ..\app --debug
+  
+  # Linux/macOS/Git Bash
+  ./scripts/symquery.sh ../app
+  ./scripts/symquery.sh ../app --json
+  ./scripts/symquery.sh ../app --debug
+  ```
+- **See Also**: `symquery/README.md` for detailed documentation
+
 ## Usage Guidelines
 
 ### Before Committing

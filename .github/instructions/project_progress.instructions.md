@@ -215,6 +215,7 @@ ferret run --debug
 Make sure you add the `bin` directory to your `PATH` environment variable to run the `ferret` command from anywhere.
 
 ### Available Scripts
+Use powershell commands on Windows and bash commands on Unix systems:
 ```bash
 # Build compiler
 ./scripts/build.sh        # Unix

@@ -538,6 +538,63 @@ The project includes several convenience scripts in the `scripts/` directory:
 
 See `scripts/README.md` for detailed script documentation.
 
+### Symbol Query Server (symquery)
+
+The Symbol Query Server is a standalone tool that compiles Ferret projects up to the typecheck phase and provides an interactive or programmatic interface to query symbol information. This is particularly useful for LSP implementations and development tools.
+
+#### Features
+- Compiles projects and keeps symbol table in memory
+- Interactive REPL-style interface for exploring symbols
+- JSON mode for programmatic access (LSP integration)
+- Query symbols by name across all modules
+- View all symbols, modules, and compilation statistics
+
+#### Building
+```bash
+cd scripts
+./symquery.sh    # This will build and run (Linux/macOS/Git Bash)
+.\symquery.bat   # Windows CMD/PowerShell
+```
+
+Or build manually:
+```bash
+cd symquery
+go build -o symquery.exe
+```
+
+#### Usage
+
+**Interactive Mode:**
+```bash
+# From project root
+./symquery/symquery.exe app
+
+symquery> help
+symquery> query main
+symquery> list
+symquery> stats
+symquery> exit
+```
+
+**JSON Mode (for LSP integration):**
+```bash
+./symquery/symquery.exe app --json
+
+# Send JSON queries via stdin:
+{"command": "query", "symbol": "main"}
+{"command": "stats"}
+```
+
+**Available Commands:**
+- `query <symbol>` or `find <symbol>` - Find information about a specific symbol
+- `list` - List all symbols from all modules
+- `modules` - List all loaded modules
+- `stats` or `statistics` - Show compilation statistics
+- `help` - Show available commands
+- `exit` - Exit the server
+
+See `symquery/README.md` for detailed documentation and integration examples.
+
 ### Testing
 The project includes comprehensive tests for:
 - CLI argument parsing
