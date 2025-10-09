@@ -1,4 +1,4 @@
-//import "app/cmd/start";
+//import "demo-app/cmd/start";
 
 type String str;
 type Int i32;

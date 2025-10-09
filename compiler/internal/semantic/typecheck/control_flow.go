@@ -40,7 +40,6 @@ func checkIfCondition(r *analyzer.AnalyzerNode, condition ast.Expression, cm *mo
 			r.Program.FullPath,
 			nil,
 			"if statement missing condition",
-			"if statement missing condition",
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -93,7 +92,6 @@ func checkAlternative(r *analyzer.AnalyzerNode, alternative ast.Node, cm *module
 			r.Program.FullPath,
 			alternative.Loc(),
 			fmt.Sprintf("invalid alternative in if statement: %T", alternative),
-			fmt.Sprintf("invalid alternative in if statement: %T", alternative),
 			report.TYPECHECK_PHASE,
 		)
 	}
@@ -107,7 +105,6 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 			r.Ctx.Reports.AddSemanticError(
 				r.Program.FullPath,
 				returnStmt.Loc(),
-				fmt.Sprintf("function must return a value of type %q", expectedReturnType),
 				fmt.Sprintf("function must return a value of type %q", expectedReturnType),
 				report.TYPECHECK_PHASE,
 			)
@@ -133,7 +130,6 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 			r.Program.FullPath,
 			returnStmt.Loc(),
 			"void function cannot return a value",
-			"void function cannot return a value",
 			report.TYPECHECK_PHASE,
 		)
 		return
@@ -144,7 +140,6 @@ func checkReturnStmt(r *analyzer.AnalyzerNode, returnStmt *ast.ReturnStmt, cm *m
 		rp := r.Ctx.Reports.AddSemanticError(
 			r.Program.FullPath,
 			returnStmt.Loc(),
-			fmt.Sprintf("cannot return %q in function expecting %q: %s",
 			fmt.Sprintf("cannot return %q in function expecting %q: %s",
 				returnValueType, expectedReturnType, err.Error()),
 			report.TYPECHECK_PHASE,
@@ -225,7 +220,6 @@ func reportUnreachableCode(r *analyzer.AnalyzerNode, node ast.Node) {
 	r.Ctx.Reports.AddSemanticError(
 		r.Program.FullPath,
 		node.Loc(),
-		"unreachable code after return statement",
 		"unreachable code after return statement",
 		report.TYPECHECK_PHASE,
 	)
