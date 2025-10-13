@@ -1,7 +1,7 @@
 
 type Error interface {
     value() str;
-}
+};
 
 type NetworkError struct {
     message: str,
