@@ -32,14 +32,21 @@ geometry::area_circle(3.0);
 
 fn doSomething() {
     // This function does something
+    add(1, 5, voidfn);
+    //myfunc();
 }
 
-fn add(a: i32, b: i32) -> i32 {
+fn add(a: i32, b: i32, callback: fn()) -> i32 {
+
+    callback();
     return a + b;
 }
 
 let value := 10;
 
+// let myfunc := fn() {
+
+// };
 
 let myname := "Ferret";
 let byt := myname[0];

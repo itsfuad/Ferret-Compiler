@@ -55,6 +55,9 @@ fn isEven(number: i32) -> bool {
     } else {
         return false;
     }
+
+    // unreachable code
+    let unreachableVar := 100;
 }
 
 fn classify(score: i32) -> i32 {
@@ -80,12 +83,15 @@ fn complexLogic(x: i32, y: i32, z: i32) -> i32 {
             } else {
                 return 2; // x and y positive, z non-positive
             }
+            return 0;
         } else {
             return 3; // x positive, y non-positive
         }
     } else {
         return 4; // x non-positive
     }
+
+    return 0;
 }
 
 // Function that uses other functions

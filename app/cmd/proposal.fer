@@ -1,0 +1,32 @@
+
+// fetch returns a string or an error
+fn fetchData() -> str, error {
+
+    // dummy variable "dataAvailable" to simulate data availability
+    if !dataAvailable {
+        return Error("network down", 500)!; // "!" suffix indicates an error message
+    }
+
+    return "payload"; // successful return
+}
+
+fn main() {
+
+    // | value | { ... } is a closure that handles the error case for possible error return from functions
+    let data, _ := fetchData()
+
+
+
+
+    
+
+    print("Got: " + data);
+
+    // Optional types use Type? syntax. Value can be of the type or None.
+    // None is a constant representing absence of value.
+    let maybeUser: str? = None;
+    let name: str = maybeUser ?? "Guest"; // "??" operator provides a default value if the variable is None
+    print("Hello, " + name);
+}
+
+

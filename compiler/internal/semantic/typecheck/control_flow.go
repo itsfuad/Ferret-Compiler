@@ -161,8 +161,8 @@ func analyzeControlFlow(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.
 	hasConditionals := false
 
 	// Process all nodes in the block
-	earlyReturn, hasConditionals := processBlockNodes(r, block, cm, expectedReturnType, &result, &conditionalResults, hasConditionals)
-	if earlyReturn {
+	foundReturn, hasConditionals := processBlockNodes(r, block, cm, expectedReturnType, &result, &conditionalResults, hasConditionals)
+	if foundReturn {
 		return result
 	}
 
@@ -179,15 +179,20 @@ func createEmptyControlFlowResult() ControlFlowResult {
 	}
 }
 
-// processBlockNodes processes all nodes in a block and returns early if return found
+// processBlockNodes processes all nodes in a block and detects unreachable code
 func processBlockNodes(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.Module, expectedReturnType stype.Type,
 	result *ControlFlowResult, conditionalResults *[]ControlFlowResult, hasConditionals bool) (bool, bool) {
 
 	reachable := true
+	foundReturn := false
+	var unreachableStart *source.Location
 
 	for _, node := range block.Nodes {
 		if !reachable {
-			reportUnreachableCode(r, node)
+			// Mark the start of unreachable section on first unreachable node
+			if unreachableStart == nil {
+				unreachableStart = node.Loc()
+			}
 			continue
 		}
 
@@ -198,28 +203,35 @@ func processBlockNodes(r *analyzer.AnalyzerNode, block *ast.Block, cm *modules.M
 			if !hasConditionals {
 				result.HasFallbackReturn = true
 			}
-			return true, hasConditionals // Early return found
+			reachable = false // Mark subsequent code as unreachable
+			foundReturn = true
 		case *ast.IfStmt:
 			hasConditionals = true
 			ifResult := analyzeIfStatement(r, n, cm, expectedReturnType)
 			*conditionalResults = append(*conditionalResults, ifResult)
 			if ifResult.AllPathsReturn {
 				result.AllPathsReturn = true
-				return true, hasConditionals // All paths in if statement return
+				reachable = false // Mark subsequent code as unreachable
+				foundReturn = true
 			}
 		default:
 			checkNode(r, node, cm)
 		}
 	}
 
-	return false, hasConditionals
+	// Report unreachable section once if any was found
+	if unreachableStart != nil {
+		reportUnreachableSection(r, unreachableStart)
+	}
+
+	return foundReturn, hasConditionals
 }
 
-// reportUnreachableCode reports unreachable code after return
-func reportUnreachableCode(r *analyzer.AnalyzerNode, node ast.Node) {
+// reportUnreachableSection reports a section of unreachable code after return
+func reportUnreachableSection(r *analyzer.AnalyzerNode, startLoc *source.Location) {
 	r.Ctx.Reports.AddSemanticError(
 		r.Program.FullPath,
-		node.Loc(),
+		startLoc,
 		"unreachable code after return statement",
 		report.TYPECHECK_PHASE,
 	)

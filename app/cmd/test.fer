@@ -25,3 +25,51 @@ const later := fn() -> i32 {
 
 // comment
 //let x := a + ;
+
+
+// type Point struct {
+//     .x: i32,
+//     .y: i32
+// };
+
+// let p := Point { .x = 12, .y = 38 };
+
+// print(p.x)
+
+// -------------------
+
+// type Point struct {
+//     x: i32,
+//     y: i32
+// };
+
+// let p := @Point { x: 12, y: 29 };
+
+
+// // Optional types
+
+// let res : str?; // string or None
+// res = "hello"; // valid
+// res = None; // valid
+
+// let data: str = res ?? "No value"; // if res is None, assign "No value" to data
+
+// // if res != None {
+// //     print(res);
+// // } else {
+// //     print("no value");
+// // }
+
+// // Error return from functions
+// fn mayFail() -> str ! {
+//     if dataAvalable {
+//         return "Data";
+//     } else {
+//         return "Error occurred"!;
+//     }
+// }
+
+// let result: str = mayFail() | error | {
+//     print("Handling error: " + error);
+//     return;
+// }
