@@ -1,10 +1,23 @@
 
+type Error interface {
+    value() str;
+}
+
+type NetworkError struct {
+    message: str,
+    code: i32
+};
+
+fn (e NetworkError) value() str {
+    return "Error " + e.message;
+}
+
 // fetch returns a string or an error
-fn fetchData() -> str, error {
+fn fetchData() -> str ! NetworkError {
 
     // dummy variable "dataAvailable" to simulate data availability
     if !dataAvailable {
-        return Error("network down", 500)!; // "!" suffix indicates an error message
+        return @NetworkError { message: "Network failure", code: 500 }!;
     }
 
     return "payload"; // successful return
@@ -13,12 +26,9 @@ fn fetchData() -> str, error {
 fn main() {
 
     // | value | { ... } is a closure that handles the error case for possible error return from functions
-    let data, _ := fetchData()
-
-
-
-
-    
+    let data := fetchData() | err | {
+        print("Fetch failed: " + err.value());
+    }
 
     print("Got: " + data);
 
